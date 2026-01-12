@@ -268,7 +268,7 @@ export default function WorkoutsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-2xl font-bold">Liste des Entraînements</h1>
@@ -280,14 +280,19 @@ export default function WorkoutsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="primary" leftIcon={<Plus className="h-4 w-4" />}>
+        <div className="flex flex-wrap items-center gap-3 justify-end">
+          <Button
+            variant="primary"
+            leftIcon={<Plus className="h-4 w-4" />}
+            className="w-full sm:w-auto"
+          >
             Ajouter manuel
           </Button>
           <Button
             variant="secondary"
             leftIcon={<Download className="h-4 w-4" />}
             onClick={handleExportCSV}
+            className="w-full sm:w-auto"
           >
             Export CSV
           </Button>

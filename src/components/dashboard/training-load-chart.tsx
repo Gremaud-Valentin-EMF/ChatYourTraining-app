@@ -36,6 +36,8 @@ export function TrainingLoadChart({
 }: TrainingLoadChartProps) {
   const [period, setPeriod] = useState<"7" | "30" | "90">("30");
   const [isMounted, setIsMounted] = useState(false);
+  const [hoverData, setHoverData] = useState<TrainingLoadData | null>(null);
+  const [hoverLabel, setHoverLabel] = useState<string>("");
 
   // Ensure component is mounted before rendering chart (fixes hydration issues)
   useEffect(() => {
@@ -60,6 +62,8 @@ export function TrainingLoadChart({
 
   const tsbStatus = getTsbStatus(currentTsb);
   const hasData = data.length > 0;
+  const fallbackData = data[data.length - 1] || null;
+  const displayData = hoverData || fallbackData;
 
   return (
     <Card className="col-span-full lg:col-span-2">
@@ -135,13 +139,58 @@ export function TrainingLoadChart({
           </div>
 
           {/* Chart */}
-          <div
-            className="h-64 min-h-[256px]"
-            style={{ width: "100%", height: 256 }}
-          >
+          <div className="px-1 sm:px-0">
+            {displayData && (
+              <div className="grid grid-cols-3 gap-3 mb-4 text-center text-xs sm:text-sm">
+                <div className="p-2 bg-dark-100 rounded-xl">
+                  <p className="text-muted uppercase">CTL</p>
+                  <p className="text-lg font-semibold text-secondary">
+                    {Math.round(displayData.ctl)}
+                  </p>
+                </div>
+                <div className="p-2 bg-dark-100 rounded-xl">
+                  <p className="text-muted uppercase">ATL</p>
+                  <p className="text-lg font-semibold text-warning">
+                    {Math.round(displayData.atl)}
+                  </p>
+                </div>
+                <div className="p-2 bg-dark-100 rounded-xl">
+                  <p className="text-muted uppercase">TSB</p>
+                  <p className="text-lg font-semibold text-accent">
+                    {displayData.tsb > 0 ? "+" : ""}
+                    {Math.round(displayData.tsb)}
+                  </p>
+                  {hoverLabel && (
+                    <p className="text-[10px] uppercase text-muted mt-1">
+                      {hoverLabel}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="h-64 min-h-[256px] px-1 sm:px-0">
             {isMounted && (
               <ResponsiveContainer width="100%" height={256}>
-                <LineChart data={filteredData}>
+                <LineChart
+                  data={filteredData}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  onMouseMove={(state: any) => {
+                    const payload = state?.activePayload as
+                      | { payload: TrainingLoadData }[]
+                      | undefined;
+                    if (payload && payload.length > 0) {
+                      const datum = payload[0].payload as TrainingLoadData;
+                      setHoverData(datum);
+                      setHoverLabel(formatDate(payload[0].payload.date));
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    setHoverData(null);
+                    setHoverLabel("");
+                  }}
+                >
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="var(--dark-200)"
@@ -153,14 +202,7 @@ export function TrainingLoadChart({
                     fontSize={12}
                   />
                   <YAxis stroke="var(--muted)" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--dark-50)",
-                      border: "1px solid var(--dark-200)",
-                      borderRadius: "12px",
-                    }}
-                    labelFormatter={formatDate}
-                  />
+                  <Tooltip wrapperStyle={{ display: "none" }} />
                   <Legend />
                   <Line
                     type="monotone"

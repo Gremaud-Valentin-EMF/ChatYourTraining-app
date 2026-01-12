@@ -410,19 +410,19 @@ export default function HealthPage() {
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
               <div className="h-16 w-16 bg-dark-100 rounded-xl flex items-center justify-center">
                 <Scale className="h-8 w-8 text-muted" />
               </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
+              <div className="flex-1 w-full">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-muted">Poids</p>
                     <p className="text-2xl font-bold">
                       72.5 <span className="text-sm text-muted">kg</span>
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right sm:text-right">
                     <p className="text-sm text-muted">Masse Grasse</p>
                     <p className="text-2xl font-bold">
                       12.4 <span className="text-sm text-muted">%</span>
@@ -446,7 +446,7 @@ export default function HealthPage() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm">Profond</span>
                 <div className="flex items-center gap-2">
                   <Progress
@@ -463,7 +463,7 @@ export default function HealthPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm">Paradoxal</span>
                 <div className="flex items-center gap-2">
                   <Progress
@@ -480,7 +480,7 @@ export default function HealthPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm">Léger</span>
                 <div className="flex items-center gap-2">
                   <Progress
@@ -496,7 +496,7 @@ export default function HealthPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm">Éveillé</span>
                 <div className="flex items-center gap-2">
                   <Progress

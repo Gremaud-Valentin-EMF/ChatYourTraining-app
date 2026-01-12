@@ -56,7 +56,8 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +68,21 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(min-width: 1024px)");
+    const applyMatches = (matches: boolean) => {
+      setIsDesktop(matches);
+      setSidebarOpen(matches);
+    };
+
+    applyMatches(media.matches);
+    const listener = (event: MediaQueryListEvent) =>
+      applyMatches(event.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, []);
 
   const loadSessions = async () => {
     try {
@@ -262,10 +278,21 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] -m-4 lg:-m-8">
+    <div className="relative flex flex-col lg:flex-row h-[calc(100vh-8rem)] gap-4">
+      {sidebarOpen && !isDesktop && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       {/* Sidebar */}
-      {showSidebar && (
-        <div className="w-64 border-r border-dark-200 flex flex-col bg-dark-50">
+      <div className={cn("flex-shrink-0", isDesktop ? "w-64" : "w-0")}>
+        <div
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-64 border-r border-dark-200 flex flex-col bg-dark-50 transform transition-transform duration-200 lg:static lg:translate-x-0",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
           <div className="p-4 border-b border-dark-200">
             <Button
               variant="primary"
@@ -287,7 +314,12 @@ export default function ChatPage() {
                 {sessions.map((session) => (
                   <button
                     key={session.id}
-                    onClick={() => loadMessages(session.id)}
+                    onClick={() => {
+                      loadMessages(session.id);
+                      if (!isDesktop) {
+                        setSidebarOpen(false);
+                      }
+                    }}
                     className={cn(
                       "w-full text-left px-3 py-2 rounded-xl transition-colors",
                       currentSession === session.id
@@ -308,7 +340,7 @@ export default function ChatPage() {
             )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
@@ -316,7 +348,7 @@ export default function ChatPage() {
         <div className="h-14 border-b border-dark-200 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowSidebar(!showSidebar)}
+              onClick={() => setSidebarOpen((prev) => !prev)}
               className="p-2 hover:bg-dark-100 rounded-lg lg:hidden"
             >
               <MessageSquare className="h-5 w-5" />

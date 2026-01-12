@@ -112,27 +112,6 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* Pro Plan Card */}
-        <div className="absolute bottom-20 left-4 right-4">
-          <div className="p-4 bg-gradient-to-br from-accent/20 to-secondary/20 rounded-xl border border-dark-200">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2 py-0.5 bg-accent text-dark text-xs font-bold rounded-full">
-                PRO
-              </span>
-              <span className="text-sm font-medium">Plan Pro</span>
-            </div>
-            <p className="text-xs text-muted mb-3">
-              Accès illimité au Coach IA et synchronisations avancées.
-            </p>
-            <Link
-              href="/settings/subscription"
-              className="text-xs text-accent hover:underline"
-            >
-              Gérer l&apos;abonnement →
-            </Link>
-          </div>
-        </div>
-
         {/* User section */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-dark-200">
           <div className="relative">
@@ -175,7 +154,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="min-h-screen lg:pl-64 pb-20 lg:pb-0">
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-dark/80 backdrop-blur-sm border-b border-dark-200">
           <div className="h-full px-4 lg:px-8 flex items-center justify-between">
@@ -223,8 +202,30 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-8">{children}</main>
+        <main className="p-4 pb-24 lg:p-8 lg:pb-8">{children}</main>
       </div>
+
+      {/* Bottom navigation for mobile */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-dark-50 border-t border-dark-200 px-4 py-2 z-40">
+        <div className="flex items-center justify-around">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center gap-1 text-xs font-medium transition-colors",
+                  isActive ? "text-accent" : "text-muted"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                <span>{item.label.split(" ")[0]}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

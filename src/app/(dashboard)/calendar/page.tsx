@@ -225,12 +225,12 @@ export default function CalendarPage() {
     : [];
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col xl:flex-row gap-6">
       {/* Main Calendar */}
       <div className="flex-1 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-4">
             <h1 className="text-3xl font-bold">{monthNames[month]}</h1>
             <h2 className="text-3xl font-bold text-muted">{year}</h2>
 
@@ -252,7 +252,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <Tabs
               defaultValue="month"
               onValueChange={(v) => setViewMode(v as ViewMode)}
@@ -263,12 +263,17 @@ export default function CalendarPage() {
               </TabsList>
             </Tabs>
 
-            <Button leftIcon={<Plus className="h-4 w-4" />}>Séance</Button>
+            <Button
+              leftIcon={<Plus className="h-4 w-4" />}
+              className="w-full sm:w-auto"
+            >
+              Séance
+            </Button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <Card padding="sm" className="flex items-center gap-3">
             <Activity className="h-5 w-5 text-accent" />
             <div>
@@ -322,106 +327,108 @@ export default function CalendarPage() {
 
         {/* Calendar Grid */}
         <Card>
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-px border-b border-dark-200 mb-2">
-            {dayNames.map((day) => (
-              <div
-                key={day}
-                className="p-3 text-center text-sm text-muted font-medium"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar days */}
-          <div className="grid grid-cols-7 gap-px">
-            {/* Empty cells for days before month starts */}
-            {Array.from({ length: startingDay }).map((_, i) => (
-              <div
-                key={`empty-${i}`}
-                className="min-h-[100px] p-2 bg-dark-100/50"
-              />
-            ))}
-
-            {/* Days of the month */}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const dayActivities = getActivitiesForDate(day);
-              const isSelected =
-                selectedDate?.getDate() === day &&
-                selectedDate?.getMonth() === month &&
-                selectedDate?.getFullYear() === year;
-
-              return (
-                <div
-                  key={day}
-                  onClick={() => setSelectedDate(new Date(year, month, day))}
-                  className={cn(
-                    "min-h-[100px] p-2 cursor-pointer transition-colors border",
-                    isToday(day)
-                      ? "border-accent bg-accent/5"
-                      : isSelected
-                      ? "border-secondary bg-secondary/5"
-                      : "border-transparent hover:bg-dark-100"
-                  )}
-                >
+          <div className="overflow-x-auto">
+            <div className="min-w-[720px]">
+              {/* Day headers */}
+              <div className="grid grid-cols-7 gap-px border-b border-dark-200 mb-2">
+                {dayNames.map((day) => (
                   <div
-                    className={cn(
-                      "text-sm font-medium mb-2",
-                      isToday(day) && "text-accent"
-                    )}
+                    key={day}
+                    className="p-3 text-center text-sm text-muted font-medium"
                   >
                     {day}
-                    {isToday(day) && (
-                      <span className="ml-1 h-1.5 w-1.5 bg-accent rounded-full inline-block" />
-                    )}
                   </div>
+                ))}
+              </div>
 
-                  <div className="space-y-1">
-                    {dayActivities.slice(0, 3).map((activity) => (
+              {/* Calendar days */}
+              <div className="grid grid-cols-7 gap-px">
+                {Array.from({ length: startingDay }).map((_, i) => (
+                  <div
+                    key={`empty-${i}`}
+                    className="min-h-[100px] p-2 bg-dark-100/50"
+                  />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const dayActivities = getActivitiesForDate(day);
+                  const isSelected =
+                    selectedDate?.getDate() === day &&
+                    selectedDate?.getMonth() === month &&
+                    selectedDate?.getFullYear() === year;
+
+                  return (
+                    <div
+                      key={day}
+                      onClick={() => setSelectedDate(new Date(year, month, day))}
+                      className={cn(
+                        "min-h-[100px] p-2 cursor-pointer transition-colors border",
+                        isToday(day)
+                          ? "border-accent bg-accent/5"
+                          : isSelected
+                          ? "border-secondary bg-secondary/5"
+                          : "border-transparent hover:bg-dark-100"
+                      )}
+                    >
                       <div
-                        key={activity.id}
                         className={cn(
-                          "px-2 py-1 rounded text-xs font-medium truncate",
-                          activity.status === "completed"
-                            ? "bg-success/20 text-success"
-                            : activity.status === "skipped"
-                            ? "bg-error/20 text-error"
-                            : ""
+                          "text-sm font-medium mb-2",
+                          isToday(day) && "text-accent"
                         )}
-                        style={
-                          activity.status === "planned"
-                            ? {
-                                backgroundColor: `${getSportColor(
-                                  activity.sport_name
-                                )}20`,
-                                color: getSportColor(activity.sport_name),
-                              }
-                            : undefined
-                        }
                       >
-                        {activity.title.length > 10
-                          ? `${activity.title.substring(0, 10)}...`
-                          : activity.title}
+                        {day}
+                        {isToday(day) && (
+                          <span className="ml-1 h-1.5 w-1.5 bg-accent rounded-full inline-block" />
+                        )}
                       </div>
-                    ))}
-                    {dayActivities.length > 3 && (
-                      <div className="text-xs text-muted">
-                        +{dayActivities.length - 3} autres
+
+                      <div className="space-y-1">
+                        {dayActivities.slice(0, 3).map((activity) => (
+                          <div
+                            key={activity.id}
+                            className={cn(
+                              "px-2 py-1 rounded text-xs font-medium truncate",
+                              activity.status === "completed"
+                                ? "bg-success/20 text-success"
+                                : activity.status === "skipped"
+                                ? "bg-error/20 text-error"
+                                : ""
+                            )}
+                            style={
+                              activity.status === "planned"
+                                ? {
+                                    backgroundColor: `${getSportColor(
+                                      activity.sport_name
+                                    )}20`,
+                                    color: getSportColor(activity.sport_name),
+                                  }
+                                : undefined
+                            }
+                          >
+                            {activity.title.length > 10
+                              ? `${activity.title.substring(0, 10)}...`
+                              : activity.title}
+                          </div>
+                        ))}
+                        {dayActivities.length > 3 && (
+                          <div className="text-xs text-muted">
+                            +{dayActivities.length - 3} autres
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </Card>
       </div>
 
       {/* Right Panel - Day Details */}
-      {selectedDate && (
-        <div className="w-80 space-y-4">
+      <div className="w-full xl:w-80 space-y-4">
+        {selectedDate ? (
           <Card>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -527,8 +534,17 @@ export default function CalendarPage() {
               )}
             </div>
           </Card>
+        ) : (
+          <Card className="text-center">
+            <h3 className="font-semibold mb-2">Sélectionnez une date</h3>
+            <p className="text-sm text-muted">
+              Touchez un jour dans le calendrier pour voir les détails.
+            </p>
+          </Card>
+        )}
 
-          {/* Journal du jour */}
+        {/* Journal du jour */}
+        {selectedDate && (
           <Card>
             <h4 className="font-medium flex items-center gap-2 mb-4">
               <Moon className="h-4 w-4 text-secondary" />
@@ -607,8 +623,10 @@ export default function CalendarPage() {
               </div>
             </div>
           </Card>
+        )}
 
-          {/* Notes */}
+        {/* Notes */}
+        {selectedDate && (
           <Card>
             <h4 className="font-medium flex items-center gap-2 mb-4">
               <Edit2 className="h-4 w-4 text-muted" />
@@ -623,8 +641,8 @@ export default function CalendarPage() {
               Sauvegarder
             </Button>
           </Card>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

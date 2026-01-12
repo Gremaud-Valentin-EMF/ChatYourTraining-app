@@ -248,7 +248,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Profil et Objectifs</h1>
           <p className="text-muted">
@@ -256,13 +256,14 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 justify-end">
           {isEditing ? (
             <>
               <Button
                 variant="ghost"
                 onClick={() => setIsEditing(false)}
                 leftIcon={<X className="h-4 w-4" />}
+                className="w-full sm:w-auto"
               >
                 Annuler
               </Button>
@@ -271,6 +272,7 @@ export default function ProfilePage() {
                 onClick={handleSave}
                 isLoading={isSaving}
                 leftIcon={<Save className="h-4 w-4" />}
+                className="w-full sm:w-auto"
               >
                 Sauvegarder
               </Button>
@@ -280,6 +282,7 @@ export default function ProfilePage() {
               variant="secondary"
               onClick={() => setIsEditing(true)}
               leftIcon={<Edit2 className="h-4 w-4" />}
+              className="w-full sm:w-auto"
             >
               Modifier
             </Button>
@@ -482,7 +485,7 @@ export default function ProfilePage() {
               Votre cible majeure pour la saison
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="text-xs text-muted uppercase block mb-2">
                   Nom de l&apos;événement
@@ -533,7 +536,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 p-4 bg-dark-100 rounded-xl">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-dark-100 rounded-xl">
               <div>
                 <p className="text-xs text-muted">Temps Restant</p>
                 <p className="text-2xl font-bold">
@@ -564,7 +567,7 @@ export default function ProfilePage() {
               Ajustez votre charge et vos préférences
             </p>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <label className="text-xs text-muted uppercase block mb-3">
                   Focus actuel
