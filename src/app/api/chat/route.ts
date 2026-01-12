@@ -7,6 +7,7 @@ import {
   formatContextForPrompt,
   checkProactiveAlerts,
 } from "@/lib/openai/coach";
+import type { InsertTables, Json, Tables } from "@/types/database";
 
 // Lazy initialization to avoid build-time errors
 let openai: OpenAI | null = null;
@@ -40,16 +41,15 @@ export async function POST(request: Request) {
     // Get or create chat session
     let currentSessionId = sessionId;
     if (!currentSessionId) {
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      const { data: newSession, error: sessionError } = await (supabase as any)
+      const sessionPayload: InsertTables<"chat_sessions"> = {
+        user_id: user.id,
+        title: message.substring(0, 50),
+      };
+      const { data: newSession, error: sessionError } = await supabase
         .from("chat_sessions")
-        .insert({
-          user_id: user.id,
-          title: message.substring(0, 50),
-        })
+        .insert(sessionPayload)
         .select()
         .single();
-      /* eslint-enable @typescript-eslint/no-explicit-any */
 
       if (sessionError) {
         console.error("Error creating session:", sessionError);
@@ -71,14 +71,16 @@ export async function POST(request: Request) {
     const alertsPrefix =
       alerts.length > 0 ? alerts.join("\n\n") + "\n\n---\n\n" : "";
 
+    type ChatHistoryEntry = Pick<Tables<"chat_messages">, "role" | "content">;
     // Get recent messages for conversation context
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: recentMessages } = await (supabase as any)
+    const { data: recentMessages } = await supabase
       .from("chat_messages")
       .select("role, content")
       .eq("session_id", currentSessionId)
       .order("created_at", { ascending: true })
       .limit(10);
+    const typedRecentMessages = (recentMessages ??
+      []) as ChatHistoryEntry[];
 
     // Build messages array for AI provider
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -86,8 +88,7 @@ export async function POST(request: Request) {
         role: "system",
         content: SYSTEM_PROMPT + contextPrompt,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(recentMessages || []).map((msg: any) => ({
+      ...typedRecentMessages.map((msg) => ({
         role: msg.role as "user" | "assistant",
         content: msg.content,
       })),
@@ -98,13 +99,13 @@ export async function POST(request: Request) {
     ];
 
     // Save user message
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from("chat_messages").insert({
+    const userMessagePayload: InsertTables<"chat_messages"> = {
       session_id: currentSessionId,
       role: "user",
       content: message,
-      context_snapshot: context,
-    });
+      context_snapshot: context as unknown as Json,
+    };
+    await supabase.from("chat_messages").insert(userMessagePayload);
 
     const provider = getChatProvider();
     if (provider === "gemini" && !process.env.GOOGLE_GEMINI_API_KEY) {
@@ -153,13 +154,13 @@ export async function POST(request: Request) {
           }
 
           // Save assistant response
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if (fullResponse.trim()) {
-            await (supabase as any).from("chat_messages").insert({
+            const assistantMessagePayload: InsertTables<"chat_messages"> = {
               session_id: currentSessionId,
               role: "assistant",
               content: fullResponse,
-            });
+            };
+            await supabase.from("chat_messages").insert(assistantMessagePayload);
           }
 
           // Send done signal
