@@ -1,0 +1,230 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui";
+import {
+  Activity,
+  LayoutDashboard,
+  Calendar,
+  Heart,
+  Link2,
+  User,
+  List,
+  MessageSquare,
+  Menu,
+  X,
+  LogOut,
+  Bell,
+  ChevronDown,
+} from "lucide-react";
+
+const navItems = [
+  {
+    href: "/dashboard",
+    label: "Tableau de bord",
+    icon: LayoutDashboard,
+  },
+  {
+    href: "/calendar",
+    label: "Calendrier",
+    icon: Calendar,
+  },
+  {
+    href: "/workouts",
+    label: "Entraînements",
+    icon: List,
+  },
+  {
+    href: "/health",
+    label: "Santé",
+    icon: Heart,
+  },
+  {
+    href: "/integrations",
+    label: "Intégrations",
+    icon: Link2,
+  },
+];
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-dark">
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed top-0 left-0 z-50 h-full w-64 bg-dark-50 border-r border-dark-200 transition-transform duration-300 lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Logo */}
+        <div className="h-16 flex items-center justify-between px-6 border-b border-dark-200">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <Activity className="h-6 w-6 text-accent" />
+            <span className="font-bold text-lg">ChatYourTraining</span>
+          </Link>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-2 text-muted hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="p-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-accent text-dark"
+                    : "text-muted hover:text-foreground hover:bg-dark-100"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Pro Plan Card */}
+        <div className="absolute bottom-20 left-4 right-4">
+          <div className="p-4 bg-gradient-to-br from-accent/20 to-secondary/20 rounded-xl border border-dark-200">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="px-2 py-0.5 bg-accent text-dark text-xs font-bold rounded-full">
+                PRO
+              </span>
+              <span className="text-sm font-medium">Plan Pro</span>
+            </div>
+            <p className="text-xs text-muted mb-3">
+              Accès illimité au Coach IA et synchronisations avancées.
+            </p>
+            <Link
+              href="/settings/subscription"
+              className="text-xs text-accent hover:underline"
+            >
+              Gérer l&apos;abonnement →
+            </Link>
+          </div>
+        </div>
+
+        {/* User section */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-dark-200">
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-dark-100 transition-colors"
+            >
+              <Avatar size="sm" fallback="JD" />
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium">Jean Dupont</p>
+                <p className="text-xs text-muted">Coach Pro</p>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 text-muted transition-transform",
+                  userMenuOpen && "rotate-180"
+                )}
+              />
+            </button>
+
+            {/* User dropdown */}
+            {userMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 p-2 bg-dark-100 rounded-xl border border-dark-200 shadow-lg">
+                <Link
+                  href="/profile"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-muted hover:text-foreground rounded-lg hover:bg-dark-200 transition-colors"
+                >
+                  <User className="h-4 w-4" />
+                  Profil & Objectifs
+                </Link>
+                <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-error hover:bg-error/10 rounded-lg transition-colors">
+                  <LogOut className="h-4 w-4" />
+                  Déconnexion
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="lg:pl-64">
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 h-16 bg-dark/80 backdrop-blur-sm border-b border-dark-200">
+          <div className="h-full px-4 lg:px-8 flex items-center justify-between">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 -ml-2 text-muted hover:text-foreground"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+
+            {/* Page title - hidden on mobile */}
+            <div className="hidden lg:block">
+              <h1 className="text-lg font-semibold">
+                {navItems.find((item) => item.href === pathname)?.label ||
+                  "Dashboard"}
+              </h1>
+            </div>
+
+            {/* Right side actions */}
+            <div className="flex items-center gap-3">
+              {/* Chat button */}
+              <Link
+                href="/chat"
+                className="flex items-center gap-2 px-4 py-2 bg-accent/20 text-accent rounded-xl hover:bg-accent/30 transition-colors"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline text-sm font-medium">
+                  Coach IA
+                </span>
+              </Link>
+
+              {/* Notifications */}
+              <button className="relative p-2 text-muted hover:text-foreground hover:bg-dark-100 rounded-xl transition-colors">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 h-2 w-2 bg-accent rounded-full" />
+              </button>
+
+              {/* User avatar - mobile */}
+              <Link href="/profile" className="lg:hidden">
+                <Avatar size="sm" fallback="JD" />
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="p-4 lg:p-8">{children}</main>
+      </div>
+    </div>
+  );
+}

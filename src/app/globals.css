@@ -3,25 +3,240 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0d0d12;
+  --foreground: #f5f5f5;
+  --card: #1a1a24;
+  --card-hover: #22222e;
+  --border: #2a2a38;
+  --muted: #6b7280;
+  --accent: #00d4aa;
+  --accent-hover: #00b894;
+  --secondary: #3b82f6;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --success: #22c55e;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Custom utility classes */
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Glassmorphism effect */
+  .glass {
+    background: rgba(26, 26, 36, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Card styles */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  .card-hover {
+    transition: all 0.2s ease;
+  }
+
+  .card-hover:hover {
+    background: var(--card-hover);
+    border-color: var(--accent);
+  }
+
+  /* Gradient backgrounds */
+  .gradient-accent {
+    background: linear-gradient(135deg, var(--accent) 0%, #00a888 100%);
+  }
+
+  .gradient-card {
+    background: linear-gradient(
+      180deg,
+      var(--card) 0%,
+      rgba(26, 26, 36, 0.5) 100%
+    );
+  }
+
+  .gradient-radial {
+    background: radial-gradient(
+      circle at center,
+      var(--card) 0%,
+      var(--background) 100%
+    );
+  }
+
+  /* Text gradients */
+  .text-gradient {
+    background: linear-gradient(
+      135deg,
+      var(--accent) 0%,
+      var(--secondary) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glow effects */
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(0, 212, 170, 0.2);
+  }
+
+  .glow-accent-strong {
+    box-shadow: 0 0 30px rgba(0, 212, 170, 0.3);
+  }
+
+  /* Sport colors */
+  .sport-run {
+    --sport-color: #00d4aa;
+  }
+
+  .sport-bike {
+    --sport-color: #3b82f6;
+  }
+
+  .sport-swim {
+    --sport-color: #06b6d4;
+  }
+
+  .sport-strength {
+    --sport-color: #f59e0b;
+  }
+
+  /* Status colors */
+  .status-optimal {
+    color: var(--success);
+  }
+
+  .status-warning {
+    color: var(--warning);
+  }
+
+  .status-critical {
+    color: var(--error);
+  }
+
+  /* Recovery score colors */
+  .recovery-green {
+    color: #22c55e;
+  }
+
+  .recovery-yellow {
+    color: #f59e0b;
+  }
+
+  .recovery-red {
+    color: #ef4444;
+  }
+}
+
+/* Component base styles */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-dark hover:bg-accent-600 focus:ring-accent;
+  }
+
+  .btn-secondary {
+    @apply btn bg-dark-100 text-foreground border border-dark-200 hover:bg-dark-200 focus:ring-dark-300;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-foreground hover:bg-dark-100 focus:ring-dark-200;
+  }
+
+  .btn-danger {
+    @apply btn bg-error text-white hover:bg-error-600 focus:ring-error;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-xl text-foreground focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-200;
+  }
+
+  .input::placeholder {
+    color: #6b7280;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-muted mb-2;
+  }
+
+  .link {
+    @apply text-accent hover:text-accent-400 transition-colors duration-200;
+  }
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--card) 0%,
+    var(--card-hover) 50%,
+    var(--card) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Chart styles */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--border);
+}
+
+.recharts-text {
+  fill: var(--muted);
 }

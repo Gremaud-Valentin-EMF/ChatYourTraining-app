@@ -1,0 +1,449 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import OpenAI from "openai";
+import {
+  SYSTEM_PROMPT,
+  buildCoachContext,
+  formatContextForPrompt,
+  checkProactiveAlerts,
+} from "@/lib/openai/coach";
+
+// Lazy initialization to avoid build-time errors
+let openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { message, sessionId, includeProactiveAlerts = true } = body;
+
+    if (!message) {
+      return NextResponse.json({ error: "Message required" }, { status: 400 });
+    }
+
+    // Get or create chat session
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const { data: newSession, error: sessionError } = await (supabase as any)
+        .from("chat_sessions")
+        .insert({
+          user_id: user.id,
+          title: message.substring(0, 50),
+        })
+        .select()
+        .single();
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+
+      if (sessionError) {
+        console.error("Error creating session:", sessionError);
+        return NextResponse.json(
+          { error: "Failed to create session" },
+          { status: 500 }
+        );
+      }
+
+      currentSessionId = newSession.id;
+    }
+
+    // Build context from database
+    const context = await buildCoachContext(user.id);
+    const contextPrompt = formatContextForPrompt(context);
+
+    // Check for proactive alerts
+    const alerts = includeProactiveAlerts ? checkProactiveAlerts(context) : [];
+    const alertsPrefix =
+      alerts.length > 0 ? alerts.join("\n\n") + "\n\n---\n\n" : "";
+
+    // Get recent messages for conversation context
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: recentMessages } = await (supabase as any)
+      .from("chat_messages")
+      .select("role, content")
+      .eq("session_id", currentSessionId)
+      .order("created_at", { ascending: true })
+      .limit(10);
+
+    // Build messages array for AI provider
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      {
+        role: "system",
+        content: SYSTEM_PROMPT + contextPrompt,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(recentMessages || []).map((msg: any) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      })),
+      {
+        role: "user",
+        content: message,
+      },
+    ];
+
+    // Save user message
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from("chat_messages").insert({
+      session_id: currentSessionId,
+      role: "user",
+      content: message,
+      context_snapshot: context,
+    });
+
+    const provider = getChatProvider();
+    if (provider === "gemini" && !process.env.GOOGLE_GEMINI_API_KEY) {
+      return NextResponse.json(
+        { error: "GOOGLE_GEMINI_API_KEY is not configured" },
+        { status: 500 }
+      );
+    }
+    if (provider === "openai" && !process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "OPENAI_API_KEY is not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Create a readable stream
+    const encoder = new TextEncoder();
+
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        let fullResponse = "";
+        const sendChunk = (content: string) => {
+          if (!content) return;
+          fullResponse += content;
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
+          );
+        };
+
+        // Send alerts first if any
+        if (alertsPrefix) {
+          sendChunk(alertsPrefix);
+        }
+
+        try {
+          if (provider === "gemini") {
+            await streamWithGemini({ messages, onChunk: sendChunk });
+          } else {
+            await streamWithOpenAI({ messages, onChunk: sendChunk });
+          }
+
+          if (!fullResponse.trim()) {
+            const fallback =
+              "Désolé, je n'ai pas pu générer de réponse pour le moment. Réessaie dans une minute.";
+            sendChunk(fallback);
+          }
+
+          // Save assistant response
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (fullResponse.trim()) {
+            await (supabase as any).from("chat_messages").insert({
+              session_id: currentSessionId,
+              role: "assistant",
+              content: fullResponse,
+            });
+          }
+
+          // Send done signal
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                done: true,
+                sessionId: currentSessionId,
+              })}\n\n`
+            )
+          );
+          controller.close();
+        } catch (error) {
+          console.error("Streaming error:", error);
+          controller.error(error);
+        }
+      },
+    });
+
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (error) {
+    console.error("Chat API error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+type ChatProvider = "openai" | "gemini";
+
+function getChatProvider(): ChatProvider {
+  const envProvider = process.env.AI_PROVIDER?.toLowerCase();
+  if (envProvider === "gemini" || envProvider === "openai") {
+    return envProvider;
+  }
+  return process.env.GOOGLE_GEMINI_API_KEY ? "gemini" : "openai";
+}
+
+type StreamOptions = {
+  messages: OpenAI.Chat.ChatCompletionMessageParam[];
+  onChunk: (content: string) => void;
+};
+
+async function streamWithOpenAI({ messages, onChunk }: StreamOptions) {
+  const model = process.env.OPENAI_CHAT_MODEL || "gpt-4o";
+  const maxTokens =
+    Number(process.env.OPENAI_MAX_OUTPUT_TOKENS) > 0
+      ? Number(process.env.OPENAI_MAX_OUTPUT_TOKENS)
+      : 1500;
+  const stream = await getOpenAI().chat.completions.create({
+    model,
+    messages,
+    stream: true,
+    temperature: 0.7,
+    max_tokens: maxTokens,
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || "";
+    if (content) {
+      onChunk(content);
+    }
+  }
+}
+
+async function streamWithGemini({ messages, onChunk }: StreamOptions) {
+  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+  }
+  const model = process.env.GOOGLE_GEMINI_MODEL || "gemini-1.5-flash";
+  const payload = buildGeminiPayload(messages);
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Gemini API error (${response.status}): ${errorText || response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  if (data?.error) {
+    throw new Error(data.error.message || "Gemini API returned an error");
+  }
+
+  const candidate = data?.candidates?.[0];
+  const parts =
+    (Array.isArray(candidate?.content?.parts)
+      ? candidate.content.parts
+      : undefined) ||
+    (Array.isArray(candidate?.content) ? candidate.content : undefined) ||
+    (Array.isArray(candidate?.parts) ? candidate.parts : undefined) ||
+    [];
+
+  const textSegments: string[] = [];
+  for (const part of parts) {
+    if (!part) continue;
+    if (typeof part === "string" && part.trim()) {
+      textSegments.push(part);
+      continue;
+    }
+    if (typeof part === "object") {
+      if (typeof (part as { text?: string }).text === "string") {
+        const textValue = (part as { text: string }).text.trim();
+        if (textValue) {
+          textSegments.push(textValue);
+          continue;
+        }
+      }
+      // Fallback: stringify other part types (reasoning, function calls, etc.)
+      const serialized = JSON.stringify(part);
+      if (serialized && serialized !== "{}") {
+        textSegments.push(serialized);
+      }
+    }
+  }
+
+  if (textSegments.length === 0) {
+    const fallbackText =
+      typeof candidate?.text === "string" && candidate.text.trim()
+        ? candidate.text
+        : null;
+    if (fallbackText) {
+      onChunk(fallbackText);
+      return;
+    }
+    console.warn("Gemini response without textual parts:", {
+      finishReason: candidate?.finishReason,
+      hasContentParts: Array.isArray(candidate?.content?.parts),
+    });
+    throw new Error("Gemini API returned no text content");
+  }
+
+  onChunk(textSegments.join("\n\n"));
+}
+
+function buildGeminiPayload(
+  messages: OpenAI.Chat.ChatCompletionMessageParam[]
+) {
+  const contents: { role: "user" | "model"; parts: { text: string }[] }[] = [];
+  const systemParts: string[] = [];
+  const maxTokensEnv = Number(process.env.GOOGLE_GEMINI_MAX_OUTPUT_TOKENS);
+  const maxTokens =
+    Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
+
+  for (const message of messages) {
+    const text = extractMessageText(message.content);
+    if (!text) continue;
+
+    if (message.role === "system") {
+      systemParts.push(text);
+      continue;
+    }
+
+    contents.push({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text }],
+    });
+  }
+
+  const payload: Record<string, unknown> = {
+    contents,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: maxTokens,
+    },
+  };
+
+  if (systemParts.length > 0) {
+    payload.systemInstruction = {
+      role: "system",
+      parts: [{ text: systemParts.join("\n\n") }],
+    };
+  }
+
+  return payload;
+}
+
+function extractMessageText(
+  content: OpenAI.Chat.ChatCompletionMessageParam["content"]
+): string {
+  if (!content) return "";
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (!part) return "";
+        if (typeof part === "string") return part;
+        if (typeof part === "object" && "text" in part) {
+          const text = (part as { text?: unknown }).text;
+          return typeof text === "string" ? text : "";
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (typeof content === "object" && "text" in content) {
+    const text = (content as { text?: unknown }).text;
+    if (typeof text === "string") {
+      return text;
+    }
+  }
+  try {
+    return JSON.stringify(content);
+  } catch {
+    return String(content);
+  }
+}
+
+// Get chat history
+export async function GET(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get("sessionId");
+
+    if (sessionId) {
+      // Get messages for specific session
+      const { data: messages, error } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        return NextResponse.json(
+          { error: "Failed to fetch messages" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ messages });
+    } else {
+      // Get all sessions
+      const { data: sessions, error } = await supabase
+        .from("chat_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(20);
+
+      if (error) {
+        return NextResponse.json(
+          { error: "Failed to fetch sessions" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ sessions });
+    }
+  } catch (error) {
+    console.error("Chat GET error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
