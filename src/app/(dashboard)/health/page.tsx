@@ -232,7 +232,7 @@ export default function HealthPage() {
       </div>
 
       {/* Main metrics cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Recovery Score */}
         <Card className="relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
@@ -329,7 +329,7 @@ export default function HealthPage() {
       </div>
 
       {/* Charts and details */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trends chart */}
         <Card className="col-span-2">
           <div className="flex items-center justify-between mb-4">
