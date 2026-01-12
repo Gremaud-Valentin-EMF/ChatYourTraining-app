@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { randomUUID } from "crypto";
 import {
   SYSTEM_PROMPT,
   buildCoachContext,
   formatContextForPrompt,
   checkProactiveAlerts,
+  PLAN_GENERATION_PROMPT,
 } from "@/lib/openai/coach";
 import type { InsertTables, Json, Tables } from "@/types/database";
 
@@ -32,7 +34,12 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { message, sessionId, includeProactiveAlerts = true } = body;
+    const {
+      message,
+      sessionId,
+      includeProactiveAlerts = true,
+      forcePlanMode = false,
+    } = body;
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
@@ -108,6 +115,7 @@ export async function POST(request: Request) {
     await supabase.from("chat_messages").insert(userMessagePayload);
 
     const provider = getChatProvider();
+    const planRequested = forcePlanMode || isPlanRequest(message);
     if (provider === "gemini" && !process.env.GOOGLE_GEMINI_API_KEY) {
       return NextResponse.json(
         { error: "GOOGLE_GEMINI_API_KEY is not configured" },
@@ -141,6 +149,58 @@ export async function POST(request: Request) {
         }
 
         try {
+          if (planRequested) {
+            try {
+              const planResult = await generatePlanSuggestion({
+                messages,
+                userMessage: message,
+                provider,
+              });
+
+              if (!planResult) {
+                const fallback =
+                  "Je n'ai pas pu générer le plan demandé. Peux-tu reformuler ta demande ?";
+                sendChunk(fallback);
+              } else {
+                if (planResult.summary) {
+                  sendChunk(planResult.summary);
+                  fullResponse += planResult.summary;
+                }
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      plan: planResult.plan,
+                      planId: planResult.planId,
+                      done: false,
+                    })}\n\n`
+                  )
+                );
+              }
+            } catch (planError) {
+              const fallback = getPlanErrorMessage(planError);
+              sendChunk(fallback);
+            }
+
+            if (fullResponse.trim()) {
+              await supabase.from("chat_messages").insert({
+                session_id: currentSessionId,
+                role: "assistant",
+                content: fullResponse,
+              } as InsertTables<"chat_messages">);
+            }
+
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  done: true,
+                  sessionId: currentSessionId,
+                })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
+
           if (provider === "gemini") {
             await streamWithGemini({ messages, onChunk: sendChunk });
           } else {
@@ -211,6 +271,163 @@ type StreamOptions = {
   onChunk: (content: string) => void;
 };
 
+function isPlanRequest(content: string): boolean {
+  const normalized = content.toLowerCase();
+  return (
+    normalized.includes("plan d'entrainement") ||
+    normalized.includes("plan d'entraînement") ||
+    normalized.includes("plan d entrainement") ||
+    normalized.includes("plan d'entrainement") ||
+    normalized.includes("programme") ||
+    normalized.includes("planning") ||
+    /plan\s+pour\s+les\s+\d+/.test(normalized)
+  );
+}
+
+async function generatePlanSuggestion({
+  messages,
+  userMessage,
+  provider,
+}: {
+  messages: OpenAI.Chat.ChatCompletionMessageParam[];
+  userMessage: string;
+  provider: ChatProvider;
+}) {
+  const planMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    ...messages,
+    {
+      role: "system",
+      content: PLAN_GENERATION_PROMPT,
+    },
+    {
+      role: "user",
+      content:
+        userMessage +
+        "\n\nTu dois répondre STRICTEMENT avec le JSON décrit ci-dessus.",
+    },
+  ];
+
+  if (provider === "gemini") {
+    return generatePlanWithGemini(planMessages);
+  }
+
+  return generatePlanWithOpenAI(planMessages);
+}
+
+async function generatePlanWithOpenAI(
+  planMessages: OpenAI.Chat.ChatCompletionMessageParam[]
+) {
+  const response = await getOpenAI().chat.completions.create({
+    model: process.env.OPENAI_CHAT_MODEL || "gpt-4o",
+    messages: planMessages,
+    temperature: 0.5,
+    stream: false,
+  });
+
+  const content = response.choices[0]?.message?.content || "";
+  return parsePlanContent(content);
+}
+
+async function generatePlanWithGemini(
+  planMessages: OpenAI.Chat.ChatCompletionMessageParam[]
+) {
+  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+  }
+  const model = process.env.GOOGLE_GEMINI_MODEL || "gemini-1.5-flash";
+  const payload = buildGeminiPayload(planMessages, {
+    temperature: 0.4,
+  });
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Gemini plan generation error (${response.status}): ${
+        errorText || response.statusText
+      }`
+    );
+  }
+
+  const data = await response.json();
+  if (data?.error) {
+    throw new Error(data.error.message || "Gemini API returned an error");
+  }
+
+  const candidate = data?.candidates?.[0];
+  const content = extractGeminiText(candidate);
+  if (!content) {
+    console.error("Gemini plan response without text:", data);
+    return null;
+  }
+
+  return parsePlanContent(content);
+}
+
+function parsePlanContent(content: string) {
+  const jsonString = extractJsonBlock(content);
+  if (!jsonString) {
+    console.error("Plan JSON introuvable dans la réponse IA:", content);
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(jsonString);
+    if (!parsed.weeks || !Array.isArray(parsed.weeks)) {
+      throw new Error("Plan invalide");
+    }
+    const planId = randomUUID();
+    return {
+      plan: parsed,
+      planId,
+      summary: parsed.summary || "Voici un plan personnalisé pour toi 👇",
+    };
+  } catch (error) {
+    console.error("Erreur parsing plan:", error, jsonString);
+    return null;
+  }
+}
+
+function extractJsonBlock(text: string): string | null {
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+  return text.slice(firstBrace, lastBrace + 1);
+}
+
+function getPlanErrorMessage(error: unknown): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: string }).code === "insufficient_quota"
+  ) {
+    return "Je suis à court de crédit OpenAI pour générer un plan. Peux-tu réessayer plus tard ?";
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "status" in error &&
+    (error as { status?: number }).status === 429
+  ) {
+    return "Je suis temporairement saturé. Réessaie dans quelques minutes pour que je génère ton plan.";
+  }
+  return "Un imprévu empêche la génération du plan. Reformule ta demande ou réessaie dans un instant.";
+}
+
 async function streamWithOpenAI({ messages, onChunk }: StreamOptions) {
   const model = process.env.OPENAI_CHAT_MODEL || "gpt-4o";
   const maxTokens =
@@ -265,64 +482,27 @@ async function streamWithGemini({ messages, onChunk }: StreamOptions) {
   }
 
   const candidate = data?.candidates?.[0];
-  const parts =
-    (Array.isArray(candidate?.content?.parts)
-      ? candidate.content.parts
-      : undefined) ||
-    (Array.isArray(candidate?.content) ? candidate.content : undefined) ||
-    (Array.isArray(candidate?.parts) ? candidate.parts : undefined) ||
-    [];
-
-  const textSegments: string[] = [];
-  for (const part of parts) {
-    if (!part) continue;
-    if (typeof part === "string" && part.trim()) {
-      textSegments.push(part);
-      continue;
-    }
-    if (typeof part === "object") {
-      if (typeof (part as { text?: string }).text === "string") {
-        const textValue = (part as { text: string }).text.trim();
-        if (textValue) {
-          textSegments.push(textValue);
-          continue;
-        }
-      }
-      // Fallback: stringify other part types (reasoning, function calls, etc.)
-      const serialized = JSON.stringify(part);
-      if (serialized && serialized !== "{}") {
-        textSegments.push(serialized);
-      }
-    }
-  }
-
-  if (textSegments.length === 0) {
-    const fallbackText =
-      typeof candidate?.text === "string" && candidate.text.trim()
-        ? candidate.text
-        : null;
-    if (fallbackText) {
-      onChunk(fallbackText);
-      return;
-    }
-    console.warn("Gemini response without textual parts:", {
-      finishReason: candidate?.finishReason,
-      hasContentParts: Array.isArray(candidate?.content?.parts),
-    });
+  const text = extractGeminiText(candidate);
+  if (!text) {
     throw new Error("Gemini API returned no text content");
   }
-
-  onChunk(textSegments.join("\n\n"));
+  onChunk(text);
 }
 
 function buildGeminiPayload(
-  messages: OpenAI.Chat.ChatCompletionMessageParam[]
+  messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  options?: { temperature?: number; maxOutputTokens?: number }
 ) {
   const contents: { role: "user" | "model"; parts: { text: string }[] }[] = [];
   const systemParts: string[] = [];
   const maxTokensEnv = Number(process.env.GOOGLE_GEMINI_MAX_OUTPUT_TOKENS);
   const maxTokens =
-    Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
+    options?.maxOutputTokens ??
+    (Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048);
+  const temperature =
+    typeof options?.temperature === "number"
+      ? options.temperature
+      : 0.7;
 
   for (const message of messages) {
     const text = extractMessageText(message.content);
@@ -342,7 +522,7 @@ function buildGeminiPayload(
   const payload: Record<string, unknown> = {
     contents,
     generationConfig: {
-      temperature: 0.7,
+      temperature,
       maxOutputTokens: maxTokens,
     },
   };
@@ -389,6 +569,50 @@ function extractMessageText(
   } catch {
     return String(content);
   }
+}
+
+function extractGeminiText(candidate: unknown): string | null {
+  const parts =
+    (Array.isArray((candidate as { content?: { parts?: unknown[] } })?.content?.parts)
+      ? (candidate as { content?: { parts?: unknown[] } }).content?.parts
+      : undefined) ||
+    (Array.isArray((candidate as { content?: unknown[] })?.content)
+      ? (candidate as { content?: unknown[] }).content
+      : undefined) ||
+    (Array.isArray((candidate as { parts?: unknown[] })?.parts)
+      ? (candidate as { parts?: unknown[] }).parts
+      : undefined) ||
+    [];
+
+  const textSegments: string[] = [];
+  for (const part of parts) {
+    if (!part) continue;
+    if (typeof part === "string" && part.trim()) {
+      textSegments.push(part);
+      continue;
+    }
+    if (typeof part === "object") {
+      const textValue = (part as { text?: string }).text;
+      if (typeof textValue === "string" && textValue.trim()) {
+        textSegments.push(textValue.trim());
+        continue;
+      }
+      const serialized = JSON.stringify(part);
+      if (serialized && serialized !== "{}") {
+        textSegments.push(serialized);
+      }
+    }
+  }
+
+  if (textSegments.length === 0) {
+    const fallbackText =
+      typeof (candidate as { text?: string })?.text === "string"
+        ? (candidate as { text?: string }).text?.trim()
+        : null;
+    return fallbackText || null;
+  }
+
+  return textSegments.join("\n\n");
 }
 
 // Get chat history
