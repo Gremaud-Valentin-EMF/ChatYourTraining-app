@@ -89,15 +89,7 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="p-4 border-t border-dark-200">
-          <div className="flex items-center gap-3">
-            <Avatar size="sm" fallback="JD" />
-            <div>
-              <p className="text-sm font-medium">Jean Dupont</p>
-              <p className="text-xs text-muted">Coach Pro</p>
-            </div>
-          </div>
-        </div>
+        <div className="p-4 border-t border-dark-200" />
       </aside>
 
       {/* Main content */}
@@ -131,12 +123,22 @@ export default function DashboardLayout({
                 <span className="absolute top-1 right-1 h-2 w-2 bg-accent rounded-full" />
               </button>
 
-              <div className="relative">
+              <div
+                className="relative"
+                onMouseEnter={() => setProfileMenuOpen(true)}
+                onMouseLeave={() => setProfileMenuOpen(false)}
+              >
                 <button
                   onClick={() => setProfileMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2 px-3 py-2 bg-dark-100 rounded-xl border border-dark-200 hover:border-accent transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl border border-transparent hover:border-accent transition-colors"
                 >
                   <Avatar size="sm" fallback="JD" />
+                  <div className="hidden sm:flex flex-col items-start">
+                    <span className="text-sm font-medium">Jean Dupont</span>
+                    <span className="text-xs text-muted">
+                      Profil & Objectifs
+                    </span>
+                  </div>
                   <ChevronDown
                     className={cn(
                       "h-4 w-4 text-muted transition-transform",
@@ -145,7 +147,7 @@ export default function DashboardLayout({
                   />
                 </button>
                 {profileMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-dark-50 border border-dark-200 rounded-xl shadow-lg p-2">
+                  <div className="absolute right-0 top-full w-56 bg-dark-50 border border-dark-200 rounded-xl shadow-lg p-2">
                     <Link
                       href="/profile"
                       onClick={() => setProfileMenuOpen(false)}
