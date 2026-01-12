@@ -445,7 +445,7 @@ export default function ChatPage() {
                                 <span className="font-medium">
                                   {session.title}
                                 </span>
-                                <Badge variant="secondary">
+                                <Badge variant="info">
                                   {session.duration_minutes || "--"} min
                                 </Badge>
                               </div>
