@@ -9,8 +9,8 @@
   --card-hover: #22222e;
   --border: #2a2a38;
   --muted: #6b7280;
-  --accent: #00d4aa;
-  --accent-hover: #00b894;
+  --accent: #118ab2;
+  --accent-hover: #0f7a9d;
   --secondary: #3b82f6;
   --warning: #f59e0b;
   --error: #ef4444;
@@ -87,7 +87,7 @@ body {
 
   /* Gradient backgrounds */
   .gradient-accent {
-    background: linear-gradient(135deg, var(--accent) 0%, #00a888 100%);
+    background: linear-gradient(135deg, var(--accent) 0%, #0b5c75 100%);
   }
 
   .gradient-card {

@@ -28,6 +28,37 @@ interface ChatSession {
   updated_at: string;
 }
 
+interface PlanSession {
+  title: string;
+  sport?: string;
+  duration_minutes?: number;
+  description?: string;
+  intensity?: string;
+}
+
+interface PlanDay {
+  date: string;
+  sessions?: PlanSession[];
+}
+
+interface PlanWeek {
+  week_index?: number;
+  focus?: string;
+  days?: PlanDay[];
+}
+
+interface TrainingPlan {
+  summary?: string;
+  weeks: PlanWeek[];
+}
+
+interface PlanSuggestion {
+  id: string;
+  plan: TrainingPlan;
+  createdAt: string;
+  status: "pending" | "saving" | "error";
+}
+
 const quickActions = [
   {
     icon: Activity,
@@ -58,6 +89,8 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [planSuggestions, setPlanSuggestions] = useState<PlanSuggestion[]>([]);
+  const [forcePlanMode, setForcePlanMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -104,6 +137,7 @@ export default function ChatPage() {
       if (data.messages) {
         setMessages(data.messages);
         setCurrentSession(sessionId);
+        setPlanSuggestions([]);
       }
     } catch (error) {
       console.error("Error loading messages:", error);
@@ -116,9 +150,17 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSend = async (message?: string) => {
+  const handleSend = async (
+    message?: string,
+    options?: { forcePlan?: boolean }
+  ) => {
     const text = message || inputValue.trim();
     if (!text || isStreaming) return;
+
+    const shouldForcePlan = options?.forcePlan ?? forcePlanMode;
+    if (forcePlanMode) {
+      setForcePlanMode(false);
+    }
 
     setInputValue("");
     setIsStreaming(true);
@@ -148,6 +190,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: text,
           sessionId: currentSession,
+          forcePlanMode: shouldForcePlan,
         }),
       });
 
@@ -186,6 +229,19 @@ export default function ChatPage() {
                 });
               }
 
+              if (data.plan) {
+                const planId = data.planId || crypto.randomUUID();
+                setPlanSuggestions((prev) => [
+                  ...prev,
+                  {
+                    id: planId,
+                    plan: data.plan as TrainingPlan,
+                    createdAt: new Date().toISOString(),
+                    status: "pending",
+                  },
+                ]);
+              }
+
               if (data.done && data.sessionId) {
                 if (!currentSession) {
                   setCurrentSession(data.sessionId);
@@ -211,6 +267,8 @@ export default function ChatPage() {
   const handleNewChat = () => {
     setCurrentSession(null);
     setMessages([]);
+    setPlanSuggestions([]);
+    setForcePlanMode(false);
   };
 
   const formatDate = (dateStr: string) => {
@@ -275,6 +333,177 @@ export default function ChatPage() {
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(/`(.*?)`/g, "<code>$1</code>")
       .replace(/\n/g, "<br>");
+  };
+
+  const handleAcceptPlan = async (planId: string) => {
+    const plan = planSuggestions.find((p) => p.id === planId);
+    if (!plan || plan.status === "saving") return;
+
+    setPlanSuggestions((prev) =>
+      prev.map((p) =>
+        p.id === planId ? { ...p, status: "saving" } : p
+      )
+    );
+
+    try {
+      const response = await fetch("/api/plans/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: plan.plan }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Plan accept failed");
+      }
+
+      setPlanSuggestions((prev) => prev.filter((p) => p.id !== planId));
+    } catch (error) {
+      console.error("Accept plan error:", error);
+      setPlanSuggestions((prev) =>
+        prev.map((p) =>
+          p.id === planId ? { ...p, status: "error" } : p
+        )
+      );
+    }
+  };
+
+  const handleAdaptPlan = (planId: string) => {
+    const plan = planSuggestions.find((p) => p.id === planId);
+    if (!plan) return;
+    setForcePlanMode(true);
+    setInputValue(
+      "Peux-tu adapter ce plan à mes contraintes (explique ce que tu veux modifier) ?"
+    );
+    inputRef.current?.focus();
+  };
+
+  const handleRefusePlan = (planId: string) => {
+    setPlanSuggestions((prev) => prev.filter((p) => p.id !== planId));
+    handleSend(
+      "Ce plan ne me convient pas, peux-tu m'en proposer un autre plus adapté ?",
+      { forcePlan: true }
+    );
+  };
+
+  const renderPlanSuggestion = (suggestion: PlanSuggestion) => {
+    return (
+      <Card
+        key={suggestion.id}
+        className="mb-6 border border-accent/30 bg-dark-50"
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <p className="text-xs text-accent uppercase">Plan IA proposé</p>
+            <h3 className="font-semibold text-lg">
+              {suggestion.plan.weeks.length} semaine
+              {suggestion.plan.weeks.length > 1 ? "s" : ""}
+            </h3>
+            {suggestion.plan.summary && (
+              <p className="text-sm text-muted">{suggestion.plan.summary}</p>
+            )}
+          </div>
+          <Badge variant="outline">
+            {suggestion.status === "saving"
+              ? "Ajout en cours..."
+              : suggestion.status === "error"
+              ? "Erreur"
+              : "Proposé"}
+          </Badge>
+        </div>
+
+        <div className="space-y-4">
+          {suggestion.plan.weeks.map((week, weekIdx) => (
+            <div key={week.week_index ?? weekIdx}>
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="font-semibold">
+                  Semaine {week.week_index ?? weekIdx + 1}
+                </h4>
+                {week.focus && (
+                  <Badge variant="outline" size="sm">
+                    {week.focus}
+                  </Badge>
+                )}
+              </div>
+              <div className="space-y-2">
+                {week.days && week.days.length > 0 ? (
+                  week.days.map((day, dayIdx) => (
+                    <div
+                      key={`${day.date}-${dayIdx}`}
+                      className="p-3 bg-dark-100 rounded-xl"
+                    >
+                      <p className="text-sm font-semibold mb-2">
+                        {formatPlanDate(day.date)}
+                      </p>
+                      {day.sessions && day.sessions.length > 0 ? (
+                        <div className="space-y-2">
+                          {day.sessions.map((session, sessionIdx) => (
+                            <div
+                              key={`${session.title}-${sessionIdx}`}
+                              className="rounded-lg border border-dark-200 p-3 text-sm"
+                            >
+                              <div className="flex flex-wrap items-center gap-2 justify-between">
+                                <span className="font-medium">
+                                  {session.title}
+                                </span>
+                                <Badge variant="secondary">
+                                  {session.duration_minutes || "--"} min
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted mt-1">
+                                Sport: {session.sport || "N/A"} • Intensité:{" "}
+                                {session.intensity || "N/A"}
+                              </p>
+                              {session.description && (
+                                <p className="mt-2 text-sm">
+                                  {session.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted">Repos / Libre</p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted">
+                    Aucun jour défini pour cette semaine.
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {suggestion.status === "error" && (
+          <p className="text-sm text-error mt-3">
+            Impossible d&apos;ajouter le plan. Réessaie plus tard.
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-3 mt-5">
+          <Button
+            onClick={() => handleAcceptPlan(suggestion.id)}
+            disabled={suggestion.status === "saving"}
+          >
+            {suggestion.status === "saving" ? "Ajout..." : "Accepter"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => handleAdaptPlan(suggestion.id)}
+          >
+            Adapter
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => handleRefusePlan(suggestion.id)}
+          >
+            Refuser
+          </Button>
+        </div>
+      </Card>
+    );
   };
 
   return (
@@ -415,6 +644,7 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
+              {planSuggestions.map(renderPlanSuggestion)}
               {messages.map(renderMessage)}
               {isStreaming && (
                 <div className="flex items-center gap-2 text-muted text-sm">
@@ -463,4 +693,16 @@ export default function ChatPage() {
       </div>
     </div>
   );
+}
+
+function formatPlanDate(dateString: string) {
+  try {
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  } catch {
+    return dateString;
+  }
 }

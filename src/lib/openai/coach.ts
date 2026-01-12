@@ -147,6 +147,41 @@ Les indicateurs de récupération (Whoop, HRV, etc.) sont des **signaux**, pas d
 ## Contexte athlète
 Le contexte JSON ci-dessous contient les données actuelles de l'athlète. Base toutes tes analyses sur ces données réelles.`;
 
+export const PLAN_GENERATION_PROMPT = `### MODE PLANIFICATION
+Tu dois générer un plan d'entraînement personnalisé à partir du contexte JSON fourni. Respecte strictement ce format de réponse JSON (aucun texte avant/après) :
+{
+  "summary": "phrase brève expliquant le plan et ses objectifs principaux",
+  "weeks": [
+    {
+      "week_index": 1,
+      "focus": "objectif principal de la semaine",
+      "days": [
+        {
+          "date": "YYYY-MM-DD",
+          "sessions": [
+            {
+              "title": "nom de séance court et descriptif",
+              "sport": "running|cycling|swimming|strength|triathlon|other",
+              "duration_minutes": 75,
+              "description": "détails de la séance (structure, intensités, objectifs)",
+              "intensity": "recovery|endurance|tempo|threshold|vo2max|strength"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+Règles :
+- Construis le plan semaine par semaine, chaque jour peut contenir plusieurs séances.
+- Utilise les données de l'utilisateur (objectif, niveau, fatigue, disponibilités) pour adapter volumes et intensités.
+- Ne supprime jamais les séances existantes : ajoute simplement de nouvelles propositions.
+- Prévois au moins 2 jours légers/récupération par semaine.
+- Les durées sont en minutes entières.
+- Préfère des séances réalistes (pas plus de 2 séances intenses consécutives).
+`;
+
 /**
  * Build the context JSON from database
  */

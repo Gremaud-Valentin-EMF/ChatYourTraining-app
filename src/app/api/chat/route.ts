@@ -592,6 +592,17 @@ function extractGeminiText(candidate: unknown): string | null {
       continue;
     }
     if (typeof part === "object") {
+      const fnCall = (part as { functionCall?: { args?: unknown } }).functionCall;
+      if (fnCall?.args) {
+        const argsText =
+          typeof fnCall.args === "string"
+            ? fnCall.args
+            : JSON.stringify(fnCall.args);
+        if (argsText) {
+          textSegments.push(argsText);
+          continue;
+        }
+      }
       const textValue = (part as { text?: string }).text;
       if (typeof textValue === "string" && textValue.trim()) {
         textSegments.push(textValue.trim());

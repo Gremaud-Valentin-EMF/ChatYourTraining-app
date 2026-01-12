@@ -24,19 +24,19 @@ const config: Config = {
           400: "#4a4a5c",
         },
 
-        // Primary accent (Cyan/Turquoise)
+        // Primary accent (Blue)
         accent: {
-          DEFAULT: "#00d4aa",
-          50: "#e6fff9",
-          100: "#b3ffed",
-          200: "#80ffe0",
-          300: "#4dffd4",
-          400: "#1affc7",
-          500: "#00d4aa",
-          600: "#00a888",
-          700: "#007d66",
-          800: "#005244",
-          900: "#002922",
+          DEFAULT: "#118ab2",
+          50: "#e6f2f7",
+          100: "#cce5ef",
+          200: "#99cbe0",
+          300: "#66b1d0",
+          400: "#3397c1",
+          500: "#118ab2",
+          600: "#0f7a9d",
+          700: "#0b5c75",
+          800: "#083d4e",
+          900: "#041e26",
         },
 
         // Secondary (Blue)
