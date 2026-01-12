@@ -347,7 +347,7 @@ export function calculateTrainingLoad(
     tssByDate.set(entry.date, current + entry.tss);
   }
 
-  const uniqueDates = [...tssByDate.keys()].sort((a, b) =>
+  const uniqueDates = Array.from(tssByDate.keys()).sort((a, b) =>
     a.localeCompare(b)
   );
   const firstDateStr = uniqueDates[0];

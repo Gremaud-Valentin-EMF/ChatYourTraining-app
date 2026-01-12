@@ -17,6 +17,7 @@ import {
   Filter,
 } from "lucide-react";
 import { cn, formatDuration, getSportColor } from "@/lib/utils";
+import type { IntegrationProvider } from "@/types/database";
 
 interface Activity {
   id: string;
@@ -29,7 +30,7 @@ interface Activity {
   avg_hr: number | null;
   max_hr: number | null;
   tss: number | null;
-  source: "strava" | "whoop" | "garmin" | "manual";
+  source: IntegrationProvider;
   intensity: string | null;
   sport: {
     name: string;
@@ -37,18 +38,26 @@ interface Activity {
   };
 }
 
-const sourceColors: Record<string, string> = {
+const sourceColors: Record<IntegrationProvider, string> = {
   strava: "#FC4C02",
   whoop: "#00D46A",
   garmin: "#007CC3",
   manual: "#6b7280",
 };
 
-const sourceLabels: Record<string, string> = {
+const sourceLabels: Record<IntegrationProvider, string> = {
   strava: "STRAVA",
   whoop: "WHOOP",
   garmin: "GARMIN",
   manual: "MANUEL",
+};
+
+type PeriodFilter = "all" | "week" | "month" | "3months";
+type ActivityFilters = {
+  period: PeriodFilter;
+  sport: string;
+  source: "all" | IntegrationProvider;
+  intensity: string;
 };
 
 export default function WorkoutsPage() {
@@ -61,7 +70,7 @@ export default function WorkoutsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Filters
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ActivityFilters>({
     period: "all",
     sport: "all",
     source: "all",
@@ -305,7 +314,12 @@ export default function WorkoutsPage() {
             { value: "3months", label: "3 derniers mois" },
           ]}
           value={filters.period}
-          onChange={(e) => setFilters({ ...filters, period: e.target.value })}
+          onChange={(e) =>
+            setFilters({
+              ...filters,
+              period: e.target.value as PeriodFilter,
+            })
+          }
           className="w-40"
         />
 
@@ -331,7 +345,12 @@ export default function WorkoutsPage() {
             { value: "manual", label: "Manuel" },
           ]}
           value={filters.source}
-          onChange={(e) => setFilters({ ...filters, source: e.target.value })}
+          onChange={(e) =>
+            setFilters({
+              ...filters,
+              source: e.target.value as "all" | IntegrationProvider,
+            })
+          }
           className="w-40"
         />
 

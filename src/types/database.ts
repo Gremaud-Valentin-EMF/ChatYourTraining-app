@@ -58,6 +58,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       physiological_data: {
         Row: {
@@ -93,11 +94,13 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       sports: {
         Row: {
           id: string;
           name: string;
+          name_fr: string;
           icon: string;
           color: string;
           created_at: string;
@@ -105,6 +108,7 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
+          name_fr: string;
           icon: string;
           color: string;
           created_at?: string;
@@ -112,10 +116,12 @@ export interface Database {
         Update: {
           id?: string;
           name?: string;
+          name_fr?: string;
           icon?: string;
           color?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       user_sports: {
         Row: {
@@ -154,6 +160,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       objectives: {
         Row: {
@@ -192,6 +199,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       activities: {
         Row: {
@@ -275,6 +283,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       daily_metrics: {
         Row: {
@@ -346,6 +355,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       integrations: {
         Row: {
@@ -359,6 +369,7 @@ export interface Database {
           is_active: boolean;
           last_sync_at: string | null;
           sync_errors: Json | null;
+          sync_config: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -373,6 +384,7 @@ export interface Database {
           is_active?: boolean;
           last_sync_at?: string | null;
           sync_errors?: Json | null;
+          sync_config?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -387,9 +399,11 @@ export interface Database {
           is_active?: boolean;
           last_sync_at?: string | null;
           sync_errors?: Json | null;
+          sync_config?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       integration_preferences: {
         Row: {
@@ -416,6 +430,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       chat_sessions: {
         Row: {
@@ -439,6 +454,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       chat_messages: {
         Row: {
@@ -465,6 +481,7 @@ export interface Database {
           context_snapshot?: Json | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       training_load: {
         Row: {
@@ -500,6 +517,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
     };
     Views: {
@@ -509,6 +527,9 @@ export interface Database {
       [_ in never]: never;
     };
     Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
       [_ in never]: never;
     };
   };

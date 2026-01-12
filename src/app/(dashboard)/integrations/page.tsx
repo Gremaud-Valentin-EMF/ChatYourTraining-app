@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, Button, Toggle, Badge, Select } from "@/components/ui";
@@ -13,10 +13,11 @@ import {
   Utensils,
   AlertCircle,
 } from "lucide-react";
+import type { Tables, IntegrationProvider } from "@/types/database";
 
 interface Integration {
   id: string;
-  provider: string;
+  provider: IntegrationProvider;
   is_active: boolean;
   last_sync_at: string | null;
   scopes: string[] | null;
@@ -32,9 +33,36 @@ interface SyncConfig {
   strain?: boolean;
 }
 
+const SYNC_CONFIG_KEYS: (keyof SyncConfig)[] = [
+  "activities",
+  "sleep",
+  "recovery",
+  "workouts",
+  "hrv",
+  "strain",
+];
+
+function parseSyncConfig(config: unknown): SyncConfig | null {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return null;
+  }
+  const typedConfig: SyncConfig = {};
+  let hasValue = false;
+
+  for (const key of SYNC_CONFIG_KEYS) {
+    const value = (config as Record<string, unknown>)[key];
+    if (typeof value === "boolean") {
+      typedConfig[key] = value;
+      hasValue = true;
+    }
+  }
+
+  return hasValue ? typedConfig : null;
+}
+
 interface IntegrationPreference {
   data_type: string;
-  preferred_provider: string;
+  preferred_provider: IntegrationProvider;
 }
 
 interface SyncOption {
@@ -45,7 +73,7 @@ interface SyncOption {
 }
 
 const integrationProviders: {
-  id: string;
+  id: IntegrationProvider;
   name: string;
   description: string;
   icon: string;
@@ -164,7 +192,7 @@ const dataTypeLabels: Record<string, { label: string; icon: React.ReactNode }> =
     },
   };
 
-export default function IntegrationsPage() {
+function IntegrationsPageContent() {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
@@ -197,14 +225,26 @@ export default function IntegrationsPage() {
           .eq("user_id", user.id),
       ]);
 
-      if (integrationsResult.data) setIntegrations(integrationsResult.data);
+      if (integrationsResult.data) {
+        const normalized = integrationsResult.data.map(
+          (integration: Tables<"integrations">) => ({
+            id: integration.id,
+            provider: integration.provider,
+            is_active: integration.is_active,
+            last_sync_at: integration.last_sync_at,
+            scopes: integration.scopes,
+            sync_config: parseSyncConfig(integration.sync_config),
+          })
+        );
+        setIntegrations(normalized);
+      }
       if (preferencesResult.data) setPreferences(preferencesResult.data);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleConnect = (provider: string) => {
+  const handleConnect = (provider: IntegrationProvider) => {
     // Redirect to OAuth flow
     const callbackUrl = `${window.location.origin}/api/${provider}/callback`;
 
@@ -246,7 +286,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleDisconnect = async (provider: string) => {
+  const handleDisconnect = async (provider: IntegrationProvider) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -261,7 +301,7 @@ export default function IntegrationsPage() {
     loadIntegrations();
   };
 
-  const handleSync = async (provider: string) => {
+  const handleSync = async (provider: IntegrationProvider) => {
     setIsSyncing(provider);
     try {
       const response = await fetch(`/api/sync/${provider}`, { method: "POST" });
@@ -274,7 +314,10 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleToggle = async (provider: string, isActive: boolean) => {
+  const handleToggle = async (
+    provider: IntegrationProvider,
+    isActive: boolean
+  ) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -290,7 +333,10 @@ export default function IntegrationsPage() {
     loadIntegrations();
   };
 
-  const handlePreferenceChange = async (dataType: string, provider: string) => {
+  const handlePreferenceChange = async (
+    dataType: string,
+    provider: IntegrationProvider
+  ) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -307,7 +353,7 @@ export default function IntegrationsPage() {
   };
 
   const handleSyncConfigChange = async (
-    provider: string,
+    provider: IntegrationProvider,
     key: keyof SyncConfig,
     enabled: boolean
   ) => {
@@ -345,7 +391,7 @@ export default function IntegrationsPage() {
     return integration.sync_config[key] ?? defaultValue;
   };
 
-  const getIntegration = (provider: string) =>
+  const getIntegration = (provider: IntegrationProvider) =>
     integrations.find((i) => i.provider === provider);
 
   const formatLastSync = (date: string | null) => {
@@ -614,7 +660,10 @@ export default function IntegrationsPage() {
                       ]}
                       value={preference?.preferred_provider || ""}
                       onChange={(e) =>
-                        handlePreferenceChange(dataType, e.target.value)
+                        handlePreferenceChange(
+                          dataType,
+                          e.target.value as IntegrationProvider
+                        )
                       }
                       className="w-40"
                     />
@@ -626,5 +675,19 @@ export default function IntegrationsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function IntegrationsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-96">
+          <RefreshCw className="h-8 w-8 text-accent animate-spin" />
+        </div>
+      }
+    >
+      <IntegrationsPageContent />
+    </Suspense>
   );
 }
