@@ -320,7 +320,7 @@ export default function WorkoutsPage() {
               period: e.target.value as PeriodFilter,
             })
           }
-          className="w-40"
+          className="w-full sm:w-40"
         />
 
         <Select
@@ -333,7 +333,7 @@ export default function WorkoutsPage() {
           ]}
           value={filters.sport}
           onChange={(e) => setFilters({ ...filters, sport: e.target.value })}
-          className="w-36"
+          className="w-full sm:w-36"
         />
 
         <Select
@@ -351,7 +351,7 @@ export default function WorkoutsPage() {
               source: e.target.value as "all" | IntegrationProvider,
             })
           }
-          className="w-40"
+          className="w-full sm:w-40"
         />
 
         <Button
@@ -377,64 +377,58 @@ export default function WorkoutsPage() {
       </div>
 
       {/* Activities List */}
-      <Card padding="none">
-        {/* Table header */}
-        <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-dark-200 text-xs text-muted uppercase tracking-wide">
-          <div className="col-span-4">Date / Sport / Titre</div>
-          <div className="col-span-4">Métriques clés</div>
-          <div className="col-span-2">Source</div>
-          <div className="col-span-2 text-right">Actions</div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Spinner size="lg" />
         </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner size="lg" />
-          </div>
-        ) : activities.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted mb-4">Aucune activité trouvée</p>
-            <Button variant="secondary" leftIcon={<Plus className="h-4 w-4" />}>
-              Ajouter votre première séance
-            </Button>
-          </div>
-        ) : (
-          <div className="divide-y divide-dark-200">
+      ) : activities.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-muted mb-4">Aucune activité trouvée</p>
+          <Button variant="secondary" leftIcon={<Plus className="h-4 w-4" />}>
+            Ajouter votre première séance
+          </Button>
+        </div>
+      ) : (
+        <>
+          {/* Mobile list */}
+          <div className="space-y-4 lg:hidden">
             {activities.map((activity) => {
               const dateInfo = formatDate(activity.scheduled_date);
               const sportColor = getSportColor(activity.sport.name);
 
               return (
-                <div
-                  key={activity.id}
-                  className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-dark-100 transition-colors items-center"
-                >
-                  {/* Date & Title */}
-                  <div className="col-span-4 flex items-center gap-4">
-                    <div
-                      className="h-14 w-14 rounded-xl flex flex-col items-center justify-center text-white"
-                      style={{ backgroundColor: sportColor }}
-                    >
-                      <span className="text-xs uppercase">
-                        {dateInfo.month}
-                      </span>
-                      <span className="text-xl font-bold">{dateInfo.day}</span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-4 w-4 rounded-full"
-                          style={{ backgroundColor: sportColor }}
-                        />
-                        <h3 className="font-medium">{activity.title}</h3>
+                <Card key={activity.id} className="space-y-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-muted uppercase">
+                          {dateInfo.month} {dateInfo.day} • {dateInfo.time}
+                        </p>
+                        <h3 className="font-semibold">{activity.title}</h3>
+                        <p className="text-xs text-muted">
+                          {activity.sport.name_fr}
+                        </p>
                       </div>
-                      <p className="text-sm text-muted">
-                        {dateInfo.weather} • {activity.sport.name_fr}
-                      </p>
+                      <Badge
+                        variant="outline"
+                        style={{
+                          borderColor: sourceColors[activity.source],
+                          color: sourceColors[activity.source],
+                        }}
+                      >
+                        {sourceLabels[activity.source]}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: sportColor }}
+                      />
+                      <span className="text-muted">{dateInfo.weather}</span>
                     </div>
                   </div>
 
-                  {/* Metrics */}
-                  <div className="col-span-4 flex items-center gap-6 text-sm">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="flex items-center gap-1.5">
                       <Clock className="h-4 w-4 text-muted" />
                       <span>
@@ -462,6 +456,9 @@ export default function WorkoutsPage() {
                         </span>
                       </span>
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
                     <Badge
                       variant={
                         activity.tss && activity.tss > 100 ? "error" : "warning"
@@ -470,96 +467,190 @@ export default function WorkoutsPage() {
                       <Zap className="h-3 w-3 mr-1" />
                       {activity.tss || "--"} TSS
                     </Badge>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm">
+                        {"{}"} JSON
+                      </Button>
+                      <Button variant="ghost" size="icon">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-
-                  {/* Source */}
-                  <div className="col-span-2">
-                    <Badge
-                      variant="outline"
-                      style={{
-                        borderColor: sourceColors[activity.source],
-                        color: sourceColors[activity.source],
-                      }}
-                    >
-                      {sourceLabels[activity.source]}
-                    </Badge>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="col-span-2 flex items-center justify-end gap-2">
-                    <Button variant="ghost" size="sm">
-                      {"{}"} JSON
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                </Card>
               );
             })}
           </div>
-        )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 py-4 border-t border-dark-200">
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+          {/* Desktop table */}
+          <Card padding="none" className="hidden lg:block">
+            {/* Table header */}
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-dark-200 text-xs text-muted uppercase tracking-wide">
+              <div className="col-span-4">Date / Sport / Titre</div>
+              <div className="col-span-4">Métriques clés</div>
+              <div className="col-span-2">Source</div>
+              <div className="col-span-2 text-right">Actions</div>
+            </div>
 
-            {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-              let pageNum: number;
-              if (totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
+            <div className="divide-y divide-dark-200">
+              {activities.map((activity) => {
+                const dateInfo = formatDate(activity.scheduled_date);
+                const sportColor = getSportColor(activity.sport.name);
 
-              return (
-                <Button
-                  key={pageNum}
-                  variant={currentPage === pageNum ? "primary" : "ghost"}
-                  size="icon"
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </Button>
-              );
-            })}
+                return (
+                  <div
+                    key={activity.id}
+                    className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-dark-100 transition-colors items-center"
+                  >
+                    <div className="col-span-4 flex items-center gap-4">
+                      <div
+                        className="h-14 w-14 rounded-xl flex flex-col items-center justify-center text-white"
+                        style={{ backgroundColor: sportColor }}
+                      >
+                        <span className="text-xs uppercase">
+                          {dateInfo.month}
+                        </span>
+                        <span className="text-xl font-bold">{dateInfo.day}</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-4 w-4 rounded-full"
+                            style={{ backgroundColor: sportColor }}
+                          />
+                          <h3 className="font-medium">{activity.title}</h3>
+                        </div>
+                        <p className="text-sm text-muted">
+                          {dateInfo.weather} • {activity.sport.name_fr}
+                        </p>
+                      </div>
+                    </div>
 
-            {totalPages > 5 && currentPage < totalPages - 2 && (
-              <>
-                <span className="text-muted">...</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setCurrentPage(totalPages)}
-                >
-                  {totalPages}
-                </Button>
-              </>
-            )}
+                    <div className="col-span-4 flex items-center gap-6 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-4 w-4 text-muted" />
+                        <span>
+                          {activity.actual_duration_minutes
+                            ? formatDuration(activity.actual_duration_minutes)
+                            : "--"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4 text-muted" />
+                        <span>
+                          {activity.actual_distance_km?.toFixed(1) || "--"} km
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Mountain className="h-4 w-4 text-muted" />
+                        <span>{activity.elevation_gain_m || "--"}m</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Heart className="h-4 w-4 text-error" />
+                        <span>
+                          {activity.avg_hr || "--"}
+                          <span className="text-muted">
+                            /{activity.max_hr || "--"} bpm
+                          </span>
+                        </span>
+                      </div>
+                      <Badge
+                        variant={
+                          activity.tss && activity.tss > 100
+                            ? "error"
+                            : "warning"
+                        }
+                      >
+                        <Zap className="h-3 w-3 mr-1" />
+                        {activity.tss || "--"} TSS
+                      </Badge>
+                    </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </Card>
+                    <div className="col-span-2">
+                      <Badge
+                        variant="outline"
+                        style={{
+                          borderColor: sourceColors[activity.source],
+                          color: sourceColors[activity.source],
+                        }}
+                      >
+                        {sourceLabels[activity.source]}
+                      </Badge>
+                    </div>
+
+                    <div className="col-span-2 flex items-center justify-end gap-2">
+                      <Button variant="ghost" size="sm">
+                        {"{}"} JSON
+                      </Button>
+                      <Button variant="ghost" size="icon">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </>
+      )}
+
+      {totalPages > 1 && !isLoading && activities.length > 0 && (
+        <div className="flex items-center justify-center gap-2 py-4 border border-dark-200 rounded-2xl lg:border-0 lg:border-t lg:rounded-none lg:mt-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((p) => p - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+            let pageNum: number;
+            if (totalPages <= 5) {
+              pageNum = i + 1;
+            } else if (currentPage <= 3) {
+              pageNum = i + 1;
+            } else if (currentPage >= totalPages - 2) {
+              pageNum = totalPages - 4 + i;
+            } else {
+              pageNum = currentPage - 2 + i;
+            }
+
+            return (
+              <Button
+                key={pageNum}
+                variant={currentPage === pageNum ? "primary" : "ghost"}
+                size="icon"
+                onClick={() => setCurrentPage(pageNum)}
+              >
+                {pageNum}
+              </Button>
+            );
+          })}
+
+          {totalPages > 5 && currentPage < totalPages - 2 && (
+            <>
+              <span className="text-muted">...</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCurrentPage(totalPages)}
+              >
+                {totalPages}
+              </Button>
+            </>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((p) => p + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

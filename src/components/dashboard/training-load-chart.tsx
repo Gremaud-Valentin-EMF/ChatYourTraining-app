@@ -63,8 +63,8 @@ export function TrainingLoadChart({
 
   return (
     <Card className="col-span-full lg:col-span-2">
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
+        <div className="flex items-start gap-3">
           <div className="p-2 bg-accent/20 rounded-xl">
             <TrendingUp className="h-5 w-5 text-accent" />
           </div>
@@ -80,8 +80,9 @@ export function TrainingLoadChart({
           <Tabs
             defaultValue="30"
             onValueChange={(v) => setPeriod(v as "7" | "30" | "90")}
+            className="w-full md:w-auto"
           >
-            <TabsList>
+            <TabsList className="w-full md:w-auto justify-between">
               <TabsTrigger value="7">7J</TabsTrigger>
               <TabsTrigger value="30">30J</TabsTrigger>
               <TabsTrigger value="90">90J</TabsTrigger>
@@ -102,7 +103,7 @@ export function TrainingLoadChart({
       ) : (
         <>
           {/* Current values */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="p-4 bg-dark-100 rounded-xl">
               <p className="text-xs text-muted uppercase tracking-wide mb-1">
                 Forme (CTL)

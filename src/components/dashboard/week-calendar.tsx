@@ -44,13 +44,13 @@ export function WeekCalendar({
 
   return (
     <Card className="col-span-full">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-accent" />
           <h3 className="font-semibold">Calendrier de la semaine</h3>
         </div>
 
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted" />
             <span>Heures:</span>
@@ -71,7 +71,7 @@ export function WeekCalendar({
       </div>
 
       {/* Progress bars */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <div className="flex justify-between text-xs mb-1">
             <span className="text-muted">Volume horaire</span>
@@ -101,63 +101,67 @@ export function WeekCalendar({
       </div>
 
       {/* Week grid */}
-      <div className="grid grid-cols-7 gap-2">
-        {weekData.map((day) => (
-          <div
-            key={day.date.toISOString()}
-            className={`p-3 rounded-xl border ${
-              day.isToday
-                ? "border-accent bg-accent/5"
-                : "border-dark-200 bg-dark-100"
-            }`}
-          >
-            <div className="text-center mb-2">
-              <p className="text-xs text-muted uppercase">{day.dayName}</p>
-              <p
-                className={`text-lg font-bold ${
-                  day.isToday ? "text-accent" : ""
-                }`}
-              >
-                {day.dayNumber}
-              </p>
-              {day.isToday && (
-                <div className="h-1 w-1 mx-auto mt-1 bg-accent rounded-full" />
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              {day.activities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className={`px-2 py-1 rounded text-xs font-medium truncate ${
-                    activity.status === "completed"
-                      ? "bg-success/20 text-success"
-                      : activity.status === "skipped"
-                      ? "bg-error/20 text-error line-through"
-                      : ""
+      <div className="overflow-x-auto pb-2">
+        <div className="grid grid-cols-7 min-w-[560px] gap-2">
+          {weekData.map((day) => (
+            <div
+              key={day.date.toISOString()}
+              className={`p-3 rounded-xl border ${
+                day.isToday
+                  ? "border-accent bg-accent/5"
+                  : "border-dark-200 bg-dark-100"
+              }`}
+            >
+              <div className="text-center mb-2">
+                <p className="text-xs text-muted uppercase">{day.dayName}</p>
+                <p
+                  className={`text-lg font-bold ${
+                    day.isToday ? "text-accent" : ""
                   }`}
-                  style={
-                    activity.status === "planned"
-                      ? {
-                          backgroundColor: `${getSportColor(activity.sport)}20`,
-                          color: getSportColor(activity.sport),
-                        }
-                      : undefined
-                  }
                 >
-                  {activity.title.length > 8
-                    ? `${activity.title.substring(0, 8)}...`
-                    : activity.title}
-                </div>
-              ))}
-              {day.activities.length === 0 && (
-                <div className="px-2 py-1 rounded text-xs text-muted bg-dark-200">
-                  Repos
-                </div>
-              )}
+                  {day.dayNumber}
+                </p>
+                {day.isToday && (
+                  <div className="h-1 w-1 mx-auto mt-1 bg-accent rounded-full" />
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                {day.activities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className={`px-2 py-1 rounded text-xs font-medium truncate ${
+                      activity.status === "completed"
+                        ? "bg-success/20 text-success"
+                        : activity.status === "skipped"
+                        ? "bg-error/20 text-error line-through"
+                        : ""
+                    }`}
+                    style={
+                      activity.status === "planned"
+                        ? {
+                            backgroundColor: `${getSportColor(
+                              activity.sport
+                            )}20`,
+                            color: getSportColor(activity.sport),
+                          }
+                        : undefined
+                    }
+                  >
+                    {activity.title.length > 8
+                      ? `${activity.title.substring(0, 8)}...`
+                      : activity.title}
+                  </div>
+                ))}
+                {day.activities.length === 0 && (
+                  <div className="px-2 py-1 rounded text-xs text-muted bg-dark-200">
+                    Repos
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </Card>
   );

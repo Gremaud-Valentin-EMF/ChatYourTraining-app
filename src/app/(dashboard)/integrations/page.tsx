@@ -443,12 +443,13 @@ function IntegrationsPageContent() {
       )}
 
       {/* Sync all button */}
-      <div className="flex items-center justify-between p-4 bg-dark-50 rounded-xl border border-dark-200">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 bg-dark-50 rounded-xl border border-dark-200">
         <p className="text-sm text-muted">
           Connectez vos services favoris pour centraliser vos données
           d&apos;entraînement, de sommeil et de nutrition.
         </p>
         <Button
+          className="w-full sm:w-auto"
           onClick={() => {
             integrations
               .filter((i) => i.is_active)
@@ -479,7 +480,7 @@ function IntegrationsPageContent() {
                 variant={isConnected ? "default" : "default"}
                 className={isConnected && isActive ? "border-accent/50" : ""}
               >
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div
                       className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl font-bold"
@@ -528,7 +529,7 @@ function IntegrationsPageContent() {
                       {provider.syncOptions.map((option) => (
                         <div
                           key={option.key}
-                          className="flex items-center justify-between py-2 px-3 bg-dark-100 rounded-lg"
+                          className="flex flex-col gap-2 sm:flex-row sm:items-center justify-between py-2 px-3 bg-dark-100 rounded-lg"
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">
@@ -568,7 +569,7 @@ function IntegrationsPageContent() {
                 )}
 
                 {/* Actions */}
-                <div className="flex items-center gap-3 pt-4 border-t border-dark-200">
+                <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-dark-200">
                   {isConnected ? (
                     <>
                       <button
@@ -592,6 +593,7 @@ function IntegrationsPageContent() {
                   ) : (
                     <Button
                       size="sm"
+                      className="w-full sm:w-auto"
                       onClick={() => handleConnect(provider.id)}
                       rightIcon={<ExternalLink className="h-4 w-4" />}
                     >
@@ -632,7 +634,7 @@ function IntegrationsPageContent() {
                 return (
                   <div
                     key={dataType}
-                    className="flex items-center justify-between p-4 bg-dark-100 rounded-xl"
+                    className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 bg-dark-100 rounded-xl"
                   >
                     <div className="flex items-center gap-3">
                       {icon}
@@ -665,7 +667,7 @@ function IntegrationsPageContent() {
                           e.target.value as IntegrationProvider
                         )
                       }
-                      className="w-40"
+                      className="w-full sm:w-40"
                     />
                   </div>
                 );
