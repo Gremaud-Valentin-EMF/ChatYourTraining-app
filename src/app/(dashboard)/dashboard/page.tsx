@@ -20,17 +20,56 @@ interface TrainingLoadDataPoint {
   tsb: number;
 }
 
+interface WeekActivity {
+  id: string;
+  sport: string;
+  title: string;
+  status: "planned" | "completed" | "skipped";
+  intensity?: string | null;
+}
+
 interface WeekDayData {
   date: Date;
   dayName: string;
   dayNumber: number;
   isToday: boolean;
-  activities: {
-    id: string;
-    sport: string;
-    title: string;
-    status: "planned" | "completed" | "skipped";
-  }[];
+  activities: WeekActivity[];
+}
+
+interface RecoveryContext {
+  score: number | null;
+  average7d: number | null;
+  deltaPercent: number | null;
+}
+
+interface HealthContext {
+  hrv?: number;
+  hrvBaseline?: number;
+  hrvDeltaPct?: number;
+  restingHr?: number;
+  restingHrTrend?: number;
+  sleepHours?: number;
+  sleepDebtHours?: number;
+  sleepTrendHours?: number;
+  strain?: number;
+}
+
+interface ObjectiveInsights {
+  completion: number;
+  completedMinutes: number;
+  totalMinutes: number;
+  confidenceScore: number;
+  confidenceLabel: "Haute" | "Moyenne" | "Faible";
+}
+
+interface DailyMetric {
+  date: string;
+  recovery_score?: number | null;
+  hrv_ms?: number | null;
+  resting_hr?: number | null;
+  sleep_duration_minutes?: number | null;
+  sleep_score?: number | null;
+  strain?: number | null;
 }
 
 export default function DashboardPage() {
@@ -50,14 +89,9 @@ export default function DashboardPage() {
       tss: number;
       status: "planned" | "completed" | "skipped" | "in_progress";
     } | null;
-    recoveryScore: number | null;
-    healthData: {
-      hrv?: number;
-      restingHr?: number;
-      sleepHours?: number;
-      sleepQuality?: number;
-      strain?: number;
-    };
+    recovery: RecoveryContext;
+    healthData: HealthContext;
+    objectiveInsights?: ObjectiveInsights;
   } | null>(null);
   const [trainingLoadData, setTrainingLoadData] = useState<
     TrainingLoadDataPoint[]
@@ -99,6 +133,7 @@ export default function DashboardPage() {
 
       // Load next objective
       let objective = null;
+      let objectiveInsights: ObjectiveInsights | undefined;
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: objData } = await (supabase as any)
@@ -117,6 +152,127 @@ export default function DashboardPage() {
         }
       } catch {
         // No objective found
+      }
+      if (objective) {
+        try {
+          const objectiveDate = new Date(objective.date);
+          const planStart = new Date(objectiveDate);
+          planStart.setDate(planStart.getDate() - 70);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: planActivities } = await (supabase as any)
+            .from("activities")
+            .select(
+              "scheduled_date, planned_duration_minutes, actual_duration_minutes, status, intensity"
+            )
+            .eq("user_id", user.id)
+            .gte("scheduled_date", planStart.toISOString().split("T")[0])
+            .lte("scheduled_date", objective.date);
+
+          if (planActivities && planActivities.length > 0) {
+            let totalMinutes = 0;
+            let completedMinutes = 0;
+            let keySessions = 0;
+            let completedKeySessions = 0;
+            const todayDate = new Date();
+
+            planActivities.forEach(
+              (activity: {
+                scheduled_date: string;
+                planned_duration_minutes: number | null;
+                actual_duration_minutes: number | null;
+                status: string;
+                intensity: string | null;
+              }) => {
+                const plannedMinutes =
+                  activity.planned_duration_minutes ??
+                  activity.actual_duration_minutes ??
+                  0;
+                totalMinutes += plannedMinutes;
+
+                const scheduledDate = new Date(activity.scheduled_date);
+                if (
+                  activity.status === "completed" &&
+                  scheduledDate <= todayDate
+                ) {
+                  completedMinutes +=
+                    activity.actual_duration_minutes ?? plannedMinutes;
+                }
+
+                if (
+                  activity.intensity &&
+                  ["tempo", "threshold", "vo2max", "anaerobic"].includes(
+                    activity.intensity
+                  )
+                ) {
+                  keySessions += 1;
+                  if (activity.status === "completed") {
+                    completedKeySessions += 1;
+                  }
+                }
+              }
+            );
+
+            const completionRatio =
+              totalMinutes > 0
+                ? Math.min(1, completedMinutes / totalMinutes)
+                : 0;
+            const confidenceRaw =
+              keySessions > 0
+                ? completedKeySessions / keySessions
+                : completionRatio;
+            const confidenceScore = Math.round(confidenceRaw * 100);
+
+            let confidenceLabel: "Haute" | "Moyenne" | "Faible" = "Moyenne";
+            if (confidenceScore >= 75) confidenceLabel = "Haute";
+            else if (confidenceScore < 50) confidenceLabel = "Faible";
+
+            objectiveInsights = {
+              completion: completionRatio,
+              completedMinutes,
+              totalMinutes,
+              confidenceScore,
+              confidenceLabel,
+            };
+          }
+        } catch {
+          // Unable to compute plan insights, leave undefined
+        }
+        if (!objectiveInsights) {
+          const objectiveDate = new Date(objective.date);
+          const planStart = new Date(objectiveDate);
+          planStart.setDate(planStart.getDate() - 70);
+          const totalDays = Math.max(
+            1,
+            Math.round(
+              (objectiveDate.getTime() - planStart.getTime()) /
+                (1000 * 60 * 60 * 24)
+            )
+          );
+          const elapsedDays = Math.min(
+            totalDays,
+            Math.max(
+              0,
+              Math.round(
+                (new Date().getTime() - planStart.getTime()) /
+                  (1000 * 60 * 60 * 24)
+              )
+            )
+          );
+          const completionRatio = Math.min(1, elapsedDays / totalDays);
+          const confidenceScore = Math.round(completionRatio * 100);
+          let confidenceLabel: "Haute" | "Moyenne" | "Faible" = "Moyenne";
+          if (confidenceScore >= 75) confidenceLabel = "Haute";
+          else if (confidenceScore < 50) confidenceLabel = "Faible";
+
+          objectiveInsights = {
+            completion: completionRatio,
+            completedMinutes: 0,
+            totalMinutes: 0,
+            confidenceScore,
+            confidenceLabel,
+          };
+        }
       }
 
       // Load sports for mapping
@@ -169,50 +325,120 @@ export default function DashboardPage() {
         // No activity today
       }
 
-      // Load today's metrics from daily_metrics (WHOOP data)
-      let healthData: {
-        hrv?: number;
-        restingHr?: number;
-        sleepHours?: number;
-        sleepQuality?: number;
-        strain?: number;
-      } = {};
-      let recoveryScore: number | null = null;
+      // Load recovery + health metrics history
+      let healthData: HealthContext = {};
+      let recovery: RecoveryContext = {
+        score: null,
+        average7d: null,
+        deltaPercent: null,
+      };
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: metricsData } = await (supabase as any)
           .from("daily_metrics")
           .select(
-            "recovery_score, hrv_ms, resting_hr, sleep_duration_minutes, sleep_score, strain"
+            "date, recovery_score, hrv_ms, resting_hr, sleep_duration_minutes, sleep_score, strain"
           )
           .eq("user_id", user.id)
           .order("date", { ascending: false })
-          .limit(1);
+          .limit(7);
 
-        const metrics = metricsData?.[0];
-        if (metrics) {
-          recoveryScore = metrics.recovery_score || null;
+        const metrics: DailyMetric[] = metricsData
+          ? (metricsData as DailyMetric[])
+          : [];
+        const latestMetrics = metrics[0];
+        if (latestMetrics) {
+          const averageRecoveryValues = metrics
+            .map((m) => m.recovery_score)
+            .filter((v): v is number => typeof v === "number");
+          const averageRecovery =
+            averageRecoveryValues.length > 0
+              ? averageRecoveryValues.reduce((sum, value) => sum + value, 0) /
+                averageRecoveryValues.length
+              : null;
+
+          const hrvValues = metrics
+            .map((m) => m.hrv_ms)
+            .filter((v): v is number => typeof v === "number");
+          const hrvBaseline =
+            hrvValues.length > 0
+              ? hrvValues.reduce((sum, value) => sum + value, 0) /
+                hrvValues.length
+              : undefined;
+
+          const hrvDeltaPct =
+            latestMetrics.hrv_ms && hrvBaseline
+              ? ((latestMetrics.hrv_ms - hrvBaseline) / hrvBaseline) * 100
+              : undefined;
+
+          const restingHrTrend =
+            latestMetrics.resting_hr !== null &&
+            latestMetrics.resting_hr !== undefined &&
+            metrics[1]?.resting_hr !== undefined &&
+            metrics[1]?.resting_hr !== null
+              ? latestMetrics.resting_hr - metrics[1].resting_hr
+              : undefined;
+
+          const latestSleepMinutes =
+            typeof latestMetrics.sleep_duration_minutes === "number"
+              ? latestMetrics.sleep_duration_minutes
+              : null;
+
+          const sleepHours =
+            latestSleepMinutes !== null ? latestSleepMinutes / 60 : undefined;
+
+          const sleepTrendHours =
+            latestSleepMinutes !== null &&
+            typeof metrics[1]?.sleep_duration_minutes === "number"
+              ? (latestSleepMinutes - metrics[1].sleep_duration_minutes) / 60
+              : undefined;
+
+          const debtSample = metrics.slice(1, 4);
+          const sleepDebtMinutes = debtSample.reduce((sum, metric) => {
+            if (
+              metric.sleep_duration_minutes !== null &&
+              metric.sleep_duration_minutes !== undefined
+            ) {
+              return sum + metric.sleep_duration_minutes;
+            }
+            return sum;
+          }, 0);
+          const expectedMinutes = debtSample.length * 8 * 60;
+          const sleepDebtHours =
+            debtSample.length > 0
+              ? Math.max(0, (expectedMinutes - sleepDebtMinutes) / 60)
+              : undefined;
+
+          const latestRecoveryScore =
+            typeof latestMetrics.recovery_score === "number"
+              ? latestMetrics.recovery_score
+              : null;
+
+          recovery = {
+            score: latestRecoveryScore,
+            average7d: averageRecovery,
+            deltaPercent:
+              averageRecovery && latestRecoveryScore !== null
+                ? ((latestRecoveryScore - averageRecovery) / averageRecovery) *
+                  100
+                : null,
+          };
+
           healthData = {
-            hrv: metrics.hrv_ms || undefined,
-            restingHr: metrics.resting_hr || undefined,
-            sleepHours: metrics.sleep_duration_minutes
-              ? metrics.sleep_duration_minutes / 60
-              : undefined,
-            sleepQuality: metrics.sleep_score || undefined,
-            strain: metrics.strain || undefined,
+            hrv: latestMetrics.hrv_ms || undefined,
+            hrvBaseline,
+            hrvDeltaPct,
+            restingHr: latestMetrics.resting_hr || undefined,
+            restingHrTrend,
+            sleepHours,
+            sleepDebtHours,
+            sleepTrendHours,
+            strain: latestMetrics.strain || undefined,
           };
         }
       } catch {
-        // No metrics
+        // No metrics available
       }
-
-      setUserData({
-        fullName,
-        objective,
-        todayWorkout,
-        recoveryScore,
-        healthData,
-      });
 
       // Load activities for training load calculation
       const trainingLoadFallbackDays = 180; // ensure at least ~4 months of history
@@ -308,7 +534,7 @@ export default function DashboardPage() {
         const { data: weekActivities } = await (supabase as any)
           .from("activities")
           .select(
-            "id, title, scheduled_date, status, sport_id, planned_duration_minutes, tss"
+            "id, title, scheduled_date, status, sport_id, planned_duration_minutes, tss, intensity"
           )
           .eq("user_id", user.id)
           .gte("scheduled_date", weekStart)
@@ -348,6 +574,7 @@ export default function DashboardPage() {
                 title: string;
                 sport_id: string;
                 status: string;
+                intensity: string | null;
               }) => ({
                 id: a.id,
                 sport: sportMap[a.sport_id]?.name || "other",
@@ -357,6 +584,7 @@ export default function DashboardPage() {
                   | "planned"
                   | "completed"
                   | "skipped",
+                intensity: a.intensity,
               })
             ),
           });
@@ -407,6 +635,15 @@ export default function DashboardPage() {
           targetTss: 0,
         });
       }
+
+      setUserData({
+        fullName,
+        objective,
+        todayWorkout,
+        recovery,
+        healthData,
+        objectiveInsights,
+      });
     } catch (error) {
       console.error("Error loading dashboard data:", error);
     } finally {
@@ -456,13 +693,24 @@ export default function DashboardPage() {
 
         {/* Right column - Recovery and Objective */}
         <div className="space-y-6">
-          <RecoveryGauge score={userData?.recoveryScore ?? null} />
+          <RecoveryGauge
+            score={userData?.recovery?.score ?? null}
+            average={userData?.recovery?.average7d ?? null}
+            deltaPercent={userData?.recovery?.deltaPercent ?? null}
+          />
 
           {userData?.objective ? (
             <NextObjective
               name={userData.objective.name}
               date={userData.objective.date}
               priority={userData.objective.priority}
+              planCompletion={userData.objectiveInsights?.completion}
+              planVolume={{
+                completed: userData.objectiveInsights?.completedMinutes ?? 0,
+                total: userData.objectiveInsights?.totalMinutes ?? 0,
+              }}
+              confidenceScore={userData.objectiveInsights?.confidenceScore}
+              confidenceLabel={userData.objectiveInsights?.confidenceLabel}
             />
           ) : (
             <div className="bg-dark-card border border-dark-border rounded-2xl p-6">
@@ -491,9 +739,13 @@ export default function DashboardPage() {
 
         <HealthSummary
           hrv={userData?.healthData.hrv}
+          hrvBaseline={userData?.healthData.hrvBaseline}
+          hrvDeltaPct={userData?.healthData.hrvDeltaPct}
           restingHr={userData?.healthData.restingHr}
+          restingHrTrend={userData?.healthData.restingHrTrend}
           sleepHours={userData?.healthData.sleepHours}
-          sleepQuality={userData?.healthData.sleepQuality}
+          sleepDebtHours={userData?.healthData.sleepDebtHours}
+          sleepTrendHours={userData?.healthData.sleepTrendHours}
           strain={userData?.healthData.strain}
         />
       </div>

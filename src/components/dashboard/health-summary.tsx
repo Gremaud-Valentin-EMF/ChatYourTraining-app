@@ -6,17 +6,25 @@ import { Heart, Moon, Activity, ArrowRight } from "lucide-react";
 
 interface HealthSummaryProps {
   hrv?: number;
+  hrvBaseline?: number;
+  hrvDeltaPct?: number;
   restingHr?: number;
+  restingHrTrend?: number;
   sleepHours?: number;
-  sleepQuality?: number;
+  sleepDebtHours?: number;
+  sleepTrendHours?: number;
   strain?: number;
 }
 
 export function HealthSummary({
   hrv,
+  hrvBaseline,
+  hrvDeltaPct,
   restingHr,
+  restingHrTrend,
   sleepHours,
-  sleepQuality,
+  sleepDebtHours,
+  sleepTrendHours,
   strain,
 }: HealthSummaryProps) {
   const formatSleep = (hours: number) => {
@@ -25,52 +33,92 @@ export function HealthSummary({
     return `${h}h${m > 0 ? m.toString().padStart(2, "0") : ""}`;
   };
 
-  const getStatus = (
-    value: number | undefined,
-    good: number,
-    warning: number,
-    reverse = false
+  const buildTrendIndicator = (
+    delta?: number,
+    reverse = false,
+    threshold = 1
   ) => {
-    if (value === undefined)
-      return { label: "Pas de données", text: "text-muted", dot: "bg-dark-300" };
-    if (reverse) {
-      if (value <= good)
-        return { label: "Optimal", text: "text-success", dot: "bg-success" };
-      if (value <= warning)
-        return { label: "Correct", text: "text-warning", dot: "bg-warning" };
-      return { label: "Élevé", text: "text-error", dot: "bg-error" };
+    if (delta === undefined) {
+      return { symbol: "➡️", className: "text-muted" };
     }
-    if (value >= good)
-      return { label: "Optimal", text: "text-success", dot: "bg-success" };
-    if (value >= warning)
-      return { label: "Correct", text: "text-warning", dot: "bg-warning" };
-    return { label: "Bas", text: "text-error", dot: "bg-error" };
+    if (Math.abs(delta) < threshold) {
+      return { symbol: "➡️", className: "text-muted" };
+    }
+    const isPositive = delta > 0;
+    const isPositiveGood = reverse ? !isPositive : isPositive;
+    return {
+      symbol: isPositive ? "↗️" : "↘️",
+      className: isPositiveGood ? "text-success" : "text-error",
+    };
   };
 
-  const hasData = hrv !== undefined || restingHr !== undefined || sleepHours !== undefined;
+  const getHrvStatus = () => {
+    if (hrvDeltaPct === undefined)
+      return { label: "Baseline inconnue", text: "text-muted" };
+    if (hrvDeltaPct <= -15)
+      return { label: "Fatigue ⚠️", text: "text-error" };
+    if (hrvDeltaPct <= -5)
+      return { label: "Surveillance", text: "text-warning" };
+    return { label: "Stable 🟢", text: "text-success" };
+  };
+
+  const getRestingStatus = () => {
+    if (restingHrTrend === undefined)
+      return { label: "Stable", text: "text-muted" };
+    if (restingHrTrend >= 2)
+      return { label: "Stress élevé", text: "text-warning" };
+    if (restingHrTrend <= -2)
+      return { label: "Récupération", text: "text-success" };
+    return { label: "Stable", text: "text-muted" };
+  };
+
+  const getSleepStatus = () => {
+    if (sleepDebtHours === undefined)
+      return { label: "Dette inconnue", text: "text-muted" };
+    if (sleepDebtHours < 0.5)
+      return { label: "Recharge 🟢", text: "text-success" };
+    if (sleepDebtHours < 1.5)
+      return { label: "Récup en cours", text: "text-warning" };
+    return { label: "Dette élevée ⚠️", text: "text-error" };
+  };
+
+  const hasData =
+    hrv !== undefined || restingHr !== undefined || sleepHours !== undefined;
   const metricCards = [
     {
       id: "hrv",
       label: "VFC (HRV)",
-      value: hrv !== undefined ? `${hrv} ms` : "--",
-      status: getStatus(hrv, 55, 35),
+      value: hrv !== undefined ? `${Math.round(hrv)} ms` : "--",
+      secondary:
+        hrvBaseline !== undefined
+          ? `Baseline 7j ${Math.round(hrvBaseline)} ms`
+          : undefined,
+      status: getHrvStatus(),
+      trend: buildTrendIndicator(hrvDeltaPct, false, 2),
     },
     {
       id: "resting-hr",
       label: "FC au repos",
-      value: restingHr !== undefined ? `${restingHr} bpm` : "--",
-      status: getStatus(restingHr, 52, 60, true),
+      value: restingHr !== undefined ? `${Math.round(restingHr)} bpm` : "--",
+      secondary:
+        restingHrTrend !== undefined
+          ? `${restingHrTrend > 0 ? "+" : ""}${Math.round(
+              restingHrTrend
+            )} bpm vs hier`
+          : undefined,
+      status: getRestingStatus(),
+      trend: buildTrendIndicator(restingHrTrend, true, 1),
     },
     {
       id: "sleep",
       label: "Sommeil",
-      value:
-        sleepHours !== undefined
-          ? formatSleep(sleepHours)
-          : sleepQuality !== undefined
-          ? `${sleepQuality}%`
-          : "--",
-      status: getStatus(sleepQuality, 75, 60),
+      value: sleepHours !== undefined ? formatSleep(sleepHours) : "--",
+      secondary:
+        sleepDebtHours !== undefined
+          ? `Dette: ${formatSleep(Math.max(0, sleepDebtHours))}`
+          : undefined,
+      status: getSleepStatus(),
+      trend: buildTrendIndicator(sleepTrendHours, false, 0.25),
     },
   ];
 
@@ -97,32 +145,41 @@ export function HealthSummary({
           {metricCards.map((metric) => (
             <div
               key={metric.id}
-              className="flex items-center justify-between rounded-xl bg-dark-100 px-3 py-2"
+              className="flex items-start justify-between rounded-xl bg-dark-100 px-3 py-3"
             >
-              <div className="flex items-center gap-2">
-                {metric.id === "hrv" && (
-                  <Activity className="h-4 w-4 text-accent" />
-                )}
-                {metric.id === "resting-hr" && (
-                  <Heart className="h-4 w-4 text-error" />
-                )}
-                {metric.id === "sleep" && (
-                  <Moon className="h-4 w-4 text-secondary" />
-                )}
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-dark-200 flex items-center justify-center">
+                  {metric.id === "hrv" && (
+                    <Activity className="h-4 w-4 text-accent" />
+                  )}
+                  {metric.id === "resting-hr" && (
+                    <Heart className="h-4 w-4 text-error" />
+                  )}
+                  {metric.id === "sleep" && (
+                    <Moon className="h-4 w-4 text-secondary" />
+                  )}
+                </div>
                 <div>
                   <p className="text-xs text-muted uppercase">
                     {metric.label}
                   </p>
-                  <p className="font-semibold">{metric.value}</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <span className="font-semibold flex items-center gap-1">
+                      {metric.value}
+                      <span className={`text-base ${metric.trend.className}`}>
+                        {metric.trend.symbol}
+                      </span>
+                    </span>
+                    {metric.secondary && (
+                      <span className="text-[11px] text-muted">
+                        {metric.secondary}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-semibold ${metric.status.text}`}>
-                  {metric.status.label}
-                </span>
-                <span
-                  className={`h-2 w-2 rounded-full ${metric.status.dot}`}
-                />
+              <div className={`text-xs font-semibold ${metric.status.text}`}>
+                {metric.status.label}
               </div>
             </div>
           ))}

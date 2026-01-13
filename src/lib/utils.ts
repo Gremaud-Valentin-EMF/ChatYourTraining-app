@@ -66,12 +66,12 @@ export function getSportIcon(sport: string): string {
 
 export function getSportColor(sport: string): string {
   const colors: Record<string, string> = {
-    running: "#00d4aa",
-    cycling: "#3b82f6",
-    swimming: "#06b6d4",
-    strength: "#f59e0b",
-    triathlon: "#8b5cf6",
-    other: "#6b7280",
+    running: "#f97316", // Orange - course
+    cycling: "#2563eb", // Bleu - vélo
+    swimming: "#0ea5e9",
+    strength: "#8b5cf6", // Violet - force
+    triathlon: "#14b8a6",
+    other: "#94a3b8",
   };
   return colors[sport] || colors.other;
 }

@@ -514,7 +514,9 @@ export default function WorkoutsPage() {
                         <span className="text-xs uppercase">
                           {dateInfo.month}
                         </span>
-                        <span className="text-xl font-bold">{dateInfo.day}</span>
+                        <span className="text-xl font-bold">
+                          {dateInfo.day}
+                        </span>
                       </div>
                       <div>
                         <div className="flex items-center gap-2">

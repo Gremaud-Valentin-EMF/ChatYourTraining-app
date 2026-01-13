@@ -33,7 +33,6 @@ interface PhysioData {
   height_cm: string;
   birth_date: string;
   hr_max: string;
-  hr_rest: string;
 }
 
 interface SportSelection {
@@ -56,7 +55,6 @@ interface ObjectiveData {
   name: string;
   event_date: string;
   event_type: string;
-  priority: string;
   target_time: string;
 }
 
@@ -82,7 +80,6 @@ export default function OnboardingPage() {
     height_cm: "",
     birth_date: "",
     hr_max: "",
-    hr_rest: "",
   });
 
   // Step 2: Sports - Initialize with defaults matching database UUIDs
@@ -150,7 +147,6 @@ export default function OnboardingPage() {
     name: "",
     event_date: "",
     event_type: "marathon",
-    priority: "A",
     target_time: "",
   });
 
@@ -316,7 +312,6 @@ export default function OnboardingPage() {
               : null,
             birth_date: physioData.birth_date || null,
             hr_max: physioData.hr_max ? parseInt(physioData.hr_max) : null,
-            hr_rest: physioData.hr_rest ? parseInt(physioData.hr_rest) : null,
           },
           { onConflict: "user_id" }
         );
@@ -374,7 +369,6 @@ export default function OnboardingPage() {
             name: objective.name,
             event_date: objective.event_date,
             event_type: objective.event_type,
-            priority: objective.priority,
             target_time: objective.target_time || null,
           });
 
@@ -504,16 +498,6 @@ export default function OnboardingPage() {
                   value={physioData.hr_max}
                   onChange={(e) =>
                     setPhysioData({ ...physioData, hr_max: e.target.value })
-                  }
-                />
-                <Input
-                  label="FC Repos (bpm)"
-                  type="number"
-                  placeholder="55"
-                  hint="Fréquence cardiaque au repos"
-                  value={physioData.hr_rest}
-                  onChange={(e) =>
-                    setPhysioData({ ...physioData, hr_rest: e.target.value })
                   }
                 />
               </div>
@@ -738,42 +722,6 @@ export default function OnboardingPage() {
                   setObjective({ ...objective, event_type: e.target.value })
                 }
               />
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted">
-                  Priorité
-                </label>
-                <div className="flex gap-3">
-                  {[
-                    {
-                      value: "A",
-                      label: "Course A",
-                      desc: "Objectif principal",
-                    },
-                    {
-                      value: "B",
-                      label: "Course B",
-                      desc: "Objectif secondaire",
-                    },
-                    { value: "C", label: "Course C", desc: "Préparation" },
-                  ].map((priority) => (
-                    <div
-                      key={priority.value}
-                      onClick={() =>
-                        setObjective({ ...objective, priority: priority.value })
-                      }
-                      className={`flex-1 p-3 rounded-xl border-2 cursor-pointer transition-all text-center ${
-                        objective.priority === priority.value
-                          ? "border-accent bg-accent/10"
-                          : "border-dark-200 hover:border-dark-300"
-                      }`}
-                    >
-                      <span className="font-semibold">{priority.label}</span>
-                      <p className="text-xs text-muted mt-1">{priority.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
               <Input
                 label="Temps objectif (optionnel)"

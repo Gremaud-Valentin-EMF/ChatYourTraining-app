@@ -56,6 +56,31 @@ export function TrainingLoadChart({
     return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
   };
 
+  const getTrainingStatus = (ratio: number) => {
+    if (ratio >= 1.2) {
+      return {
+        label: "Surcharge",
+        color: "text-error",
+        barColor: "var(--error)",
+        description: "Charge trop haute, risque de blessure.",
+      };
+    }
+    if (ratio >= 0.95) {
+      return {
+        label: "Productif",
+        color: "text-warning",
+        barColor: "var(--warning)",
+        description: "Charge en hausse contrôlée.",
+      };
+    }
+    return {
+      label: "Maintien",
+      color: "text-success",
+      barColor: "var(--success)",
+      description: "Charge stable, focus technique.",
+    };
+  };
+
   const getTsbStatus = (tsb: number) => {
     if (tsb > 25) return { label: "Très frais", color: "text-secondary" };
     if (tsb > 5) return { label: "Frais", color: "text-success" };
@@ -68,7 +93,12 @@ export function TrainingLoadChart({
   const hasData = data.length > 0;
   const fallbackData = data[data.length - 1] || null;
   const displayData = hoverData || selectedData || fallbackData;
-  const displayLabel = hoverLabel || selectedLabel;
+  const fallbackLabel = fallbackData ? formatDate(fallbackData.date) : "";
+  const displayLabel = hoverLabel || selectedLabel || fallbackLabel;
+  const loadRatio = currentCtl > 0 ? currentAtl / Math.max(currentCtl, 1) : 1;
+  const clampedRatio = Math.min(1.5, Math.max(0.5, loadRatio));
+  const trainingProgress = ((clampedRatio - 0.5) / 1) * 100;
+  const trainingStatus = getTrainingStatus(loadRatio);
 
   const handlePointSelection = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,6 +161,37 @@ export function TrainingLoadChart({
         </div>
       ) : (
         <>
+          <div className="mb-6">
+            <div className="flex items-center justify-between text-xs text-muted uppercase tracking-wide mb-2">
+              <span>Statut d&apos;entraînement</span>
+              <span>
+                ATL/CTL {Math.round(currentAtl)} / {Math.round(currentCtl)}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1 mb-2">
+              <span className={`text-sm font-semibold ${trainingStatus.color}`}>
+                {trainingStatus.label}
+              </span>
+              <span className="text-xs text-muted">
+                {trainingStatus.description}
+              </span>
+            </div>
+            <div className="h-2 w-full bg-dark-200 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${trainingProgress}%`,
+                  backgroundColor: trainingStatus.barColor,
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-muted uppercase mt-1">
+              <span>Maintien</span>
+              <span>Productif</span>
+              <span>Surcharge</span>
+            </div>
+          </div>
+
           {/* Current values */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="p-4 bg-dark-100 rounded-xl">
@@ -166,37 +227,33 @@ export function TrainingLoadChart({
           {/* Chart */}
           <div className="px-1 sm:px-0">
             {displayData && (
-              <div className="grid grid-cols-3 gap-3 mb-4 text-center text-xs sm:text-sm">
-                <div className="p-2 bg-dark-100 rounded-xl">
-                  <p className="text-muted uppercase">CTL</p>
-                  <p className="text-lg font-semibold text-secondary">
-                    {Math.round(displayData.ctl)}
-                  </p>
+              <div className="mb-4 rounded-xl bg-dark-100 p-4">
+                <div className="flex items-center justify-between text-[11px] text-muted uppercase tracking-wide mb-2">
+                  <span>Données sélectionnées</span>
+                  <span>{displayLabel}</span>
                 </div>
-                <div className="p-2 bg-dark-100 rounded-xl">
-                  <p className="text-muted uppercase">ATL</p>
-                  <p className="text-lg font-semibold text-warning">
-                    {Math.round(displayData.atl)}
-                  </p>
-                </div>
-                <div className="p-2 bg-dark-100 rounded-xl">
-                  <p className="text-muted uppercase">TSB</p>
-                  <p className="text-lg font-semibold text-accent">
-                    {displayData.tsb > 0 ? "+" : ""}
-                    {Math.round(displayData.tsb)}
-                  </p>
-                  {hoverLabel && (
-                    <p className="text-[10px] uppercase text-muted mt-1">
-                      {hoverLabel}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-xs sm:text-sm">
+                  <div>
+                    <p className="text-muted uppercase">CTL</p>
+                    <p className="text-lg font-semibold text-secondary">
+                      {Math.round(displayData.ctl)}
                     </p>
-                  )}
+                  </div>
+                  <div>
+                    <p className="text-muted uppercase">ATL</p>
+                    <p className="text-lg font-semibold text-warning">
+                      {Math.round(displayData.atl)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted uppercase">TSB</p>
+                    <p className="text-lg font-semibold text-accent">
+                      {displayData.tsb > 0 ? "+" : ""}
+                      {Math.round(displayData.tsb)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            )}
-            {displayLabel && (
-              <p className="text-[11px] text-muted text-center uppercase tracking-wide mb-2">
-                {displayLabel}
-              </p>
             )}
           </div>
 

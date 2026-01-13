@@ -9,6 +9,7 @@ interface WeekActivity {
   sport: string;
   title: string;
   status: "planned" | "completed" | "skipped";
+  intensity?: string | null;
 }
 
 interface WeekDay {
@@ -41,6 +42,27 @@ export function WeekCalendar({
     const m = minutes % 60;
     return `${h}h${m > 0 ? m.toString().padStart(2, "0") : ""}m`;
   };
+  const getPercent = (value: number, target: number) =>
+    target > 0 ? Math.round((value / target) * 100) : 0;
+  const intensityMap: Record<
+    string,
+    {
+      zone: string;
+      label: string;
+    }
+  > = {
+    recovery: { zone: "Z1", label: "Récup" },
+    endurance: { zone: "Z2", label: "Endurance" },
+    tempo: { zone: "Z3", label: "Tempo" },
+    threshold: { zone: "Z4", label: "Seuil" },
+    vo2max: { zone: "Z5", label: "VO2" },
+    anaerobic: { zone: "Z6", label: "Anaérobie" },
+  };
+
+  const getIntensityInfo = (intensity?: string | null) => {
+    if (!intensity) return null;
+    return intensityMap[intensity] || null;
+  };
 
   return (
     <Card className="col-span-full">
@@ -63,7 +85,10 @@ export function WeekCalendar({
           </div>
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-warning" />
-            <span>TSS:</span>
+            <span>
+              TSS{" "}
+              <span title="TSS = Stress de ton entraînement">(semaine)</span>:
+            </span>
             <span className="font-bold">{weeklyTss.completed}</span>
             <span className="text-muted">/ {weeklyTss.target}</span>
           </div>
@@ -76,12 +101,12 @@ export function WeekCalendar({
           <div className="flex justify-between text-xs mb-1">
             <span className="text-muted">Volume horaire</span>
             <span>
-              {Math.round((weeklyHours.completed / weeklyHours.target) * 100)}%
+              {getPercent(weeklyHours.completed, weeklyHours.target)}%
             </span>
           </div>
           <Progress
             value={weeklyHours.completed}
-            max={weeklyHours.target}
+            max={Math.max(weeklyHours.target, 1)}
             variant="default"
           />
         </div>
@@ -89,12 +114,12 @@ export function WeekCalendar({
           <div className="flex justify-between text-xs mb-1">
             <span className="text-muted">Charge TSS</span>
             <span>
-              {Math.round((weeklyTss.completed / weeklyTss.target) * 100)}%
+              {getPercent(weeklyTss.completed, weeklyTss.target)}%
             </span>
           </div>
           <Progress
             value={weeklyTss.completed}
-            max={weeklyTss.target}
+            max={Math.max(weeklyTss.target, 1)}
             variant="warning"
           />
         </div>
@@ -127,32 +152,50 @@ export function WeekCalendar({
               </div>
 
               <div className="space-y-1.5">
-                {day.activities.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className={`px-2 py-1 rounded text-xs font-medium truncate ${
-                      activity.status === "completed"
-                        ? "bg-success/20 text-success"
-                        : activity.status === "skipped"
-                        ? "bg-error/20 text-error line-through"
-                        : ""
-                    }`}
-                    style={
-                      activity.status === "planned"
-                        ? {
-                            backgroundColor: `${getSportColor(
-                              activity.sport
-                            )}20`,
-                            color: getSportColor(activity.sport),
-                          }
-                        : undefined
-                    }
-                  >
-                    {activity.title.length > 8
-                      ? `${activity.title.substring(0, 8)}...`
-                      : activity.title}
-                  </div>
-                ))}
+                {day.activities.map((activity) => {
+                  const intensityInfo = getIntensityInfo(activity.intensity);
+                  return (
+                    <div
+                      key={activity.id}
+                      className="px-2 py-1.5 rounded-lg border border-dark-200 bg-dark-50 text-xs font-medium"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                            style={{
+                              backgroundColor: getSportColor(activity.sport),
+                            }}
+                          />
+                          <span className="truncate">{activity.title}</span>
+                        </div>
+                        <span
+                          className={`text-[10px] uppercase ${
+                            activity.status === "completed"
+                              ? "text-success"
+                              : activity.status === "skipped"
+                              ? "text-error"
+                              : "text-muted"
+                          }`}
+                        >
+                          {activity.status === "completed"
+                            ? "Fait"
+                            : activity.status === "skipped"
+                            ? "Annulé"
+                            : "Planifié"}
+                        </span>
+                      </div>
+                      {intensityInfo && (
+                        <div className="mt-1 text-[10px] text-muted flex items-center gap-1">
+                          <span className="font-semibold">
+                            {intensityInfo.zone}
+                          </span>
+                          <span>{intensityInfo.label}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {day.activities.length === 0 && (
                   <div className="px-2 py-1 rounded text-xs text-muted bg-dark-200">
                     Repos
