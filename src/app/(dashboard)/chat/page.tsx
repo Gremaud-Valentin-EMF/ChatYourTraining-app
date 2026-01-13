@@ -594,11 +594,6 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
-
-          <Badge variant="success" size="sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-success mr-1.5 animate-pulse" />
-            En ligne
-          </Badge>
         </div>
 
         {/* Messages area */}
@@ -644,8 +639,8 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
-              {planSuggestions.map(renderPlanSuggestion)}
               {messages.map(renderMessage)}
+              {planSuggestions.map(renderPlanSuggestion)}
               {isStreaming && (
                 <div className="flex items-center gap-2 text-muted text-sm">
                   <Spinner size="sm" />
@@ -659,7 +654,15 @@ export default function ChatPage() {
 
         {/* Input area */}
         <div className="border-t border-dark-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              variant={forcePlanMode ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => setForcePlanMode((prev) => !prev)}
+              disabled={isStreaming}
+            >
+              {forcePlanMode ? "Mode plan activé" : "Demander un plan"}
+            </Button>
             <div className="flex-1 relative">
               <Input
                 ref={inputRef}
@@ -681,10 +684,16 @@ export default function ChatPage() {
               size="icon"
               onClick={() => handleSend()}
               disabled={!inputValue.trim() || isStreaming}
+              aria-label="Envoyer"
             >
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          {forcePlanMode && (
+            <p className="text-xs text-accent mt-2">
+              Vous demandez explicitement une proposition de plan IA.
+            </p>
+          )}
           <p className="text-xs text-muted text-center mt-2">
             Le coach analyse vos données de récupération, charge et planning en
             temps réel.

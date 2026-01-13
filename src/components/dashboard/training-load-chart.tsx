@@ -38,6 +38,10 @@ export function TrainingLoadChart({
   const [isMounted, setIsMounted] = useState(false);
   const [hoverData, setHoverData] = useState<TrainingLoadData | null>(null);
   const [hoverLabel, setHoverLabel] = useState<string>("");
+  const [selectedData, setSelectedData] = useState<TrainingLoadData | null>(
+    null
+  );
+  const [selectedLabel, setSelectedLabel] = useState<string>("");
 
   // Ensure component is mounted before rendering chart (fixes hydration issues)
   useEffect(() => {
@@ -63,7 +67,28 @@ export function TrainingLoadChart({
   const tsbStatus = getTsbStatus(currentTsb);
   const hasData = data.length > 0;
   const fallbackData = data[data.length - 1] || null;
-  const displayData = hoverData || fallbackData;
+  const displayData = hoverData || selectedData || fallbackData;
+  const displayLabel = hoverLabel || selectedLabel;
+
+  const handlePointSelection = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    state: any,
+    persistSelection = false
+  ) => {
+    const payload = state?.activePayload as
+      | { payload: TrainingLoadData }[]
+      | undefined;
+    if (payload && payload.length > 0) {
+      const datum = payload[0].payload as TrainingLoadData;
+      if (persistSelection) {
+        setSelectedData(datum);
+        setSelectedLabel(formatDate(payload[0].payload.date));
+      } else {
+        setHoverData(datum);
+        setHoverLabel(formatDate(payload[0].payload.date));
+      }
+    }
+  };
 
   return (
     <Card className="col-span-full lg:col-span-2">
@@ -168,6 +193,11 @@ export function TrainingLoadChart({
                 </div>
               </div>
             )}
+            {displayLabel && (
+              <p className="text-[11px] text-muted text-center uppercase tracking-wide mb-2">
+                {displayLabel}
+              </p>
+            )}
           </div>
 
           <div className="h-64 min-h-[256px] px-1 sm:px-0">
@@ -175,21 +205,13 @@ export function TrainingLoadChart({
               <ResponsiveContainer width="100%" height={256}>
                 <LineChart
                   data={filteredData}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  onMouseMove={(state: any) => {
-                    const payload = state?.activePayload as
-                      | { payload: TrainingLoadData }[]
-                      | undefined;
-                    if (payload && payload.length > 0) {
-                      const datum = payload[0].payload as TrainingLoadData;
-                      setHoverData(datum);
-                      setHoverLabel(formatDate(payload[0].payload.date));
-                    }
-                  }}
+                  onMouseMove={(state) => handlePointSelection(state)}
                   onMouseLeave={() => {
                     setHoverData(null);
                     setHoverLabel("");
                   }}
+                  onClick={(state) => handlePointSelection(state, true)}
+                  onTouchEnd={(state) => handlePointSelection(state, true)}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"

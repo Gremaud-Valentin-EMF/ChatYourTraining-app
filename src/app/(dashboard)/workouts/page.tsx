@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card, Button, Badge, Input, Select, Spinner } from "@/components/ui";
 import {
@@ -270,10 +271,7 @@ export default function WorkoutsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold">Liste des Entraînements</h1>
-            <Badge variant="info">{totalCount} Sessions</Badge>
-          </div>
+          <h1 className="text-2xl font-bold mb-2">Liste des Entraînements</h1>
           <p className="text-muted">
             Analysez vos performances, surveillez votre charge
             d&apos;entraînement et exportez vos données brutes.
@@ -402,86 +400,87 @@ export default function WorkoutsPage() {
               const sportColor = getSportColor(activity.sport.name);
 
               return (
-                <Card key={activity.id} className="space-y-4">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs text-muted uppercase">
-                          {dateInfo.month} {dateInfo.day} • {dateInfo.time}
-                        </p>
-                        <h3 className="font-semibold">{activity.title}</h3>
-                        <p className="text-xs text-muted">
-                          {activity.sport.name_fr}
-                        </p>
+                <Link
+                  key={activity.id}
+                  href={`/workouts/${activity.id}`}
+                  className="block"
+                >
+                  <Card className="space-y-4 hover:border-accent transition-colors">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-muted uppercase">
+                            {dateInfo.month} {dateInfo.day} • {dateInfo.time}
+                          </p>
+                          <h3 className="font-semibold">{activity.title}</h3>
+                          <p className="text-xs text-muted">
+                            {activity.sport.name_fr}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          style={{
+                            borderColor: sourceColors[activity.source],
+                            color: sourceColors[activity.source],
+                          }}
+                        >
+                          {sourceLabels[activity.source]}
+                        </Badge>
                       </div>
-                      <Badge
-                        variant="outline"
-                        style={{
-                          borderColor: sourceColors[activity.source],
-                          color: sourceColors[activity.source],
-                        }}
-                      >
-                        {sourceLabels[activity.source]}
-                      </Badge>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: sportColor }}
+                        />
+                        <span className="text-muted">{dateInfo.weather}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: sportColor }}
-                      />
-                      <span className="text-muted">{dateInfo.weather}</span>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-4 w-4 text-muted" />
-                      <span>
-                        {activity.actual_duration_minutes
-                          ? formatDuration(activity.actual_duration_minutes)
-                          : "--"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4 text-muted" />
-                      <span>
-                        {activity.actual_distance_km?.toFixed(1) || "--"} km
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Mountain className="h-4 w-4 text-muted" />
-                      <span>{activity.elevation_gain_m || "--"}m</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Heart className="h-4 w-4 text-error" />
-                      <span>
-                        {activity.avg_hr || "--"}
-                        <span className="text-muted">
-                          /{activity.max_hr || "--"} bpm
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-4 w-4 text-muted" />
+                        <span>
+                          {activity.actual_duration_minutes
+                            ? formatDuration(activity.actual_duration_minutes)
+                            : "--"}
                         </span>
-                      </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4 text-muted" />
+                        <span>
+                          {activity.actual_distance_km?.toFixed(1) || "--"} km
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Mountain className="h-4 w-4 text-muted" />
+                        <span>{activity.elevation_gain_m || "--"}m</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Heart className="h-4 w-4 text-error" />
+                        <span>
+                          {activity.avg_hr || "--"}
+                          <span className="text-muted">
+                            /{activity.max_hr || "--"} bpm
+                          </span>
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <Badge
-                      variant={
-                        activity.tss && activity.tss > 100 ? "error" : "warning"
-                      }
-                    >
-                      <Zap className="h-3 w-3 mr-1" />
-                      {activity.tss || "--"} TSS
-                    </Badge>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm">
-                        {"{}"} JSON
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                    <div className="flex items-center justify-between">
+                      <Badge
+                        variant={
+                          activity.tss && activity.tss > 100
+                            ? "error"
+                            : "warning"
+                        }
+                      >
+                        <Zap className="h-3 w-3 mr-1" />
+                        {activity.tss || "--"} TSS
+                      </Badge>
+                      <ChevronRight className="h-4 w-4 text-muted" />
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                </Link>
               );
             })}
           </div>
@@ -502,8 +501,9 @@ export default function WorkoutsPage() {
                 const sportColor = getSportColor(activity.sport.name);
 
                 return (
-                  <div
+                  <Link
                     key={activity.id}
+                    href={`/workouts/${activity.id}`}
                     className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-dark-100 transition-colors items-center"
                   >
                     <div className="col-span-4 flex items-center gap-4">
@@ -583,14 +583,9 @@ export default function WorkoutsPage() {
                     </div>
 
                     <div className="col-span-2 flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="sm">
-                        {"{}"} JSON
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                      <ChevronRight className="h-4 w-4 text-muted" />
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

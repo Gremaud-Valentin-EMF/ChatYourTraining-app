@@ -38,6 +38,7 @@ export function RecoveryGauge({ score, label = "PRÊT" }: RecoveryGaugeProps) {
   // Only show 270 degrees (3/4 of circle)
   const arcLength = circumference * 0.75;
   const progress = (score / 100) * arcLength;
+  const dashOffset = arcLength - progress;
 
   // Determine color based on score
   const getColor = () => {
@@ -83,12 +84,13 @@ export function RecoveryGauge({ score, label = "PRÊT" }: RecoveryGaugeProps) {
             fill="transparent"
             strokeWidth={strokeWidth}
             strokeLinecap="round"
-            strokeDasharray={`${progress} ${circumference}`}
+            strokeDasharray={`${arcLength} ${circumference}`}
+            strokeDashoffset={dashOffset}
             r={normalizedRadius}
             cx={radius}
             cy={radius}
             style={{
-              transition: "stroke-dasharray 0.5s ease",
+              transition: "stroke-dashoffset 0.5s ease",
               filter: `drop-shadow(0 0 8px ${getColor()})`,
             }}
           />

@@ -37,6 +37,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.recharts-wrapper:focus,
+.recharts-responsive-container:focus,
+.recharts-surface:focus {
+  outline: none;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

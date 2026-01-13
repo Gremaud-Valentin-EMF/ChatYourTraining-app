@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Card,
@@ -21,15 +21,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import {
-  Heart,
-  Moon,
-  Activity,
-  Zap,
-  RefreshCw,
-  Scale,
-  Check,
-} from "lucide-react";
+import { Heart, Moon, Activity, Zap, RefreshCw, Check } from "lucide-react";
 
 interface DailyMetrics {
   date: string;
@@ -52,9 +44,16 @@ export default function HealthPage() {
   const [metrics, setMetrics] = useState<DailyMetrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-
-  // Get latest metrics for reference
-  void metrics[metrics.length - 1];
+  const [physio, setPhysio] = useState<{
+    weight_kg: number | null;
+    height_cm: number | null;
+  } | null>(null);
+  const [trendHover, setTrendHover] = useState<DailyMetrics | null>(null);
+  const [trendHoverLabel, setTrendHoverLabel] = useState("");
+  const [trendSelection, setTrendSelection] = useState<DailyMetrics | null>(
+    null
+  );
+  const [trendSelectionLabel, setTrendSelectionLabel] = useState("");
 
   useEffect(() => {
     loadMetrics();
@@ -84,6 +83,18 @@ export default function HealthPage() {
         setMetrics(data);
       }
 
+      const { data: physioData } = await supabase
+        .from("physiological_data")
+        .select("weight_kg, height_cm")
+        .eq("user_id", user.id)
+        .single();
+      if (physioData) {
+        setPhysio({
+          weight_kg: physioData.weight_kg,
+          height_cm: physioData.height_cm,
+        });
+      }
+
       // Get last sync time
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: integration } = await (supabase as any)
@@ -101,9 +112,10 @@ export default function HealthPage() {
     }
   };
 
-  // Generate demo data if no real data
-  const displayMetrics =
-    metrics.length > 0 ? metrics : generateDemoMetrics(parseInt(period));
+  const displayMetrics = useMemo(
+    () => (metrics.length > 0 ? metrics : []),
+    [metrics]
+  );
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -149,10 +161,13 @@ export default function HealthPage() {
   };
 
   // Calculate averages
-  const avgHRV = Math.round(
-    displayMetrics.reduce((sum, m) => sum + (m.hrv_ms || 0), 0) /
-      displayMetrics.length
-  );
+  const avgHRV =
+    displayMetrics.length > 0
+      ? Math.round(
+          displayMetrics.reduce((sum, m) => sum + (m.hrv_ms || 0), 0) /
+            displayMetrics.length
+        )
+      : 0;
 
   // Average resting HR for reference
   void (
@@ -160,32 +175,102 @@ export default function HealthPage() {
     displayMetrics.length
   );
 
-  const todayData = displayMetrics[displayMetrics.length - 1] || {
-    recovery_score: 82,
-    hrv_ms: 65,
-    sleep_duration_minutes: 462,
-    sleep_score: 85,
-    strain: 2.4,
-    resting_hr: 52,
-    sleep_deep_minutes: 112,
-    sleep_rem_minutes: 135,
-    sleep_light_minutes: 190,
-    sleep_awake_minutes: 25,
-  };
+  const todayData =
+    displayMetrics.length > 0
+      ? displayMetrics[displayMetrics.length - 1]
+      : null;
 
-  const recoveryStatus = getRecoveryStatus(todayData.recovery_score || 0);
-  const hrvStatus = getHRVStatus(todayData.hrv_ms || 0, avgHRV);
-  const stressStatus = getStressStatus(todayData.strain || 0);
+  const recoveryStatus = todayData?.recovery_score
+    ? getRecoveryStatus(todayData.recovery_score)
+    : null;
+  const hrvStatus =
+    todayData?.hrv_ms !== undefined
+      ? getHRVStatus(todayData.hrv_ms || 0, avgHRV || todayData.hrv_ms || 1)
+      : null;
+  const stressStatus = todayData?.strain
+    ? getStressStatus(todayData.strain)
+    : null;
 
-  // Sleep hours calculated for reference
-  void (todayData.sleep_duration_minutes
-    ? todayData.sleep_duration_minutes / 60
-    : 7.7);
   const formatSleepDuration = (mins: number) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return `${h}h${m.toString().padStart(2, "0")}m`;
   };
+
+  const formatClockTime = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, "0")}h${m.toString().padStart(2, "0")}`;
+  };
+
+  const averageBedtimeMinutes = useMemo(() => {
+    if (!displayMetrics.length) return null;
+    const WAKE_MINUTES = 7 * 60;
+    const samples = displayMetrics
+      .map((m) => m.sleep_duration_minutes)
+      .filter((value): value is number => typeof value === "number");
+    if (!samples.length) return null;
+    const total = samples.reduce((sum, duration) => {
+      const bedtime = (WAKE_MINUTES - duration + 1440) % 1440;
+      return sum + bedtime;
+    }, 0);
+    return Math.round(total / samples.length);
+  }, [displayMetrics]);
+
+  const averageBedtime =
+    averageBedtimeMinutes !== null
+      ? formatClockTime(averageBedtimeMinutes)
+      : null;
+
+  const handleTrendHover = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    state: any,
+    persist = false
+  ) => {
+    const payload = state?.activePayload as
+      | { payload: DailyMetrics }[]
+      | undefined;
+    if (payload && payload.length > 0) {
+      const datum = payload[0].payload;
+      const label = formatDate(datum.date);
+      if (persist) {
+        setTrendSelection(datum);
+        setTrendSelectionLabel(label);
+      } else {
+        setTrendHover(datum);
+        setTrendHoverLabel(label);
+      }
+    }
+  };
+
+  const clearTrendHover = () => {
+    setTrendHover(null);
+    setTrendHoverLabel("");
+  };
+
+  const activeTrendPoint =
+    trendHover || trendSelection || todayData || null;
+  const activeTrendLabel =
+    trendHoverLabel ||
+    trendSelectionLabel ||
+    (activeTrendPoint ? formatDate(activeTrendPoint.date) : "");
+
+  const bmi =
+    physio?.weight_kg && physio?.height_cm
+      ? physio.weight_kg /
+        Math.pow(Number(physio.height_cm) / 100, 2)
+      : null;
+
+  const sleepQualityBadge = (() => {
+    if (!todayData?.sleep_score) {
+      return { label: "En attente", variant: "outline" as const };
+    }
+    if (todayData.sleep_score >= 80)
+      return { label: "Bonne qualité", variant: "success" as const };
+    if (todayData.sleep_score >= 65)
+      return { label: "Correct", variant: "warning" as const };
+    return { label: "À surveiller", variant: "error" as const };
+  })();
 
   if (isLoading) {
     return (
@@ -232,99 +317,104 @@ export default function HealthPage() {
       </div>
 
       {/* Main metrics cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Recovery Score */}
-        <Card className="relative overflow-hidden">
+      <div className="flex flex-col gap-4">
+        <Card>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted">Score de Récupération</span>
+            <span className="text-sm text-muted">Score de récupération</span>
             <Heart className="h-5 w-5 text-success" />
           </div>
-          <p className="text-4xl font-bold mb-1">
-            {todayData.recovery_score || 82}%
-          </p>
-          <Badge variant="success" size="sm" className={recoveryStatus.bg}>
-            {recoveryStatus.label}
-          </Badge>
-          <p className="text-xs text-muted mt-2">+12% vs moy.</p>
-
-          {/* Background decoration */}
-          <div
-            className="absolute -bottom-4 -right-4 h-24 w-24 rounded-full opacity-10"
-            style={{ backgroundColor: "var(--success)" }}
-          />
+          {todayData?.recovery_score ? (
+            <>
+              <p className="text-4xl font-bold mb-1">
+                {todayData.recovery_score}%
+              </p>
+              {recoveryStatus && (
+                <Badge variant="success" size="sm" className={recoveryStatus.bg}>
+                  {recoveryStatus.label}
+                </Badge>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-muted">
+              Connectez WHOOP pour afficher votre récupération.
+            </p>
+          )}
         </Card>
 
-        {/* HRV */}
-        <Card className="relative overflow-hidden">
+        <Card>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted">VFC (HRV)</span>
             <Activity className="h-5 w-5 text-secondary" />
           </div>
-          <p className="text-4xl font-bold mb-1">
-            {todayData.hrv_ms || 65}{" "}
-            <span className="text-lg text-muted">ms</span>
-          </p>
-          <Badge variant="success" size="sm">
-            {hrvStatus.label}
-          </Badge>
-          <p className="text-xs text-muted mt-2">{hrvStatus.change}</p>
+          {todayData?.hrv_ms ? (
+            <>
+              <p className="text-4xl font-bold mb-1">
+                {todayData.hrv_ms}
+                <span className="text-lg text-muted"> ms</span>
+              </p>
+              {hrvStatus && (
+                <>
+                  <Badge variant="success" size="sm">
+                    {hrvStatus.label}
+                  </Badge>
+                  <p className="text-xs text-muted mt-2">
+                    {hrvStatus.change}
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-muted">
+              Aucune donnée VFC sur cette période.
+            </p>
+          )}
         </Card>
 
-        {/* Sleep */}
-        <Card className="relative overflow-hidden">
+        <Card>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted">Sommeil Total</span>
+            <span className="text-sm text-muted">Sommeil total</span>
             <Moon className="h-5 w-5 text-secondary" />
           </div>
-          <p className="text-4xl font-bold mb-1">
-            {formatSleepDuration(todayData.sleep_duration_minutes || 462)}
-          </p>
-          <div className="flex gap-1 mt-2">
-            <div
-              className="h-1 w-8 bg-secondary rounded-full"
-              title="Profond"
-            />
-            <div
-              className="h-1 w-12 bg-accent rounded-full"
-              title="Paradoxal"
-            />
-            <div className="h-1 w-16 bg-dark-300 rounded-full" title="Léger" />
-          </div>
-          <p className="text-xs text-muted mt-2">
-            Profond{" "}
-            {Math.round(
-              ((todayData.sleep_deep_minutes || 112) /
-                (todayData.sleep_duration_minutes || 462)) *
-                100
-            )}
-            % • Paradoxal{" "}
-            {Math.round(
-              ((todayData.sleep_rem_minutes || 135) /
-                (todayData.sleep_duration_minutes || 462)) *
-                100
-            )}
-            %
-          </p>
+          {todayData?.sleep_duration_minutes ? (
+            <>
+              <p className="text-4xl font-bold mb-1">
+                {formatSleepDuration(todayData.sleep_duration_minutes)}
+              </p>
+              <p className="text-xs text-muted">
+                Heure moyenne de coucher: {averageBedtime || "--"}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted">
+              Synchronisez vos nuits pour afficher ces données.
+            </p>
+          )}
         </Card>
 
-        {/* Stress/Strain */}
-        <Card className="relative overflow-hidden">
+        <Card>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted">Stress Quotidien</span>
+            <span className="text-sm text-muted">Stress quotidien</span>
             <Zap className="h-5 w-5 text-warning" />
           </div>
-          <p className="text-4xl font-bold mb-1">
-            {(todayData.strain || 2.4).toFixed(1)}
-          </p>
-          <Badge
-            variant={
-              todayData.strain && todayData.strain > 3 ? "warning" : "success"
-            }
-            size="sm"
-          >
-            {stressStatus.label}
-          </Badge>
-          <p className="text-xs text-muted mt-2">-0.3 vs moy.</p>
+          {todayData?.strain ? (
+            <>
+              <p className="text-4xl font-bold mb-1">
+                {todayData.strain.toFixed(1)}
+              </p>
+              {stressStatus && (
+                <Badge
+                  variant={todayData.strain > 3 ? "warning" : "success"}
+                  size="sm"
+                >
+                  {stressStatus.label}
+                </Badge>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-muted">
+              Aucune mesure de strain pour aujourd&apos;hui.
+            </p>
+          )}
         </Card>
       </div>
 
@@ -332,226 +422,225 @@ export default function HealthPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trends chart */}
         <Card className="col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Tendances Physiologiques</h3>
-            <div className="flex items-center gap-4 text-sm">
+          <div className="mb-2">
+            <h3 className="font-semibold">Tendances physiologiques</h3>
+            <div className="flex flex-wrap gap-4 text-xs text-muted mt-2">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-accent" />
+                <span className="h-2 w-2 rounded-full bg-accent" />
                 <span>Récupération</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-warning" />
-                <span>Repos (RHR)</span>
+                <span className="h-2 w-2 rounded-full bg-warning" />
+                <span>FC repos</span>
               </div>
             </div>
           </div>
 
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={displayMetrics}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--dark-200)" />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={formatDate}
-                  stroke="var(--muted)"
-                  fontSize={12}
-                />
-                <YAxis
-                  yAxisId="left"
-                  stroke="var(--muted)"
-                  fontSize={12}
-                  domain={[0, 100]}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  stroke="var(--muted)"
-                  fontSize={12}
-                  domain={[40, 80]}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "var(--dark-50)",
-                    border: "1px solid var(--dark-200)",
-                    borderRadius: "12px",
-                  }}
-                />
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="recovery_score"
-                  name="Récupération %"
-                  stroke="var(--accent)"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: "var(--accent)" }}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="resting_hr"
-                  name="FC Repos"
-                  stroke="var(--warning)"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {!displayMetrics.length ? (
+            <div className="py-12 text-center text-sm text-muted">
+              Aucune donnée sur cette période.
+            </div>
+          ) : (
+            <>
+              {activeTrendPoint && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm bg-dark-100 rounded-xl p-4">
+                  <div>
+                    <p className="text-xs text-muted uppercase">Jour</p>
+                    <p className="font-semibold">
+                      {activeTrendLabel || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted uppercase">
+                      Récupération
+                    </p>
+                    <p className="font-semibold text-accent">
+                      {activeTrendPoint.recovery_score ?? "--"}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted uppercase">FC repos</p>
+                    <p className="font-semibold text-warning">
+                      {activeTrendPoint.resting_hr ?? "--"} bpm
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={displayMetrics}
+                    onMouseMove={(state) => handleTrendHover(state)}
+                    onMouseLeave={() => clearTrendHover()}
+                    onClick={(state) => handleTrendHover(state, true)}
+                    onTouchEnd={(state) => handleTrendHover(state, true)}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--dark-200)"
+                    />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={formatDate}
+                      stroke="var(--muted)"
+                      fontSize={12}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      stroke="var(--muted)"
+                      fontSize={12}
+                      domain={[0, 100]}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="var(--muted)"
+                      fontSize={12}
+                      domain={[40, 80]}
+                    />
+                    <Tooltip wrapperStyle={{ display: "none" }} />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="recovery_score"
+                      name="Récupération %"
+                      stroke="var(--accent)"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "var(--accent)" }}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="resting_hr"
+                      name="FC Repos"
+                      stroke="var(--warning)"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
         </Card>
 
-        {/* Biometry */}
+        {/* Biometry and sleep */}
         <div className="space-y-6">
           <Card>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Biométrie</h3>
               <button className="text-sm text-accent hover:underline">
-                Modifier
+                Mettre à jour
               </button>
             </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-              <div className="h-16 w-16 bg-dark-100 rounded-xl flex items-center justify-center">
-                <Scale className="h-8 w-8 text-muted" />
-              </div>
-              <div className="flex-1 w-full">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-muted">Poids</p>
-                    <p className="text-2xl font-bold">
-                      72.5 <span className="text-sm text-muted">kg</span>
-                    </p>
-                  </div>
-                  <div className="text-right sm:text-right">
-                    <p className="text-sm text-muted">Masse Grasse</p>
-                    <p className="text-2xl font-bold">
-                      12.4 <span className="text-sm text-muted">%</span>
-                    </p>
-                  </div>
+            {physio ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                <div className="p-3 bg-dark-100 rounded-xl">
+                  <p className="text-xs text-muted uppercase">Poids</p>
+                  <p className="text-2xl font-bold">
+                    {physio.weight_kg ?? "--"}
+                    <span className="text-sm text-muted ml-1">kg</span>
+                  </p>
                 </div>
-                <p className="text-xs text-muted mt-2">
-                  Dernière pesée: Hier matin
-                </p>
+                <div className="p-3 bg-dark-100 rounded-xl">
+                  <p className="text-xs text-muted uppercase">Taille</p>
+                  <p className="text-2xl font-bold">
+                    {physio.height_cm ?? "--"}
+                    <span className="text-sm text-muted ml-1">cm</span>
+                  </p>
+                </div>
+                <div className="p-3 bg-dark-100 rounded-xl">
+                  <p className="text-xs text-muted uppercase">IMC</p>
+                  <p className="text-2xl font-bold">
+                    {bmi ? bmi.toFixed(1) : "--"}
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <p className="text-sm text-muted text-center">
+                Ajoutez vos données biométriques pour suivre votre évolution.
+              </p>
+            )}
           </Card>
 
-          {/* Sleep details */}
           <Card>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Détails Sommeil</h3>
-              <Badge variant="success" size="sm">
-                Bonne qualité
+              <h3 className="font-semibold">Détails sommeil</h3>
+              <Badge variant={sleepQualityBadge.variant} size="sm">
+                {sleepQualityBadge.label}
               </Badge>
             </div>
+            {!todayData?.sleep_duration_minutes ? (
+              <p className="text-sm text-muted">
+                Aucune nuit synchronisée pour analyser les phases de sommeil.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {[
+                  {
+                    label: "Sommeil profond",
+                    value: todayData.sleep_deep_minutes ?? 0,
+                    info: "Récupération musculaire et hormonale.",
+                    variant: "default" as const,
+                  },
+                  {
+                    label: "Sommeil paradoxal",
+                    value: todayData.sleep_rem_minutes ?? 0,
+                    info: "Consolidation de la mémoire.",
+                    variant: "success" as const,
+                  },
+                  {
+                    label: "Sommeil léger",
+                    value: todayData.sleep_light_minutes ?? 0,
+                    info: "Transition et régulation autonome.",
+                    variant: "default" as const,
+                  },
+                  {
+                    label: "Éveils",
+                    value: todayData.sleep_awake_minutes ?? 0,
+                    info: "Éveils nocturnes cumulés.",
+                    variant: "error" as const,
+                  },
+                ].map((phase) => (
+                  <div key={phase.label} className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm">{phase.label}</span>
+                      <div className="flex items-center gap-2">
+                        <Progress
+                          value={phase.value}
+                          max={todayData.sleep_duration_minutes || 1}
+                          className="w-28"
+                          variant={phase.variant}
+                        />
+                        <span className="text-sm font-medium w-16 text-right">
+                          {phase.variant === "error"
+                            ? `${phase.value}m`
+                            : formatSleepDuration(phase.value).replace("m", "")}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted">{phase.info}</p>
+                  </div>
+                ))}
 
-            <div className="space-y-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm">Profond</span>
-                <div className="flex items-center gap-2">
-                  <Progress
-                    value={todayData.sleep_deep_minutes || 112}
-                    max={todayData.sleep_duration_minutes || 462}
-                    className="w-24"
-                    variant="default"
-                  />
-                  <span className="text-sm font-medium w-12 text-right">
-                    {formatSleepDuration(
-                      todayData.sleep_deep_minutes || 112
-                    ).replace("m", "")}
-                  </span>
+                <div className="pt-3 mt-3 border-t border-dark-200">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-success" />
+                    <span>Heure moyenne de coucher</span>
+                  </div>
+                  <p className="text-xs text-muted ml-6 mt-1">
+                    {averageBedtime
+                      ? `Vous vous couchez vers ${averageBedtime}.`
+                      : "Synchronisez vos nuits pour suivre cette habitude."}
+                  </p>
                 </div>
               </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm">Paradoxal</span>
-                <div className="flex items-center gap-2">
-                  <Progress
-                    value={todayData.sleep_rem_minutes || 135}
-                    max={todayData.sleep_duration_minutes || 462}
-                    className="w-24"
-                    variant="success"
-                  />
-                  <span className="text-sm font-medium w-12 text-right">
-                    {formatSleepDuration(
-                      todayData.sleep_rem_minutes || 135
-                    ).replace("m", "")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm">Léger</span>
-                <div className="flex items-center gap-2">
-                  <Progress
-                    value={todayData.sleep_light_minutes || 190}
-                    max={todayData.sleep_duration_minutes || 462}
-                    className="w-24"
-                  />
-                  <span className="text-sm font-medium w-12 text-right">
-                    {formatSleepDuration(
-                      todayData.sleep_light_minutes || 190
-                    ).replace("m", "")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm">Éveillé</span>
-                <div className="flex items-center gap-2">
-                  <Progress
-                    value={todayData.sleep_awake_minutes || 25}
-                    max={todayData.sleep_duration_minutes || 462}
-                    className="w-24"
-                    variant="error"
-                  />
-                  <span className="text-sm font-medium w-12 text-right">
-                    {todayData.sleep_awake_minutes || 25}m
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-3 mt-3 border-t border-dark-200">
-                <div className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-success" />
-                  <span>Cohérence du coucher</span>
-                </div>
-                <p className="text-xs text-muted ml-6 mt-1">
-                  Vous vous êtes couché à 22:45 (+/- 15min de votre habitude).
-                </p>
-              </div>
-            </div>
+            )}
           </Card>
         </div>
       </div>
     </div>
   );
-}
-
-// Generate demo data
-function generateDemoMetrics(days: number): DailyMetrics[] {
-  const metrics: DailyMetrics[] = [];
-  const today = new Date();
-
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-
-    metrics.push({
-      date: date.toISOString().split("T")[0],
-      recovery_score: Math.round(60 + Math.random() * 35),
-      hrv_ms: Math.round(50 + Math.random() * 30),
-      resting_hr: Math.round(48 + Math.random() * 12),
-      sleep_duration_minutes: Math.round(360 + Math.random() * 180),
-      sleep_score: Math.round(60 + Math.random() * 35),
-      sleep_deep_minutes: Math.round(60 + Math.random() * 80),
-      sleep_rem_minutes: Math.round(80 + Math.random() * 80),
-      sleep_light_minutes: Math.round(150 + Math.random() * 80),
-      sleep_awake_minutes: Math.round(10 + Math.random() * 30),
-      strain: parseFloat((1 + Math.random() * 4).toFixed(1)),
-      stress_level: Math.round(1 + Math.random() * 4),
-    });
-  }
-
-  return metrics;
 }

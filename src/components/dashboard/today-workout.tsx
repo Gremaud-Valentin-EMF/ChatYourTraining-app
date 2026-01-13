@@ -58,10 +58,10 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
 
   return (
     <Card className="h-full">
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
         {/* Sport icon/color */}
         <div
-          className="h-20 w-20 rounded-xl flex items-center justify-center flex-shrink-0"
+          className="h-20 w-20 rounded-xl flex items-center justify-center flex-shrink-0 self-start"
           style={{ backgroundColor: `${sportColor}20` }}
         >
           <Activity className="h-8 w-8" style={{ color: sportColor }} />
@@ -87,15 +87,25 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
           </h3>
 
           {/* Metrics */}
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div className="flex items-center gap-2 justify-between sm:justify-start rounded-xl bg-dark-100 px-3 py-2">
               <Clock className="h-4 w-4 text-muted" />
-              <span className="font-medium">
-                {formatDuration(workout.plannedDuration)}
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted uppercase">Durée</span>
+                <span className="font-medium">
+                  {formatDuration(workout.plannedDuration)}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-muted">Intensité</span>
+            <div className="flex items-center gap-2 justify-between sm:justify-start rounded-xl bg-dark-100 px-3 py-2">
+              <Zap className="h-4 w-4 text-warning" />
+              <div className="flex flex-col">
+                <span className="text-xs text-muted uppercase">Charge</span>
+                <span className="font-medium">{workout.tss} TSS</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 justify-between sm:justify-start rounded-xl bg-dark-100 px-3 py-2">
+              <span className="text-xs text-muted uppercase">Intensité</span>
               <Badge
                 variant={
                   workout.intensity === "recovery"
@@ -109,11 +119,6 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
               >
                 {intensityLabels[workout.intensity] || workout.intensity}
               </Badge>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Zap className="h-4 w-4 text-warning" />
-              <span className="font-medium">{workout.tss}</span>
-              <span className="text-muted text-xs">TSS</span>
             </div>
           </div>
         </div>

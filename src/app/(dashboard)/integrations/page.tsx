@@ -10,7 +10,6 @@ import {
   Clock,
   Activity,
   Moon,
-  Utensils,
   AlertCircle,
 } from "lucide-react";
 import type { Tables, IntegrationProvider } from "@/types/database";
@@ -141,35 +140,6 @@ const integrationProviders: {
       },
     ],
   },
-  {
-    id: "garmin",
-    name: "Garmin Connect",
-    description: "Synchronisez vos activités et données de santé Garmin.",
-    icon: "/icons/garmin.svg",
-    color: "#007CC3",
-    scopes: ["activity", "health"],
-    dataTypes: ["workouts", "sleep", "recovery"],
-    syncOptions: [
-      {
-        key: "activities",
-        label: "Activités",
-        description: "Course, vélo, etc.",
-        defaultEnabled: true,
-      },
-      {
-        key: "sleep",
-        label: "Sommeil",
-        description: "Données de sommeil",
-        defaultEnabled: true,
-      },
-      {
-        key: "recovery",
-        label: "Body Battery",
-        description: "Score d'énergie",
-        defaultEnabled: true,
-      },
-    ],
-  },
 ];
 
 const dataTypeLabels: Record<string, { label: string; icon: React.ReactNode }> =
@@ -185,10 +155,6 @@ const dataTypeLabels: Record<string, { label: string; icon: React.ReactNode }> =
     recovery: {
       label: "Récupération",
       icon: <Activity className="h-5 w-5 text-success" />,
-    },
-    nutrition: {
-      label: "Nutrition",
-      icon: <Utensils className="h-5 w-5 text-warning" />,
     },
   };
 
@@ -446,7 +412,7 @@ function IntegrationsPageContent() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 bg-dark-50 rounded-xl border border-dark-200">
         <p className="text-sm text-muted">
           Connectez vos services favoris pour centraliser vos données
-          d&apos;entraînement, de sommeil et de nutrition.
+          d&apos;entraînement, de sommeil et de récupération.
         </p>
         <Button
           className="w-full sm:w-auto"

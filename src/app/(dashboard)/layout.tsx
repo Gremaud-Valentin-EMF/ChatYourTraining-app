@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
 import {
   Activity,
   LayoutDashboard,
@@ -53,7 +54,14 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
 
   return (
     <div className="min-h-screen bg-dark">
@@ -156,7 +164,10 @@ export default function DashboardLayout({
                       <User className="h-4 w-4" />
                       Profil & Objectifs
                     </Link>
-                    <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors">
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-error hover:bg-error/10 transition-colors"
+                      onClick={handleLogout}
+                    >
                       <LogOut className="h-4 w-4" />
                       Déconnexion
                     </button>

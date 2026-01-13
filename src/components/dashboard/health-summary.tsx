@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Card, Button, Progress } from "@/components/ui";
+import { Card, Button } from "@/components/ui";
 import { Heart, Moon, Activity, ArrowRight } from "lucide-react";
 
 interface HealthSummaryProps {
@@ -25,7 +25,54 @@ export function HealthSummary({
     return `${h}h${m > 0 ? m.toString().padStart(2, "0") : ""}`;
   };
 
-  const hasData = hrv || restingHr || sleepHours;
+  const getStatus = (
+    value: number | undefined,
+    good: number,
+    warning: number,
+    reverse = false
+  ) => {
+    if (value === undefined)
+      return { label: "Pas de données", text: "text-muted", dot: "bg-dark-300" };
+    if (reverse) {
+      if (value <= good)
+        return { label: "Optimal", text: "text-success", dot: "bg-success" };
+      if (value <= warning)
+        return { label: "Correct", text: "text-warning", dot: "bg-warning" };
+      return { label: "Élevé", text: "text-error", dot: "bg-error" };
+    }
+    if (value >= good)
+      return { label: "Optimal", text: "text-success", dot: "bg-success" };
+    if (value >= warning)
+      return { label: "Correct", text: "text-warning", dot: "bg-warning" };
+    return { label: "Bas", text: "text-error", dot: "bg-error" };
+  };
+
+  const hasData = hrv !== undefined || restingHr !== undefined || sleepHours !== undefined;
+  const metricCards = [
+    {
+      id: "hrv",
+      label: "VFC (HRV)",
+      value: hrv !== undefined ? `${hrv} ms` : "--",
+      status: getStatus(hrv, 55, 35),
+    },
+    {
+      id: "resting-hr",
+      label: "FC au repos",
+      value: restingHr !== undefined ? `${restingHr} bpm` : "--",
+      status: getStatus(restingHr, 52, 60, true),
+    },
+    {
+      id: "sleep",
+      label: "Sommeil",
+      value:
+        sleepHours !== undefined
+          ? formatSleep(sleepHours)
+          : sleepQuality !== undefined
+          ? `${sleepQuality}%`
+          : "--",
+      status: getStatus(sleepQuality, 75, 60),
+    },
+  ];
 
   return (
     <Card className="h-full">
@@ -46,86 +93,42 @@ export function HealthSummary({
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* HRV */}
-          {hrv && (
-            <div className="flex items-center justify-between">
+        <div className="space-y-3">
+          {metricCards.map((metric) => (
+            <div
+              key={metric.id}
+              className="flex items-center justify-between rounded-xl bg-dark-100 px-3 py-2"
+            >
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-accent/20 flex items-center justify-center">
+                {metric.id === "hrv" && (
                   <Activity className="h-4 w-4 text-accent" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted">VFC (HRV)</p>
-                  <p className="font-semibold">
-                    {hrv} <span className="text-xs text-muted">ms</span>
-                  </p>
-                </div>
-              </div>
-              <span
-                className={`text-xs ${
-                  hrv > 50
-                    ? "text-success"
-                    : hrv > 30
-                    ? "text-warning"
-                    : "text-error"
-                }`}
-              >
-                {hrv > 50 ? "Bon" : hrv > 30 ? "Modéré" : "Faible"}
-              </span>
-            </div>
-          )}
-
-          {/* Resting HR */}
-          {restingHr && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-error/20 flex items-center justify-center">
+                )}
+                {metric.id === "resting-hr" && (
                   <Heart className="h-4 w-4 text-error" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted">FC Repos</p>
-                  <p className="font-semibold">
-                    {restingHr} <span className="text-xs text-muted">bpm</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sleep */}
-          {sleepHours && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-secondary/20 flex items-center justify-center">
+                )}
+                {metric.id === "sleep" && (
                   <Moon className="h-4 w-4 text-secondary" />
-                </div>
+                )}
                 <div>
-                  <p className="text-xs text-muted">Sommeil</p>
-                  <p className="font-semibold">{formatSleep(sleepHours)}</p>
+                  <p className="text-xs text-muted uppercase">
+                    {metric.label}
+                  </p>
+                  <p className="font-semibold">{metric.value}</p>
                 </div>
               </div>
-              {sleepQuality && (
-                <div className="w-20">
-                  <Progress
-                    value={sleepQuality}
-                    max={100}
-                    size="sm"
-                    variant={
-                      sleepQuality > 70
-                        ? "success"
-                        : sleepQuality > 50
-                        ? "warning"
-                        : "error"
-                    }
-                  />
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-semibold ${metric.status.text}`}>
+                  {metric.status.label}
+                </span>
+                <span
+                  className={`h-2 w-2 rounded-full ${metric.status.dot}`}
+                />
+              </div>
             </div>
-          )}
+          ))}
 
-          {/* Strain */}
           {strain !== undefined && (
-            <div className="flex items-center justify-between pt-2 border-t border-dark-200">
+            <div className="flex items-center justify-between pt-3 border-t border-dark-200">
               <span className="text-sm text-muted">Strain du jour</span>
               <span className="font-bold text-warning">
                 {strain.toFixed(1)}

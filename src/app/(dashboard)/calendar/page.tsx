@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Card,
@@ -11,6 +11,10 @@ import {
   TabsTrigger,
   Slider,
   Progress,
+  Input,
+  Select,
+  Modal,
+  Spinner,
 } from "@/components/ui";
 import {
   ChevronLeft,
@@ -20,10 +24,9 @@ import {
   Clock,
   Activity,
   Moon,
-  Smile,
-  Frown,
-  Meh,
+  Zap,
   Edit2,
+  NotebookPen,
 } from "lucide-react";
 import { cn, getSportColor, formatDuration } from "@/lib/utils";
 
@@ -54,12 +57,28 @@ type ViewMode = "week" | "month";
 
 export default function CalendarPage() {
   const supabase = createClient();
-  const [, setViewMode] = useState<ViewMode>("month");
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetrics | null>(null);
-  const [, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sports, setSports] = useState<
+    { id: string; name: string; name_fr: string }[]
+  >([]);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newSession, setNewSession] = useState({
+    title: "",
+    sportId: "",
+    date: "",
+    duration: "",
+    distance: "",
+    intensity: "endurance",
+  });
+  const [fatigueValue, setFatigueValue] = useState<number | null>(null);
+  const [notesValue, setNotesValue] = useState("");
+  const [isSavingMetrics, setIsSavingMetrics] = useState(false);
 
   // Get calendar data
   const year = currentDate.getFullYear();
@@ -91,22 +110,116 @@ export default function CalendarPage() {
   let startingDay = firstDayOfMonth.getDay() - 1;
   if (startingDay < 0) startingDay = 6;
 
-  // Calculate week stats
-  const weeklyStats = {
-    volume: 54,
-    volumeChange: 12,
-    duration: { hours: 5, minutes: 30 },
-    durationChange: 5,
-    tss: 420,
-    tssTarget: 450,
-    form: 98,
+  const today = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }, []);
+  const isSameDay = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear();
+
+  const formatHoursFromMinutes = (minutes: number) => {
+    const safeMinutes = Math.max(0, Math.round(minutes));
+    const h = Math.floor(safeMinutes / 60);
+    const m = safeMinutes % 60;
+    return `${h}h${m.toString().padStart(2, "0")}`;
   };
+
+  const weekRange = useMemo(() => {
+    const base = new Date(currentDate);
+    const day = base.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(base);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(base.getDate() + mondayOffset);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return { start: monday, end: sunday };
+  }, [currentDate]);
+
+  const monthStats = useMemo(() => {
+    const base = {
+      plannedDuration: 0,
+      actualDuration: 0,
+      plannedDistance: 0,
+      actualDistance: 0,
+      plannedTss: 0,
+      actualTss: 0,
+      sessions: activities.length,
+      completedSessions: activities.filter((a) => a.status === "completed")
+        .length,
+    };
+
+    activities.forEach((activity) => {
+      base.plannedDuration += activity.planned_duration_minutes || 0;
+      base.actualDuration += activity.actual_duration_minutes || 0;
+      base.plannedDistance += activity.planned_distance_km || 0;
+      base.actualDistance += activity.actual_distance_km || 0;
+      base.plannedTss += activity.tss || 0;
+      base.actualTss +=
+        activity.status === "completed" ? activity.tss || 0 : 0;
+    });
+
+    return base;
+  }, [activities]);
+
+  const weeklyStats = useMemo(() => {
+    const stats = {
+      plannedMinutes: 0,
+      actualMinutes: 0,
+      plannedDistance: 0,
+      actualDistance: 0,
+      plannedTss: 0,
+      actualTss: 0,
+      sessions: 0,
+      completedSessions: 0,
+    };
+
+    activities.forEach((activity) => {
+      const date = new Date(activity.scheduled_date);
+      date.setHours(0, 0, 0, 0);
+      if (date >= weekRange.start && date <= weekRange.end) {
+        stats.sessions += 1;
+        if (activity.status === "completed") {
+          stats.completedSessions += 1;
+        }
+        stats.plannedMinutes += activity.planned_duration_minutes || 0;
+        stats.actualMinutes += activity.actual_duration_minutes || 0;
+        stats.plannedDistance += activity.planned_distance_km || 0;
+        stats.actualDistance += activity.actual_distance_km || 0;
+        stats.plannedTss += activity.tss || 0;
+        stats.actualTss +=
+          activity.status === "completed" ? activity.tss || 0 : 0;
+      }
+    });
+
+    return stats;
+  }, [activities, weekRange]);
+
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }).map((_, index) => {
+      const date = new Date(weekRange.start);
+      date.setDate(weekRange.start.getDate() + index);
+      const dateStr = date.toISOString().split("T")[0];
+      return {
+        date,
+        activities: activities.filter((a) => a.scheduled_date === dateStr),
+        isToday: isSameDay(date, today),
+      };
+    });
+  }, [activities, weekRange, today]);
 
   useEffect(() => {
     loadActivities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDate]);
 
+  useEffect(() => {
+    loadSports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (selectedDate) {
       loadDayDetails(selectedDate);
@@ -172,7 +285,25 @@ export default function CalendarPage() {
     }
   };
 
+  const loadSports = async () => {
+    const { data } = await supabase
+      .from("sports")
+      .select("id, name, name_fr")
+      .order("name_fr");
+    if (data) {
+      setSports(data);
+    }
+  };
+
   const loadDayDetails = async (date: Date) => {
+    const now = new Date();
+    if (date > now) {
+      setDailyMetrics(null);
+      setFatigueValue(null);
+      setNotesValue("");
+      return;
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -188,10 +319,42 @@ export default function CalendarPage() {
       .single();
 
     setDailyMetrics(data);
+    setFatigueValue(data?.fatigue_level || null);
+    setNotesValue(data?.notes || "");
   };
 
   const navigateMonth = (direction: number) => {
     setCurrentDate(new Date(year, month + direction, 1));
+  };
+
+  const handleSaveJournal = async () => {
+    if (!selectedDate || selectedDate > today) return;
+    const fatigueChanged =
+      fatigueValue !== null &&
+      fatigueValue !== (dailyMetrics?.fatigue_level || null);
+    const notesChanged =
+      notesValue !== (dailyMetrics?.notes || "");
+    if (!fatigueChanged && !notesChanged) return;
+
+    setIsSavingMetrics(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const dateStr = selectedDate.toISOString().split("T")[0];
+      await supabase.from("daily_metrics").upsert({
+        user_id: user.id,
+        date: dateStr,
+        fatigue_level:
+          fatigueValue !== null ? fatigueValue : dailyMetrics?.fatigue_level,
+        notes: notesValue || null,
+      });
+      await loadDayDetails(selectedDate);
+    } finally {
+      setIsSavingMetrics(false);
+    }
   };
 
   const getActivitiesForDate = (day: number) => {
@@ -201,13 +364,66 @@ export default function CalendarPage() {
     return activities.filter((a) => a.scheduled_date === dateStr);
   };
 
-  const isToday = (day: number) => {
-    const today = new Date();
+  const isCurrentDay = (day: number) => {
     return (
       day === today.getDate() &&
       month === today.getMonth() &&
       year === today.getFullYear()
     );
+  };
+
+  const handleCreateSession = async () => {
+    if (!newSession.title || !newSession.sportId || !newSession.date) return;
+    setIsSavingSession(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.from("activities").insert({
+        user_id: user.id,
+        title: newSession.title,
+        sport_id: newSession.sportId,
+        scheduled_date: newSession.date,
+        planned_duration_minutes: newSession.duration
+          ? parseInt(newSession.duration, 10)
+          : null,
+        planned_distance_km: newSession.distance
+          ? parseFloat(newSession.distance)
+          : null,
+        intensity: newSession.intensity,
+        status: "planned",
+      });
+
+      setIsModalOpen(false);
+      setNewSession({
+        title: "",
+        sportId: "",
+        date: "",
+        duration: "",
+        distance: "",
+        intensity: "endurance",
+      });
+      await loadActivities();
+      if (
+        selectedDate &&
+        selectedDate.toISOString().split("T")[0] === newSession.date
+      ) {
+        await loadDayDetails(selectedDate);
+      }
+    } finally {
+      setIsSavingSession(false);
+    }
+  };
+
+  const handleOpenModal = () => {
+    const baseDate = selectedDate || currentDate;
+    setNewSession((session) => ({
+      ...session,
+      date: baseDate.toISOString().split("T")[0],
+    }));
+    setIsModalOpen(true);
   };
 
   const formatSelectedDate = () => {
@@ -223,9 +439,26 @@ export default function CalendarPage() {
   const selectedDateActivities = selectedDate
     ? getActivitiesForDate(selectedDate.getDate())
     : [];
+  const isFutureSelection =
+    selectedDate !== null && selectedDate.getTime() > today.getTime();
+  const sleepMinutes = !isFutureSelection
+    ? dailyMetrics?.sleep_duration_minutes
+    : null;
+  const sleepScore = !isFutureSelection ? dailyMetrics?.sleep_score : null;
+  const resolvedFatigue =
+    fatigueValue ?? dailyMetrics?.fatigue_level ?? null;
+  const fatigueStatus =
+    resolvedFatigue === null
+      ? { label: "Non renseigné", color: "text-muted" }
+      : resolvedFatigue <= 3
+      ? { label: "Très frais", color: "text-success" }
+      : resolvedFatigue <= 6
+      ? { label: "Modéré", color: "text-warning" }
+      : { label: "Élevé", color: "text-error" };
 
   return (
-    <div className="flex flex-col xl:flex-row gap-6">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col xl:flex-row gap-6">
       {/* Main Calendar */}
       <div className="flex-1 space-y-6">
         {/* Header */}
@@ -266,164 +499,283 @@ export default function CalendarPage() {
             <Button
               leftIcon={<Plus className="h-4 w-4" />}
               className="w-full sm:w-auto"
+              onClick={handleOpenModal}
             >
-              Séance
+              Nouvelle séance
             </Button>
+            {isLoading && <Spinner size="sm" />}
           </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <Card padding="sm" className="flex items-center gap-3">
-            <Activity className="h-5 w-5 text-accent" />
-            <div>
-              <p className="text-xs text-muted">Volume hebdo</p>
-              <p className="text-xl font-bold">
-                {weeklyStats.volume}
-                <span className="text-sm font-normal text-muted ml-1">km</span>
+          <Card padding="sm" className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-secondary" />
+              <div>
+                <p className="text-xs text-muted uppercase">
+                  Durée planifiée (mois)
+                </p>
+                <p className="text-xl font-bold">
+                  {formatHoursFromMinutes(monthStats.plannedDuration)}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted">Réalisé</p>
+              <p className="text-sm font-semibold">
+                {formatHoursFromMinutes(monthStats.actualDuration)}
               </p>
             </div>
-            <Badge variant="success" size="sm">
-              +{weeklyStats.volumeChange}%
-            </Badge>
           </Card>
 
-          <Card padding="sm" className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-secondary" />
-            <div>
-              <p className="text-xs text-muted">Durée totale</p>
-              <p className="text-xl font-bold">
-                {weeklyStats.duration.hours}h
-                {weeklyStats.duration.minutes.toString().padStart(2, "0")}
+          <Card padding="sm" className="flex items-center justify-between gap-3">
+            <div className={cn("flex items-center gap-2")}>
+              <Activity className="h-5 w-5 text-accent" />
+              <div>
+                <p className="text-xs text-muted uppercase">
+                  Distance prévue (mois)
+                </p>
+                <p className="text-xl font-bold">
+                  {monthStats.plannedDistance.toFixed(1)}
+                  <span className="text-sm text-muted ml-1">km</span>
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted">Complétée</p>
+              <p className="text-sm font-semibold">
+                {monthStats.actualDistance.toFixed(1)} km
               </p>
             </div>
-            <Badge variant="success" size="sm">
-              +{weeklyStats.durationChange}%
-            </Badge>
           </Card>
 
-          <Card padding="sm" className="flex items-center gap-3">
-            <Activity className="h-5 w-5 text-warning" />
-            <div>
-              <p className="text-xs text-muted">Charge (TSS)</p>
-              <p className="text-xl font-bold">{weeklyStats.tss}</p>
-            </div>
-            <span className="text-xs text-accent">
-              Cible: {weeklyStats.tssTarget}
-            </span>
-          </Card>
-
-          <Card padding="sm" className="flex items-center gap-3">
-            <Activity className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-xs text-muted">Forme</p>
-              <p className="text-xl font-bold">{weeklyStats.form}%</p>
+          <Card padding="sm" className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-warning" />
+              <div>
+                <p className="text-xs text-muted uppercase">Charge TSS</p>
+                <p className="text-xl font-bold">{monthStats.actualTss}</p>
+              </div>
             </div>
             <Badge variant="outline" size="sm">
-              Stable
+              Objectif {monthStats.plannedTss}
             </Badge>
+          </Card>
+
+          <Card padding="sm" className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs text-muted uppercase">Séances</p>
+              <p className="text-xl font-bold">{monthStats.completedSessions}</p>
+            </div>
+            <p className="text-sm text-muted">
+              sur {monthStats.sessions} prévues
+            </p>
           </Card>
         </div>
 
-        {/* Calendar Grid */}
-        <Card>
-          <div className="overflow-x-auto">
-            <div className="min-w-[720px]">
-              {/* Day headers */}
-              <div className="grid grid-cols-7 gap-px border-b border-dark-200 mb-2">
-                {dayNames.map((day) => (
-                  <div
-                    key={day}
-                    className="p-3 text-center text-sm text-muted font-medium"
-                  >
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar days */}
-              <div className="grid grid-cols-7 gap-px">
-                {Array.from({ length: startingDay }).map((_, i) => (
-                  <div
-                    key={`empty-${i}`}
-                    className="min-h-[100px] p-2 bg-dark-100/50"
-                  />
-                ))}
-
-                {Array.from({ length: daysInMonth }).map((_, i) => {
-                  const day = i + 1;
-                  const dayActivities = getActivitiesForDate(day);
-                  const isSelected =
-                    selectedDate?.getDate() === day &&
-                    selectedDate?.getMonth() === month &&
-                    selectedDate?.getFullYear() === year;
-
-                  return (
+        {/* Calendar View */}
+        {viewMode === "month" ? (
+          <Card>
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <div className="grid grid-cols-7 gap-px border-b border-dark-200 mb-2">
+                  {dayNames.map((day) => (
                     <div
                       key={day}
-                      onClick={() => setSelectedDate(new Date(year, month, day))}
-                      className={cn(
-                        "min-h-[100px] p-2 cursor-pointer transition-colors border",
-                        isToday(day)
-                          ? "border-accent bg-accent/5"
-                          : isSelected
-                          ? "border-secondary bg-secondary/5"
-                          : "border-transparent hover:bg-dark-100"
-                      )}
+                      className="p-3 text-center text-sm text-muted font-medium"
                     >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-px">
+                  {Array.from({ length: startingDay }).map((_, i) => (
+                    <div
+                      key={`empty-${i}`}
+                      className="min-h-[100px] p-2 bg-dark-100/50"
+                    />
+                  ))}
+
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const day = i + 1;
+                    const dayActivities = getActivitiesForDate(day);
+                    const isSelected =
+                      selectedDate?.getDate() === day &&
+                      selectedDate?.getMonth() === month &&
+                      selectedDate?.getFullYear() === year;
+
+                    return (
                       <div
+                        key={day}
+                        onClick={() =>
+                          setSelectedDate(new Date(year, month, day))
+                        }
                         className={cn(
-                          "text-sm font-medium mb-2",
-                          isToday(day) && "text-accent"
+                          "min-h-[100px] p-2 cursor-pointer transition-colors border",
+                          isCurrentDay(day)
+                            ? "border-accent bg-accent/5"
+                            : isSelected
+                            ? "border-secondary bg-secondary/5"
+                            : "border-transparent hover:bg-dark-100"
                         )}
                       >
-                        {day}
-                        {isToday(day) && (
-                          <span className="ml-1 h-1.5 w-1.5 bg-accent rounded-full inline-block" />
-                        )}
-                      </div>
+                        <div
+                          className={cn(
+                            "text-sm font-medium mb-2",
+                            isCurrentDay(day) && "text-accent"
+                          )}
+                        >
+                          {day}
+                          {isCurrentDay(day) && (
+                            <span className="ml-1 h-1.5 w-1.5 bg-accent rounded-full inline-block" />
+                          )}
+                        </div>
 
-                      <div className="space-y-1">
-                        {dayActivities.slice(0, 3).map((activity) => (
-                          <div
-                            key={activity.id}
-                            className={cn(
-                              "px-2 py-1 rounded text-xs font-medium truncate",
-                              activity.status === "completed"
-                                ? "bg-success/20 text-success"
-                                : activity.status === "skipped"
-                                ? "bg-error/20 text-error"
-                                : ""
-                            )}
-                            style={
-                              activity.status === "planned"
-                                ? {
-                                    backgroundColor: `${getSportColor(
-                                      activity.sport_name
-                                    )}20`,
-                                    color: getSportColor(activity.sport_name),
-                                  }
-                                : undefined
-                            }
-                          >
-                            {activity.title.length > 10
-                              ? `${activity.title.substring(0, 10)}...`
-                              : activity.title}
-                          </div>
-                        ))}
-                        {dayActivities.length > 3 && (
-                          <div className="text-xs text-muted">
-                            +{dayActivities.length - 3} autres
-                          </div>
-                        )}
+                        <div className="space-y-1">
+                          {dayActivities.slice(0, 3).map((activity) => (
+                            <div
+                              key={activity.id}
+                              className={cn(
+                                "px-2 py-1 rounded text-xs font-medium truncate",
+                                activity.status === "completed"
+                                  ? "bg-success/20 text-success"
+                                  : activity.status === "skipped"
+                                  ? "bg-error/20 text-error"
+                                  : ""
+                              )}
+                              style={
+                                activity.status === "planned"
+                                  ? {
+                                      backgroundColor: `${getSportColor(
+                                        activity.sport_name
+                                      )}20`,
+                                      color: getSportColor(activity.sport_name),
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {activity.title.length > 10
+                                ? `${activity.title.substring(0, 10)}...`
+                                : activity.title}
+                            </div>
+                          ))}
+                          {dayActivities.length > 3 && (
+                            <div className="text-xs text-muted">
+                              +{dayActivities.length - 3} autres
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        ) : (
+          <Card>
+            <div className="flex flex-wrap gap-4 mb-4 text-sm">
+              <div>
+                <p className="text-xs text-muted uppercase">
+                  Durée planifiée
+                </p>
+                <p className="font-semibold">
+                  {formatHoursFromMinutes(weeklyStats.plannedMinutes)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted uppercase">
+                  Durée réalisée
+                </p>
+                <p className="font-semibold">
+                  {formatHoursFromMinutes(weeklyStats.actualMinutes)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted uppercase">Charge TSS</p>
+                <p className="font-semibold">
+                  {weeklyStats.actualTss}/{weeklyStats.plannedTss}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted uppercase">Séances</p>
+                <p className="font-semibold">
+                  {weeklyStats.completedSessions}/{weeklyStats.sessions}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {weekDays.map((day) => {
+                const dateStr = day.date.toLocaleDateString("fr-FR", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                });
+                const isSelected =
+                  selectedDate && isSameDay(day.date, selectedDate);
+
+                return (
+                  <button
+                    key={day.date.toISOString()}
+                    onClick={() => setSelectedDate(new Date(day.date))}
+                    className={cn(
+                      "w-full text-left p-4 rounded-xl border transition-colors",
+                      day.isToday
+                        ? "border-accent bg-accent/5"
+                        : "border-dark-200 hover:border-accent/50",
+                      isSelected && "bg-secondary/10 border-secondary"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-xs text-muted uppercase">
+                          {dateStr}
+                        </p>
+                        <p className="text-sm font-semibold">
+                          {day.activities.length > 0
+                            ? `${day.activities.length} séance${
+                                day.activities.length > 1 ? "s" : ""
+                              }`
+                            : "Repos"}
+                        </p>
+                      </div>
+                      {day.isToday && (
+                        <Badge variant="outline" size="sm">
+                          Aujourd&apos;hui
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {day.activities.length > 0 ? (
+                        day.activities.map((activity) => (
+                          <div
+                            key={activity.id}
+                            className="px-3 py-1 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: `${getSportColor(
+                                activity.sport_name
+                              )}20`,
+                              color: getSportColor(activity.sport_name),
+                            }}
+                          >
+                            {activity.title}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted">
+                          Aucune séance planifiée
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Right Panel - Day Details */}
@@ -433,7 +785,9 @@ export default function CalendarPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs text-accent uppercase">
-                  Aujourd&apos;hui
+                  {selectedDate && isSameDay(selectedDate, today)
+                    ? "Aujourd'hui"
+                    : "Jour sélectionné"}
                 </p>
                 <h3 className="text-lg font-bold capitalize">
                   {formatSelectedDate()}
@@ -455,16 +809,21 @@ export default function CalendarPage() {
                   <Activity className="h-4 w-4 text-muted" />
                   Entraînement
                 </h4>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={handleOpenModal}>
                   <Edit2 className="h-3 w-3 mr-1" />
-                  Modifier
+                  Planifier
                 </Button>
               </div>
 
               {selectedDateActivities.length === 0 ? (
                 <div className="text-center py-6 text-muted text-sm">
                   <p>Pas d&apos;entraînement prévu</p>
-                  <Button variant="ghost" size="sm" className="mt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2"
+                    onClick={handleOpenModal}
+                  >
                     <Plus className="h-4 w-4 mr-1" />
                     Ajouter
                   </Button>
@@ -559,38 +918,28 @@ export default function CalendarPage() {
                   <Moon className="h-4 w-4 text-muted" />
                 </div>
                 <p className="text-2xl font-bold">
-                  {dailyMetrics?.sleep_duration_minutes
-                    ? `${Math.floor(
-                        dailyMetrics.sleep_duration_minutes / 60
-                      )}h${(dailyMetrics.sleep_duration_minutes % 60)
-                        .toString()
-                        .padStart(2, "0")}`
-                    : "7h15"}
+                  {sleepMinutes
+                    ? `${Math.floor(sleepMinutes / 60)}h${String(
+                        sleepMinutes % 60
+                      ).padStart(2, "0")}`
+                    : isFutureSelection
+                    ? "--"
+                    : "Non renseigné"}
                 </p>
-                <Progress value={75} max={100} size="sm" className="mt-2" />
-              </div>
-
-              {/* Mood */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted uppercase">Humeur</span>
-                  <Smile className="h-4 w-4 text-muted" />
-                </div>
-                <div className="flex gap-2">
-                  {[Frown, Meh, Smile].map((Icon, i) => (
-                    <button
-                      key={i}
-                      className={cn(
-                        "h-10 w-10 rounded-full flex items-center justify-center transition-all",
-                        dailyMetrics?.mood === i + 1
-                          ? "bg-accent text-dark"
-                          : "bg-dark-100 text-muted hover:bg-dark-200"
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </button>
-                  ))}
-                </div>
+                {sleepScore ? (
+                  <Progress
+                    value={sleepScore}
+                    max={100}
+                    size="sm"
+                    className="mt-2"
+                  />
+                ) : (
+                  <p className="text-xs text-muted mt-2">
+                    {isFutureSelection
+                      ? "Les données apparaîtront après la nuit."
+                      : "Aucune donnée WHOOP pour ce jour."}
+                  </p>
+                )}
               </div>
 
               {/* Fatigue */}
@@ -600,21 +949,22 @@ export default function CalendarPage() {
                   <span
                     className={cn(
                       "text-sm font-medium",
-                      (dailyMetrics?.fatigue_level || 7) > 7
-                        ? "text-error"
-                        : (dailyMetrics?.fatigue_level || 7) > 4
-                        ? "text-warning"
-                        : "text-success"
+                      fatigueStatus.color
                     )}
                   >
-                    Élevée ({dailyMetrics?.fatigue_level || 7}/10)
+                    {fatigueStatus.label}
+                    {resolvedFatigue !== null && ` (${resolvedFatigue}/10)`}
                   </span>
                 </div>
                 <Slider
                   min={1}
                   max={10}
-                  value={dailyMetrics?.fatigue_level || 7}
-                  showValue={false}
+                  value={resolvedFatigue ?? 5}
+                  showValue
+                  onChange={(e) =>
+                    setFatigueValue(Number(e.currentTarget.value))
+                  }
+                  disabled={isFutureSelection}
                 />
                 <div className="flex justify-between text-xs text-muted mt-1">
                   <span>FRAIS</span>
@@ -629,20 +979,128 @@ export default function CalendarPage() {
         {selectedDate && (
           <Card>
             <h4 className="font-medium flex items-center gap-2 mb-4">
-              <Edit2 className="h-4 w-4 text-muted" />
+              <NotebookPen className="h-4 w-4 text-muted" />
               Notes
             </h4>
             <textarea
               className="w-full h-24 bg-dark-100 rounded-xl p-3 text-sm resize-none border border-dark-200 focus:border-accent focus:outline-none"
               placeholder="Commentaire sur la séance, sensation particulière..."
-              defaultValue={dailyMetrics?.notes || ""}
+              value={notesValue}
+              onChange={(e) => setNotesValue(e.target.value)}
+              disabled={isFutureSelection}
             />
-            <Button variant="ghost" size="sm" className="mt-2 w-full">
-              Sauvegarder
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-2 w-full"
+              onClick={handleSaveJournal}
+              disabled={isFutureSelection || isSavingMetrics}
+              isLoading={isSavingMetrics}
+            >
+              Sauvegarder le journal
             </Button>
+            {isFutureSelection && (
+              <p className="text-xs text-muted text-center mt-2">
+                Les entrées futures seront disponibles une fois la journée
+                passée.
+              </p>
+            )}
           </Card>
         )}
       </div>
+    </div>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Planifier une séance"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Titre"
+            placeholder="Séance tempo, sortie longue..."
+            value={newSession.title}
+            onChange={(e) =>
+              setNewSession((prev) => ({ ...prev, title: e.target.value }))
+            }
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Date"
+              type="date"
+              value={newSession.date}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, date: e.target.value }))
+              }
+            />
+            <Select
+              label="Sport"
+              value={newSession.sportId}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, sportId: e.target.value }))
+              }
+              placeholder="Choisissez un sport"
+              options={sports.map((sport) => ({
+                value: sport.id,
+                label: sport.name_fr,
+              }))}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Durée (minutes)"
+              type="number"
+              min={0}
+              value={newSession.duration}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, duration: e.target.value }))
+              }
+            />
+            <Input
+              label="Distance (km)"
+              type="number"
+              min={0}
+              step="0.1"
+              value={newSession.distance}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, distance: e.target.value }))
+              }
+            />
+          </div>
+          <Select
+            label="Intensité"
+            value={newSession.intensity}
+            onChange={(e) =>
+              setNewSession((prev) => ({ ...prev, intensity: e.target.value }))
+            }
+            options={[
+              { value: "recovery", label: "Récupération" },
+              { value: "endurance", label: "Endurance" },
+              { value: "tempo", label: "Tempo" },
+              { value: "threshold", label: "Seuil" },
+              { value: "vo2max", label: "VO2max" },
+              { value: "anaerobic", label: "Anaérobie" },
+            ]}
+          />
+
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateSession}
+              isLoading={isSavingSession}
+              disabled={
+                !newSession.title || !newSession.date || !newSession.sportId
+              }
+            >
+              Ajouter
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

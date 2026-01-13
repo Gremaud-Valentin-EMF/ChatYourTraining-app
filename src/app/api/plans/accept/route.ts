@@ -114,6 +114,26 @@ export async function POST(request: Request) {
       );
     }
 
+    const planDates = Array.from(
+      new Set(inserts.map((session) => session.scheduled_date))
+    );
+
+    if (planDates.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("activities")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("status", "planned")
+        .in("scheduled_date", planDates);
+      if (deleteError) {
+        console.error("Erreur suppression ancien plan:", deleteError);
+        return NextResponse.json(
+          { error: "Impossible d'actualiser les anciennes séances" },
+          { status: 500 }
+        );
+      }
+    }
+
     const { error } = await supabase.from("activities").insert(inserts);
     if (error) {
       console.error("Erreur insertion plan:", error);
