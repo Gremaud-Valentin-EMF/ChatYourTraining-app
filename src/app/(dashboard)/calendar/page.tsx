@@ -49,6 +49,7 @@ interface Activity {
 
 interface DailyMetrics {
   sleep_duration_minutes: number | null;
+  sleep_score: number | null;
   mood: number | null;
   fatigue_level: number | null;
   notes: string | null;
