@@ -20,6 +20,7 @@ interface ActivityDetail {
   title: string;
   scheduled_date: string;
   status: string;
+  sport_id: string | null;
   sport_name: string;
   sport_label: string;
   planned_duration_minutes: number | null;
@@ -59,6 +60,7 @@ export default function WorkoutDetailPage({
         title,
         scheduled_date,
         status,
+        sport_id,
         planned_duration_minutes,
         actual_duration_minutes,
         planned_distance_km,
@@ -68,21 +70,34 @@ export default function WorkoutDetailPage({
         max_hr,
         tss,
         intensity,
-        source,
-        sports (name, name_fr)
+        source
       `
       )
       .eq("id", params.id)
       .single();
 
     if (data) {
+      let sportName = "other";
+      let sportLabel = "Autre";
+      if (data.sport_id) {
+        const { data: sportInfo } = await supabase
+          .from("sports")
+          .select("name, name_fr")
+          .eq("id", data.sport_id)
+          .single();
+        if (sportInfo) {
+          sportName = sportInfo.name || sportName;
+          sportLabel = sportInfo.name_fr || sportLabel;
+        }
+      }
       setActivity({
         id: data.id,
         title: data.title,
         scheduled_date: data.scheduled_date,
         status: data.status,
-        sport_name: data.sports?.name || "other",
-        sport_label: data.sports?.name_fr || "Autre",
+        sport_id: data.sport_id,
+        sport_name: sportName,
+        sport_label: sportLabel,
         planned_duration_minutes: data.planned_duration_minutes,
         actual_duration_minutes: data.actual_duration_minutes,
         planned_distance_km: data.planned_distance_km,
