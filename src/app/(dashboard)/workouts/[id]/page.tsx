@@ -31,7 +31,6 @@ interface ActivityDetail {
   max_hr: number | null;
   tss: number | null;
   intensity: string | null;
-  notes: string | null;
   source: string;
 }
 
@@ -69,7 +68,6 @@ export default function WorkoutDetailPage({
         max_hr,
         tss,
         intensity,
-        notes,
         source,
         sports (name, name_fr)
       `
@@ -94,7 +92,6 @@ export default function WorkoutDetailPage({
         max_hr: data.max_hr,
         tss: data.tss,
         intensity: data.intensity,
-        notes: data.notes,
         source: data.source,
       });
     } else {
@@ -229,12 +226,6 @@ export default function WorkoutDetailPage({
           )}
         </div>
 
-        {activity.notes && (
-          <div className="mt-4 p-4 bg-dark-100 rounded-xl">
-            <p className="text-xs text-muted uppercase mb-2">Notes</p>
-            <p>{activity.notes}</p>
-          </div>
-        )}
       </Card>
     </div>
   );
