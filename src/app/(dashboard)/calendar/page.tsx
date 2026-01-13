@@ -317,7 +317,7 @@ export default function CalendarPage() {
 
     const { data } = await supabase
       .from("daily_metrics")
-      .select("sleep_duration_minutes, mood, fatigue_level, notes")
+      .select("sleep_duration_minutes, sleep_score, mood, fatigue_level, notes")
       .eq("user_id", user.id)
       .eq("date", dateStr)
       .single();
