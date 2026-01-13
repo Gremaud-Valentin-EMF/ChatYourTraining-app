@@ -42,6 +42,7 @@ interface Activity {
   actual_duration_minutes: number | null;
   planned_distance_km: number | null;
   actual_distance_km: number | null;
+  tss: number | null;
   intensity: string | null;
   rpe: number | null;
 }
@@ -251,6 +252,7 @@ export default function CalendarPage() {
           actual_duration_minutes,
           planned_distance_km,
           actual_distance_km,
+          tss,
           intensity,
           rpe,
           sports (name, name_fr)
@@ -273,6 +275,7 @@ export default function CalendarPage() {
             actual_duration_minutes: a.actual_duration_minutes,
             planned_distance_km: a.planned_distance_km,
             actual_distance_km: a.actual_distance_km,
+            tss: a.tss,
             intensity: a.intensity,
             rpe: a.rpe,
             sport_name: a.sports?.name || "other",
