@@ -10,10 +10,23 @@ import {
   calculateNormalizedPower,
   TSSCalculationOptions,
 } from "@/lib/integrations/strava";
+import {
+  acquireSyncLock,
+  releaseSyncLock,
+  matchPlannedWorkout,
+  SyncLockError,
+  SyncState,
+} from "@/lib/integrations/sync-helpers";
 
 export async function POST() {
+  const supabase = await createClient();
+  let lockAcquired = false;
+  let lockedState: SyncState | null = null;
+  let integrationId: string | null = null;
+  let releaseError: string | undefined;
+  let syncSuccess = false;
+
   try {
-    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -38,11 +51,34 @@ export async function POST() {
       );
     }
 
+    // Prevent concurrent syncs
+    const syncState =
+      (integration.sync_errors as SyncState | null) ?? null;
+    integrationId = integration.id;
+    try {
+      lockedState = await acquireSyncLock(
+        supabase,
+        integration.id,
+        "strava",
+        syncState
+      );
+      lockAcquired = true;
+    } catch (lockError) {
+      if (lockError instanceof SyncLockError) {
+        return NextResponse.json(
+          { error: "Synchronisation déjà en cours" },
+          { status: 429 }
+        );
+      }
+      throw lockError;
+    }
+
     // Get sync configuration (defaults if not set)
     const syncConfig = integration.sync_config || {};
     const syncActivities = syncConfig.activities !== false; // Default: true
 
     if (!syncActivities) {
+      syncSuccess = true;
       console.log("Strava sync - Activities sync disabled");
       return NextResponse.json({
         success: true,
@@ -120,7 +156,9 @@ export async function POST() {
       .from("sports")
       .select("id, name");
 
-    const sportMap = new Map(sports?.map((s: any) => [s.name, s.id]) || []);
+    const sportMap = new Map<string, string>(
+      (sports?.map((s: any) => [s.name, s.id]) as [string, string][]) || []
+    );
 
     // Smart sync: Check oldest Strava activity to determine sync range
     // - First sync or < 120 days of data: sync 120 days for accurate CTL (3x the 42-day constant)
@@ -184,6 +222,7 @@ export async function POST() {
 
     let synced = 0;
     let skipped = 0;
+    let matchedToPlan = 0;
 
     // Process activities with rate limiting for streams API
     // Strava rate limit: 100 requests per 15 minutes, 1000 per day
@@ -193,15 +232,16 @@ export async function POST() {
 
     for (const stravaActivity of activities) {
       // Check if activity already exists
+      const externalId = String(stravaActivity.id);
       const { data: existing } = await (supabase as any)
         .from("activities")
         .select("id")
         .eq("user_id", user.id)
         .eq("source", "strava")
-        .eq("external_id", String(stravaActivity.id))
-        .single();
+        .eq("external_id", externalId)
+        .limit(1);
 
-      if (existing) {
+      if (existing && existing.length > 0) {
         skipped++;
         continue;
       }
@@ -294,6 +334,19 @@ export async function POST() {
           }${tssOptions.normalizedHeartRate ? " (NHR)" : ""}`
       );
 
+      const matchedPlan = await matchPlannedWorkout(supabase as any, {
+        userId: user.id,
+        sportId,
+        scheduledDate: activityData.scheduled_date,
+        data: activityData,
+      });
+
+      if (matchedPlan) {
+        synced++;
+        matchedToPlan++;
+        continue;
+      }
+
       const { error: insertError } = await (supabase as any)
         .from("activities")
         .insert({
@@ -318,16 +371,27 @@ export async function POST() {
       .from("integrations")
       .update({ last_sync_at: new Date().toISOString() })
       .eq("id", integration.id);
+    syncSuccess = true;
     /* eslint-enable @typescript-eslint/no-explicit-any */
 
     return NextResponse.json({
       success: true,
       synced,
       skipped,
+      matchedToPlan,
       total: activities.length,
     });
   } catch (error) {
     console.error("Strava sync error:", error);
+    releaseError =
+      error instanceof Error ? error.message : "Sync failed";
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
+  } finally {
+    if (lockAcquired && lockedState && integrationId) {
+      await releaseSyncLock(supabase, integrationId, lockedState, {
+        success: syncSuccess,
+        errorMessage: syncSuccess ? undefined : releaseError,
+      });
+    }
   }
 }

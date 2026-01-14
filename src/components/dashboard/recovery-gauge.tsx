@@ -1,7 +1,8 @@
 "use client";
 
 import { Card } from "@/components/ui";
-import { Battery } from "lucide-react";
+import { Battery, AlertTriangle, CheckCircle2, Info, TrendingUp } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 interface RecoveryGaugeProps {
   score: number | null;
@@ -10,39 +11,51 @@ interface RecoveryGaugeProps {
   label?: string;
 }
 
-const getReadinessStatus = (deltaPercent: number | null) => {
+const getReadinessStatus = (
+  deltaPercent: number | null
+): {
+  label: string;
+  description: string;
+  color: string;
+  Icon: LucideIcon;
+} => {
   if (deltaPercent === null) {
     return {
       label: "Pas assez de données",
       description: "Connectez une source pour suivre la tendance.",
-      color: "text-muted",
+      color: "text-muted-foreground",
+      Icon: Info,
     };
   }
   if (deltaPercent <= -12) {
     return {
-      label: "Alerte 🔴",
+      label: "Alerte",
       description: "Sous la moyenne, privilégie la récup.",
       color: "text-error",
+      Icon: AlertTriangle,
     };
   }
   if (deltaPercent <= -5) {
     return {
-      label: "Surveiller 🟠",
+      label: "Surveiller",
       description: "Légèrement en dessous, allège la séance.",
       color: "text-warning",
+      Icon: AlertTriangle,
     };
   }
   if (deltaPercent < 4) {
     return {
-      label: "Bon jour 🟢",
+      label: "Bon jour",
       description: "Dans la moyenne, charge nominale.",
       color: "text-success",
+      Icon: TrendingUp,
     };
   }
   return {
-    label: "Boost 🟢",
+    label: "Boost",
     description: "Au-dessus de la moyenne, séance qualitative OK.",
     color: "text-success",
+    Icon: CheckCircle2,
   };
 };
 
@@ -160,8 +173,9 @@ export function RecoveryGauge({
       </div>
 
       <p
-        className={`mt-4 text-sm font-semibold ${status.color}`}
+        className={`mt-4 text-sm font-semibold flex items-center gap-1 ${status.color}`}
       >
+        <status.Icon className="h-4 w-4" />
         {status.label}
       </p>
       <p className="text-xs text-muted mt-1 text-center">

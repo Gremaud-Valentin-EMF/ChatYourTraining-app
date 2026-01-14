@@ -135,7 +135,7 @@ const integrationProviders: {
       {
         key: "workouts",
         label: "Workouts WHOOP",
-        description: "⚠️ Désactiver si Strava actif (évite doublons)",
+        description: "Désactiver si Strava actif (évite doublons)",
         defaultEnabled: false,
       },
     ],

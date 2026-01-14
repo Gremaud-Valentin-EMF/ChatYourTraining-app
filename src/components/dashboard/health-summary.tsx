@@ -2,7 +2,20 @@
 
 import Link from "next/link";
 import { Card, Button } from "@/components/ui";
-import { Heart, Moon, Activity, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Heart,
+  Moon,
+  Activity,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 interface HealthSummaryProps {
   hrv?: number;
@@ -37,49 +50,82 @@ export function HealthSummary({
     delta?: number,
     reverse = false,
     threshold = 1
-  ) => {
-    if (delta === undefined) {
-      return { symbol: "➡️", className: "text-muted" };
-    }
-    if (Math.abs(delta) < threshold) {
-      return { symbol: "➡️", className: "text-muted" };
+  ): { Icon: LucideIcon; className: string } => {
+    if (delta === undefined || Math.abs(delta) < threshold) {
+      return { Icon: Minus, className: "text-muted-foreground" };
     }
     const isPositive = delta > 0;
     const isPositiveGood = reverse ? !isPositive : isPositive;
     return {
-      symbol: isPositive ? "↗️" : "↘️",
+      Icon: isPositive ? ArrowUpRight : ArrowDownRight,
       className: isPositiveGood ? "text-success" : "text-error",
     };
   };
 
   const getHrvStatus = () => {
     if (hrvDeltaPct === undefined)
-      return { label: "Baseline inconnue", text: "text-muted" };
+      return {
+        label: "Baseline inconnue",
+        text: "text-muted-foreground",
+        Icon: Info,
+      };
     if (hrvDeltaPct <= -15)
-      return { label: "Fatigue ⚠️", text: "text-error" };
+      return {
+        label: "Fatigue",
+        text: "text-error",
+        Icon: AlertTriangle,
+      };
     if (hrvDeltaPct <= -5)
-      return { label: "Surveillance", text: "text-warning" };
-    return { label: "Stable 🟢", text: "text-success" };
+      return {
+        label: "Surveillance",
+        text: "text-warning",
+        Icon: AlertTriangle,
+      };
+    return {
+      label: "Stable",
+      text: "text-success",
+      Icon: CheckCircle2,
+    };
   };
 
   const getRestingStatus = () => {
     if (restingHrTrend === undefined)
-      return { label: "Stable", text: "text-muted" };
+      return { label: "Stable", text: "text-muted-foreground", Icon: Minus };
     if (restingHrTrend >= 2)
-      return { label: "Stress élevé", text: "text-warning" };
+      return {
+        label: "Stress élevé",
+        text: "text-warning",
+        Icon: AlertTriangle,
+      };
     if (restingHrTrend <= -2)
-      return { label: "Récupération", text: "text-success" };
-    return { label: "Stable", text: "text-muted" };
+      return {
+        label: "Récupération",
+        text: "text-success",
+        Icon: CheckCircle2,
+      };
+    return { label: "Stable", text: "text-muted-foreground", Icon: Minus };
   };
 
   const getSleepStatus = () => {
     if (sleepDebtHours === undefined)
-      return { label: "Dette inconnue", text: "text-muted" };
+      return {
+        label: "Dette inconnue",
+        text: "text-muted-foreground",
+        Icon: Info,
+      };
     if (sleepDebtHours < 0.5)
-      return { label: "Recharge 🟢", text: "text-success" };
+      return {
+        label: "Recharge",
+        text: "text-success",
+        Icon: CheckCircle2,
+      };
     if (sleepDebtHours < 1.5)
-      return { label: "Récup en cours", text: "text-warning" };
-    return { label: "Dette élevée ⚠️", text: "text-error" };
+      return {
+        label: "Récup en cours",
+        text: "text-warning",
+        Icon: AlertTriangle,
+      };
+    return { label: "Dette élevée", text: "text-error", Icon: AlertTriangle };
   };
 
   const hasData =
@@ -131,7 +177,7 @@ export function HealthSummary({
 
       {!hasData ? (
         <div className="text-center py-6">
-          <p className="text-sm text-muted mb-3">
+          <p className="text-sm text-muted-foreground mb-3">
             Consultez vos métriques détaillées de sommeil, VRC et stress.
           </p>
           <Link href="/integrations">
@@ -160,25 +206,33 @@ export function HealthSummary({
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-muted uppercase">
+                  <p className="text-xs text-muted-foreground uppercase">
                     {metric.label}
                   </p>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                     <span className="font-semibold flex items-center gap-1">
                       {metric.value}
-                      <span className={`text-base ${metric.trend.className}`}>
-                        {metric.trend.symbol}
-                      </span>
+                      {metric.trend.Icon && (
+                        <metric.trend.Icon
+                          className={cn("h-4 w-4", metric.trend.className)}
+                        />
+                      )}
                     </span>
                     {metric.secondary && (
-                      <span className="text-[11px] text-muted">
+                      <span className="text-[11px] text-muted-foreground">
                         {metric.secondary}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
-              <div className={`text-xs font-semibold ${metric.status.text}`}>
+              <div
+                className={cn(
+                  "text-xs font-semibold flex items-center gap-1",
+                  metric.status.text
+                )}
+              >
+                <metric.status.Icon className="h-3.5 w-3.5" />
                 {metric.status.label}
               </div>
             </div>
@@ -186,7 +240,9 @@ export function HealthSummary({
 
           {strain !== undefined && (
             <div className="flex items-center justify-between pt-3 border-t border-dark-200">
-              <span className="text-sm text-muted">Strain du jour</span>
+              <span className="text-sm text-muted-foreground">
+                Strain du jour
+              </span>
               <span className="font-bold text-warning">
                 {strain.toFixed(1)}
               </span>

@@ -10,10 +10,26 @@ import {
   WhoopRecovery,
   WhoopWorkout,
 } from "@/lib/integrations/whoop";
+import {
+  acquireSyncLock,
+  releaseSyncLock,
+  matchPlannedWorkout,
+  SyncLockError,
+} from "@/lib/integrations/sync-helpers";
+import type {
+  ImportedActivityData,
+  SyncState,
+} from "@/lib/integrations/sync-helpers";
 
 export async function POST() {
+  const supabase = await createClient();
+  let lockAcquired = false;
+  let lockedState: SyncState | null = null;
+  let integrationId: string | null = null;
+  let releaseError: string | undefined;
+  let syncSuccess = false;
+
   try {
-    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -36,6 +52,28 @@ export async function POST() {
         { error: "WHOOP not connected" },
         { status: 400 }
       );
+    }
+
+    const syncState =
+      (integration.sync_errors as SyncState | null) ?? null;
+    integrationId = integration.id;
+
+    try {
+      lockedState = await acquireSyncLock(
+        supabase,
+        integration.id,
+        "whoop",
+        syncState
+      );
+      lockAcquired = true;
+    } catch (lockError) {
+      if (lockError instanceof SyncLockError) {
+        return NextResponse.json(
+          { error: "Synchronisation WHOOP déjà en cours" },
+          { status: 429 }
+        );
+      }
+      throw lockError;
     }
 
     // Get sync configuration (defaults if not set)
@@ -291,12 +329,15 @@ export async function POST() {
     const { data: sports } = await (supabase as any)
       .from("sports")
       .select("id, name");
-    const sportMap = new Map(sports?.map((s: any) => [s.name, s.id]) || []);
+    const sportMap = new Map<string, string>(
+      (sports?.map((s: any) => [s.name, s.id]) as [string, string][]) || []
+    );
 
     // Process workout data - import as activities for TSS calculation
     // Only import if no Strava activity exists for the same time period (avoid duplicates)
     let workoutsSynced = 0;
     let workoutsSkipped = 0;
+    let workoutsMatched = 0;
 
     if (syncWorkouts) {
       for (const workout of workoutData.records) {
@@ -368,25 +409,57 @@ export async function POST() {
         const strain = workout.score?.strain || 0;
         const tss = Math.round(Math.pow(strain / 21, 2) * 200);
 
+        const titlePrefix = sportType
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+        const workoutPayload: ImportedActivityData = {
+          title: `WHOOP ${titlePrefix || "Workout"} Workout`,
+          description: null,
+          scheduled_date: workoutDate,
+          completed_date: workout.end,
+          status: "completed",
+          actual_duration_minutes: workoutDuration,
+          actual_distance_km:
+            typeof workout.score?.distance_meter === "number"
+              ? Math.round(workout.score.distance_meter / 10) / 100
+              : null,
+          elevation_gain_m:
+            typeof workout.score?.altitude_gain_meter === "number"
+              ? Math.round(workout.score.altitude_gain_meter)
+              : null,
+          avg_hr: workout.score?.average_heart_rate
+            ? Math.round(workout.score.average_heart_rate)
+            : null,
+          max_hr: workout.score?.max_heart_rate
+            ? Math.round(workout.score.max_heart_rate)
+            : null,
+          avg_power_watts: null,
+          tss,
+          source: "whoop",
+          external_id: String(workout.id),
+          raw_data: workout as unknown as ImportedActivityData["raw_data"],
+        };
+
+        const matchedPlan = await matchPlannedWorkout(supabase as any, {
+          userId: user.id,
+          sportId,
+          scheduledDate: workoutDate,
+          data: workoutPayload,
+        });
+
+        if (matchedPlan) {
+          workoutsSynced++;
+          workoutsMatched++;
+          continue;
+        }
+
         const { error: insertError } = await (supabase as any)
           .from("activities")
           .insert({
             user_id: user.id,
             sport_id: sportId,
-            title: `WHOOP Workout`,
-            scheduled_date: workoutDate,
-            completed_date: workout.end,
-            status: "completed",
-            actual_duration_minutes: workoutDuration,
-            avg_hr: workout.score?.average_heart_rate
-              ? Math.round(workout.score.average_heart_rate)
-              : null,
-            max_hr: workout.score?.max_heart_rate
-              ? Math.round(workout.score.max_heart_rate)
-              : null,
-            tss,
-            source: "whoop",
-            external_id: String(workout.id),
+            ...workoutPayload,
           });
 
         if (!insertError) workoutsSynced++;
@@ -430,6 +503,7 @@ export async function POST() {
       .from("integrations")
       .update({ last_sync_at: new Date().toISOString() })
       .eq("id", integration.id);
+    syncSuccess = true;
     /* eslint-enable @typescript-eslint/no-explicit-any */
 
     return NextResponse.json({
@@ -438,12 +512,22 @@ export async function POST() {
       updated,
       workoutsSynced,
       workoutsSkipped, // Skipped because already in Strava
+      workoutsMatchedToPlan: workoutsMatched,
       totalSleep: sleepData.records.length,
       totalRecovery: recoveryData.records.length,
       totalWorkouts: workoutData.records.length,
     });
   } catch (error) {
     console.error("WHOOP sync error:", error);
+    releaseError =
+      error instanceof Error ? error.message : "Sync failed";
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
+  } finally {
+    if (lockAcquired && lockedState && integrationId) {
+      await releaseSyncLock(supabase, integrationId, lockedState, {
+        success: syncSuccess,
+        errorMessage: syncSuccess ? undefined : releaseError,
+      });
+    }
   }
 }

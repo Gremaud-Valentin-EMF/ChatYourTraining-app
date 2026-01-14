@@ -1,3 +1,6 @@
+import type { Json } from "@/types/database";
+import type { ImportedActivityData } from "@/lib/integrations/sync-helpers";
+
 /**
  * Strava API Integration
  * Documentation: https://developers.strava.com/docs/reference/
@@ -511,25 +514,9 @@ export function calculateActivityTSS(
 export function convertStravaActivity(
   stravaActivity: StravaActivity,
   options: TSSCalculationOptions = {}
-): {
-  title: string;
-  description: string | null;
-  scheduled_date: string;
-  completed_date: string;
-  status: "completed";
-  actual_duration_minutes: number;
-  actual_distance_km: number;
-  elevation_gain_m: number | null;
-  avg_hr: number | null;
-  max_hr: number | null;
-  avg_power_watts: number | null;
-  tss: number;
-  source: "strava";
-  external_id: string;
-  raw_data: object;
-} {
+): ImportedActivityData {
   // Store normalized values and streams in raw_data for reference and charting
-  const enrichedRawData = {
+  const enrichedRawData: Json = {
     ...stravaActivity,
     _calculated: {
       normalized_hr: options.normalizedHeartRate || null,
@@ -540,7 +527,7 @@ export function convertStravaActivity(
       power: options.powerStream || null,
       time: options.timeStream || null,
     },
-  };
+  } as Json;
 
   return {
     title: stravaActivity.name,
