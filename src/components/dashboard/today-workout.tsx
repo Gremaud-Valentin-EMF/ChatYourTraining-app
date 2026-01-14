@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Card, Badge, Button } from "@/components/ui";
-import { Activity, Clock, Zap, Info, Check, X } from "lucide-react";
+import { Card, Button, Badge } from "@/components/ui";
+import { Activity, Clock, Zap, Info, Check, X, Gauge } from "lucide-react";
 import { formatDuration, getSportColor } from "@/lib/utils";
 
 interface TodayWorkoutProps {
@@ -11,7 +11,6 @@ interface TodayWorkoutProps {
     sport: string;
     sportName: string;
     title: string;
-    scheduledTime?: string;
     plannedDuration: number;
     intensity: string;
     tss: number;
@@ -56,6 +55,21 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
     anaerobic: "Anaérobie",
   };
 
+  const metrics = [
+    {
+      key: "duration",
+      label: "Durée",
+      value: formatDuration(workout.plannedDuration),
+      icon: Clock,
+    },
+    {
+      key: "load",
+      label: "Charge",
+      value: `${workout.tss} TSS`,
+      icon: Zap,
+    },
+  ];
+
   return (
     <Card className="h-full">
       <div className="flex flex-col gap-4 lg:flex-row">
@@ -70,10 +84,7 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
         <div className="flex-1 min-w-0">
           {/* Time and status */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm text-muted">
-              Aujourd&apos;hui{" "}
-              {workout.scheduledTime && `• ${workout.scheduledTime}`}
-            </span>
+            <span className="text-sm text-muted">Aujourd&apos;hui</span>
             <div
               className={`h-2 w-2 rounded-full ${
                 statusConfig[workout.status].color
@@ -87,25 +98,28 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
           </h3>
 
           {/* Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <div className="flex items-center gap-2 justify-between sm:justify-start rounded-xl bg-dark-100 px-3 py-2">
-              <Clock className="h-4 w-4 text-muted" />
-              <div className="flex flex-col">
-                <span className="text-xs text-muted uppercase">Durée</span>
-                <span className="font-medium">
-                  {formatDuration(workout.plannedDuration)}
-                </span>
+          <div className="flex flex-col gap-2 text-sm">
+            {metrics.map(({ key, label, value, icon: Icon }) => (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded-xl bg-dark-100/40 px-3 py-2"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-dark-100 flex items-center justify-center">
+                    <Icon className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-xs text-muted uppercase">{label}</span>
+                </div>
+                <span className="font-medium text-right">{value}</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 justify-between sm:justify-start rounded-xl bg-dark-100 px-3 py-2">
-              <Zap className="h-4 w-4 text-warning" />
-              <div className="flex flex-col">
-                <span className="text-xs text-muted uppercase">Charge</span>
-                <span className="font-medium">{workout.tss} TSS</span>
+            ))}
+            <div className="flex items-center justify-between rounded-xl bg-dark-100/40 px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-dark-100 flex items-center justify-center">
+                  <Gauge className="h-4 w-4 text-white" />
+                </div>
+                <span className="text-xs text-muted uppercase">Intensité</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 justify-between sm:justify-start rounded-xl bg-dark-100 px-3 py-2">
-              <span className="text-xs text-muted uppercase">Intensité</span>
               <Badge
                 variant={
                   workout.intensity === "recovery"
@@ -128,12 +142,12 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
       <div className="flex items-center gap-3 mt-4 pt-4 border-t border-dark-200">
         <Link href={`/workouts/${workout.id}`} className="flex-1">
           <Button
-            variant="secondary"
-            size="sm"
+            variant="primary"
+            size="md"
             className="w-full"
             leftIcon={<Info className="h-4 w-4" />}
           >
-            Détails de l&apos;entraînement
+            Détail de l&apos;entraînement
           </Button>
         </Link>
 

@@ -14,6 +14,54 @@ import {
 import { Card, Tabs, TabsList, TabsTrigger } from "@/components/ui";
 import { TrendingUp } from "lucide-react";
 
+interface ChartTooltipProps {
+  active?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload?: any[];
+  label?: string;
+}
+
+function ChartTooltipContent({ active, payload, label }: ChartTooltipProps) {
+  if (!active || !payload || payload.length === 0 || !label) {
+    return null;
+  }
+
+  const formatValue = (key: string) => {
+    const entry = payload.find((p) => p.dataKey === key);
+    if (!entry || typeof entry.value !== "number") return "-";
+    const prefix =
+      key === "tsb" && entry.value > 0 ? "+" : "";
+    return `${prefix}${Math.round(entry.value)}`;
+  };
+
+  const formattedDate = new Date(label).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <div className="rounded-xl bg-dark-100/95 backdrop-blur px-3 py-2 border border-dark-200 shadow-lg">
+      <p className="text-[11px] uppercase tracking-wide text-muted mb-2">
+        {formattedDate}
+      </p>
+      <div className="flex gap-4 text-xs">
+        <div className="text-secondary">
+          <p className="text-muted uppercase">CTL</p>
+          <p className="font-semibold">{formatValue("ctl")}</p>
+        </div>
+        <div className="text-warning">
+          <p className="text-muted uppercase">ATL</p>
+          <p className="font-semibold">{formatValue("atl")}</p>
+        </div>
+        <div className="text-accent">
+          <p className="text-muted uppercase">TSB</p>
+          <p className="font-semibold">{formatValue("tsb")}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface TrainingLoadData {
   date: string;
   atl: number;
@@ -36,12 +84,6 @@ export function TrainingLoadChart({
 }: TrainingLoadChartProps) {
   const [period, setPeriod] = useState<"7" | "30" | "90">("30");
   const [isMounted, setIsMounted] = useState(false);
-  const [hoverData, setHoverData] = useState<TrainingLoadData | null>(null);
-  const [hoverLabel, setHoverLabel] = useState<string>("");
-  const [selectedData, setSelectedData] = useState<TrainingLoadData | null>(
-    null
-  );
-  const [selectedLabel, setSelectedLabel] = useState<string>("");
 
   // Ensure component is mounted before rendering chart (fixes hydration issues)
   useEffect(() => {
@@ -91,34 +133,10 @@ export function TrainingLoadChart({
 
   const tsbStatus = getTsbStatus(currentTsb);
   const hasData = data.length > 0;
-  const fallbackData = data[data.length - 1] || null;
-  const displayData = hoverData || selectedData || fallbackData;
-  const fallbackLabel = fallbackData ? formatDate(fallbackData.date) : "";
-  const displayLabel = hoverLabel || selectedLabel || fallbackLabel;
   const loadRatio = currentCtl > 0 ? currentAtl / Math.max(currentCtl, 1) : 1;
   const clampedRatio = Math.min(1.5, Math.max(0.5, loadRatio));
   const trainingProgress = ((clampedRatio - 0.5) / 1) * 100;
   const trainingStatus = getTrainingStatus(loadRatio);
-
-  const handlePointSelection = (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    state: any,
-    persistSelection = false
-  ) => {
-    const payload = state?.activePayload as
-      | { payload: TrainingLoadData }[]
-      | undefined;
-    if (payload && payload.length > 0) {
-      const datum = payload[0].payload as TrainingLoadData;
-      if (persistSelection) {
-        setSelectedData(datum);
-        setSelectedLabel(formatDate(payload[0].payload.date));
-      } else {
-        setHoverData(datum);
-        setHoverLabel(formatDate(payload[0].payload.date));
-      }
-    }
-  };
 
   return (
     <Card className="col-span-full lg:col-span-2">
@@ -224,52 +242,10 @@ export function TrainingLoadChart({
             </div>
           </div>
 
-          {/* Chart */}
-          <div className="px-1 sm:px-0">
-            {displayData && (
-              <div className="mb-4 rounded-xl bg-dark-100 p-4">
-                <div className="flex items-center justify-between text-[11px] text-muted uppercase tracking-wide mb-2">
-                  <span>Données sélectionnées</span>
-                  <span>{displayLabel}</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-xs sm:text-sm">
-                  <div>
-                    <p className="text-muted uppercase">CTL</p>
-                    <p className="text-lg font-semibold text-secondary">
-                      {Math.round(displayData.ctl)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted uppercase">ATL</p>
-                    <p className="text-lg font-semibold text-warning">
-                      {Math.round(displayData.atl)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted uppercase">TSB</p>
-                    <p className="text-lg font-semibold text-accent">
-                      {displayData.tsb > 0 ? "+" : ""}
-                      {Math.round(displayData.tsb)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
           <div className="h-64 min-h-[256px] px-1 sm:px-0">
             {isMounted && (
               <ResponsiveContainer width="100%" height={256}>
-                <LineChart
-                  data={filteredData}
-                  onMouseMove={(state) => handlePointSelection(state)}
-                  onMouseLeave={() => {
-                    setHoverData(null);
-                    setHoverLabel("");
-                  }}
-                  onClick={(state) => handlePointSelection(state, true)}
-                  onTouchEnd={(state) => handlePointSelection(state, true)}
-                >
+                <LineChart data={filteredData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="var(--dark-200)"
@@ -281,7 +257,10 @@ export function TrainingLoadChart({
                     fontSize={12}
                   />
                   <YAxis stroke="var(--muted)" fontSize={12} />
-                  <Tooltip wrapperStyle={{ display: "none" }} />
+                  <Tooltip
+                    content={<ChartTooltipContent />}
+                    cursor={{ stroke: "var(--dark-300)" }}
+                  />
                   <Legend />
                   <Line
                     type="monotone"

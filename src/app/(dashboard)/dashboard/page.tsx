@@ -83,7 +83,6 @@ export default function DashboardPage() {
       sport: string;
       sportName: string;
       title: string;
-      scheduledTime: string;
       plannedDuration: number;
       intensity: string;
       tss: number;
@@ -310,7 +309,6 @@ export default function DashboardPage() {
             sport: sport?.name || "other",
             sportName: sport?.nameFr || "Autre",
             title: todayActivity.title,
-            scheduledTime: "18:00",
             plannedDuration: todayActivity.planned_duration_minutes || 60,
             intensity: todayActivity.intensity || "endurance",
             tss: todayActivity.tss || 0,

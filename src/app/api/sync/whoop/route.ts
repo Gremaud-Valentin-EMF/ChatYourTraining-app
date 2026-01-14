@@ -341,17 +341,6 @@ export async function POST() {
 
     if (syncWorkouts) {
       for (const workout of workoutData.records) {
-        // Check if workout already exists from WHOOP
-        const { data: existingWhoop } = await (supabase as any)
-          .from("activities")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("source", "whoop")
-          .eq("external_id", String(workout.id))
-          .limit(1);
-
-        if (existingWhoop && existingWhoop.length > 0) continue;
-
         // Check if a Strava activity exists for the same time period (deduplication)
         // Look for activities on the same date with similar duration (±30 min start time)
         const workoutDate = workout.start.split("T")[0];
@@ -359,6 +348,24 @@ export async function POST() {
         const workoutDuration = Math.round(
           (new Date(workout.end).getTime() - workoutStart.getTime()) / 60000
         );
+
+        // Skip workouts already synced from WHOOP
+        const whoopExternalId = String(workout.id);
+        const { data: existingWhoop } = await (supabase as any)
+          .from("activities")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("source", "whoop")
+          .eq("external_id", whoopExternalId)
+          .limit(1);
+
+        if (existingWhoop && existingWhoop.length > 0) {
+          workoutsSkipped++;
+          console.log(
+            `WHOOP workout skipped (already synced): ${workoutDate}, id=${whoopExternalId}`
+          );
+          continue;
+        }
 
         // Check for existing Strava activities on the same date
         const { data: stravaActivities } = await (supabase as any)

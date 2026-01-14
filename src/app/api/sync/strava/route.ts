@@ -243,6 +243,9 @@ export async function POST() {
 
       if (existing && existing.length > 0) {
         skipped++;
+        console.log(
+          `Strava sync - Activity already imported, skipping: ${stravaActivity.name} (${externalId})`
+        );
         continue;
       }
 
