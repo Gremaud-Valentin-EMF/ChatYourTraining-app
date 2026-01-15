@@ -441,9 +441,7 @@ export default function DashboardPage() {
       // Load activities for training load calculation
       const trainingLoadFallbackDays = 180; // ensure at least ~4 months of history
       const fallbackStart = new Date();
-      fallbackStart.setDate(
-        fallbackStart.getDate() - trainingLoadFallbackDays
-      );
+      fallbackStart.setDate(fallbackStart.getDate() - trainingLoadFallbackDays);
       let trainingLoadStartDate =
         fallbackStart.toISOString().split("T")[0] ?? undefined;
 
@@ -661,7 +659,6 @@ export default function DashboardPage() {
     );
   }
 
-  const firstName = userData?.fullName?.split(" ")[0] || "Athlète";
   const latestLoad =
     trainingLoadData.length > 0
       ? trainingLoadData[trainingLoadData.length - 1]
@@ -670,14 +667,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="mb-8">
+      {/* <div className="mb-8">
         <h1 className="text-2xl font-bold mb-1">Bonjour, {firstName} 👋</h1>
         <p className="text-muted">
           {userData?.todayWorkout
             ? `Prêt pour votre séance de ${userData.todayWorkout.title} ?`
             : "Jour de repos aujourd'hui. Profitez-en pour récupérer !"}
         </p>
-      </div>
+      </div> */}
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

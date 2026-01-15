@@ -17,4 +17,5 @@ export { Slider, type SliderProps } from "./slider";
 export { Progress, type ProgressProps } from "./progress";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
 export { Modal, type ModalProps } from "./modal";
+export { ChartContainer, type ChartConfig } from "./chart";
 export { Spinner } from "./spinner";

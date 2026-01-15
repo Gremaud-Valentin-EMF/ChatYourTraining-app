@@ -1,8 +1,28 @@
-"use client";
+"use client"
 
-import { Card } from "@/components/ui";
-import { Battery, AlertTriangle, CheckCircle2, Info, TrendingUp } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { TrendingUp, Battery, AlertTriangle, CheckCircle2, Info } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import {
+  Label,
+  PolarGrid,
+  PolarRadiusAxis,
+  PolarAngleAxis,
+  RadialBar,
+  RadialBarChart,
+} from "recharts"
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  ChartContainer,
+  type ChartConfig,
+} from "@/components/ui/chart"
 
 interface RecoveryGaugeProps {
   score: number | null;
@@ -23,7 +43,7 @@ const getReadinessStatus = (
     return {
       label: "Pas assez de données",
       description: "Connectez une source pour suivre la tendance.",
-      color: "text-muted-foreground",
+      color: "text-muted",
       Icon: Info,
     };
   }
@@ -68,8 +88,8 @@ export function RecoveryGauge({
   // Handle no data case
   if (score === null) {
     return (
-      <Card className="flex flex-col items-center justify-center">
-        <div className="flex items-center gap-2 mb-4 self-start">
+      <Card className="flex flex-col items-center justify-center min-h-[350px]">
+        <div className="flex items-center gap-2 mb-4 self-start p-6">
           <Battery className="h-4 w-4 text-muted" />
           <span className="text-sm text-muted uppercase tracking-wide">
             Récupération
@@ -85,29 +105,35 @@ export function RecoveryGauge({
     );
   }
 
-  // Calculate the arc for the gauge
-  const radius = 60;
-  const strokeWidth = 10;
-  const normalizedRadius = radius - strokeWidth / 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-
-  // Only show 270 degrees (3/4 of circle)
-  const arcLength = circumference * 0.75;
-  const progress = (score / 100) * arcLength;
-  const dashOffset = arcLength - progress;
-
   // Determine color based on score
-  const getColor = () => {
+  const getColor = (score: number) => {
     if (score >= 67) return "var(--success)";
     if (score >= 34) return "var(--warning)";
     return "var(--error)";
   };
+  
+  const color = getColor(score);
+
+  const chartData = [
+    { name: "recovery", score: score, fill: "var(--color-recovery)" },
+  ]
+
+  const chartConfig = {
+    score: {
+      label: "Score",
+    },
+    recovery: {
+      label: "Récupération",
+      color: color,
+    },
+  } satisfies ChartConfig
 
   const status = getReadinessStatus(
     typeof deltaPercent === "number"
       ? Number(deltaPercent.toFixed(1))
       : null
   );
+
   const averageDisplay =
     average !== null && average !== undefined ? Math.round(average) : null;
   const deltaText =
@@ -116,82 +142,93 @@ export function RecoveryGauge({
       : null;
 
   return (
-    <Card className="flex flex-col items-center justify-center">
-      <div className="flex items-center justify-between gap-2 mb-4 w-full">
-        <Battery className="h-4 w-4 text-muted" />
-        <span className="text-sm text-muted uppercase tracking-wide flex-1 text-left">
-          Récupération
-        </span>
-        {averageDisplay !== null && (
-          <span className="text-xs text-muted">
-            Moy. 7j {averageDisplay}%
-          </span>
-        )}
-      </div>
-
-      <div className="relative">
-        <svg
-          height={radius * 2}
-          width={radius * 2}
-          className="transform rotate-[135deg]"
+    <Card className="flex flex-col">
+      <CardHeader className="items-center pb-0">
+        <CardTitle>Récupération</CardTitle>
+        <CardDescription>Score du jour</CardDescription>
+      </CardHeader>
+      <CardContent className="flex-1 pb-0">
+        <ChartContainer
+          config={chartConfig}
+          className="mx-auto aspect-square max-h-[250px]"
         >
-          {/* Background arc */}
-          <circle
-            stroke="var(--dark-200)"
-            fill="transparent"
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${arcLength} ${circumference}`}
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
-          />
-          {/* Progress arc */}
-          <circle
-            stroke={getColor()}
-            fill="transparent"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={`${arcLength} ${circumference}`}
-            strokeDashoffset={dashOffset}
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
-            style={{
-              transition: "stroke-dashoffset 0.5s ease",
-              filter: `drop-shadow(0 0 8px ${getColor()})`,
-            }}
-          />
-        </svg>
-
-        {/* Center text */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold" style={{ color: getColor() }}>
-            {score}%
-          </span>
-          <span className="text-xs text-muted uppercase">{label}</span>
+          <RadialBarChart
+            data={chartData}
+            startAngle={270}
+            endAngle={-90}
+            innerRadius={80}
+            outerRadius={110}
+          >
+            <PolarGrid
+              gridType="circle"
+              radialLines={false}
+              stroke="none"
+              className="first:fill-muted/10 last:fill-transparent"
+              polarRadius={[86, 74]}
+            />
+            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+            <RadialBar dataKey="score" background cornerRadius={10} />
+            <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+              <Label
+                content={({ viewBox }) => {
+                  if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                    return (
+                      <text
+                        x={viewBox.cx}
+                        y={viewBox.cy}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        <tspan
+                          x={viewBox.cx}
+                          y={viewBox.cy}
+                          className="fill-foreground text-4xl font-bold"
+                        >
+                          {score.toLocaleString()}
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 24}
+                          className={`text-xs font-medium ${
+                            score >= 67
+                              ? "fill-green-400"
+                              : score >= 34
+                              ? "fill-yellow-400"
+                              : "fill-red-400"
+                          }`}
+                        >
+                          {label}
+                        </tspan>
+                      </text>
+                    )
+                  }
+                }}
+              />
+            </PolarRadiusAxis>
+          </RadialBarChart>
+        </ChartContainer>
+      </CardContent>
+      <CardFooter className="flex-col gap-2 text-sm">
+        <div className={`flex items-center gap-2 leading-none font-medium ${status.color}`}>
+          {status.label} <status.Icon className="h-4 w-4" />
         </div>
-      </div>
-
-      <p
-        className={`mt-4 text-sm font-semibold flex items-center gap-1 ${status.color}`}
-      >
-        <status.Icon className="h-4 w-4" />
-        {status.label}
-      </p>
-      <p className="text-xs text-muted mt-1 text-center">
-        {averageDisplay !== null && deltaText
-          ? `${deltaText} vs moyenne ( ${averageDisplay}% )`
+        <div className="text-muted leading-none text-center text-xs">
+          {averageDisplay !== null && deltaText
+          ? `${deltaText} vs moyenne (${averageDisplay}%)`
           : "Historique insuffisant"}
-      </p>
-      <p
-        className="mt-2 text-xs font-medium px-3 py-1 rounded-full text-center"
-        style={{
-          backgroundColor: `${getColor()}12`,
-          color: getColor(),
-        }}
-      >
-        {status.description}
-      </p>
+        </div>
+        <div
+          className={`leading-none text-center text-xs mt-1 ${
+            score >= 67
+              ? "text-green-400"
+              : score >= 34
+              ? "text-yellow-400"
+              : "text-red-400"
+          }`}
+        >
+            {status.description}
+        </div>
+      </CardFooter>
     </Card>
-  );
+  )
 }

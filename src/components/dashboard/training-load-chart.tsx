@@ -29,8 +29,7 @@ function ChartTooltipContent({ active, payload, label }: ChartTooltipProps) {
   const formatValue = (key: string) => {
     const entry = payload.find((p) => p.dataKey === key);
     if (!entry || typeof entry.value !== "number") return "-";
-    const prefix =
-      key === "tsb" && entry.value > 0 ? "+" : "";
+    const prefix = key === "tsb" && entry.value > 0 ? "+" : "";
     return `${prefix}${Math.round(entry.value)}`;
   };
 
@@ -49,11 +48,11 @@ function ChartTooltipContent({ active, payload, label }: ChartTooltipProps) {
           <p className="text-muted uppercase">CTL</p>
           <p className="font-semibold">{formatValue("ctl")}</p>
         </div>
-        <div className="text-warning">
+        <div className="text-error">
           <p className="text-muted uppercase">ATL</p>
           <p className="font-semibold">{formatValue("atl")}</p>
         </div>
-        <div className="text-accent">
+        <div className="text-warning">
           <p className="text-muted uppercase">TSB</p>
           <p className="font-semibold">{formatValue("tsb")}</p>
         </div>
@@ -110,15 +109,15 @@ export function TrainingLoadChart({
     if (ratio >= 0.95) {
       return {
         label: "Productif",
-        color: "text-warning",
-        barColor: "var(--warning)",
+        color: "text-success",
+        barColor: "var(--success)",
         description: "Charge en hausse contrôlée.",
       };
     }
     return {
       label: "Maintien",
-      color: "text-success",
-      barColor: "var(--success)",
+      color: "text-muted",
+      barColor: "var(--dark-300)",
       description: "Charge stable, focus technique.",
     };
   };
@@ -126,8 +125,8 @@ export function TrainingLoadChart({
   const getTsbStatus = (tsb: number) => {
     if (tsb > 25) return { label: "Très frais", color: "text-secondary" };
     if (tsb > 5) return { label: "Frais", color: "text-success" };
-    if (tsb > -10) return { label: "Optimal", color: "text-accent" };
-    if (tsb > -30) return { label: "Fatigué", color: "text-warning" };
+    if (tsb > -10) return { label: "Optimal", color: "text-warning" };
+    if (tsb > -30) return { label: "Fatigué", color: "text-error" };
     return { label: "Attention", color: "text-error" };
   };
 
@@ -180,12 +179,12 @@ export function TrainingLoadChart({
       ) : (
         <>
           <div className="mb-6">
-            <div className="flex items-center justify-between text-xs text-muted uppercase tracking-wide mb-2">
+            {/* <div className="flex items-center justify-between text-xs text-muted uppercase tracking-wide mb-2">
               <span>Statut d&apos;entraînement</span>
               <span>
                 ATL/CTL {Math.round(currentAtl)} / {Math.round(currentCtl)}
               </span>
-            </div>
+            </div> */}
             <div className="flex flex-col gap-1 mb-2">
               <span className={`text-sm font-semibold ${trainingStatus.color}`}>
                 {trainingStatus.label}
@@ -224,11 +223,11 @@ export function TrainingLoadChart({
               <p className="text-xs text-muted uppercase tracking-wide mb-1">
                 Fatigue (ATL)
               </p>
-              <p className="text-2xl font-bold text-warning">
+              <p className="text-2xl font-bold text-error">
                 {Math.round(currentAtl)}
               </p>
             </div>
-            <div className="p-4 bg-dark-100 rounded-xl border-l-2 border-accent">
+            <div className="p-4 bg-dark-100 rounded-xl  ">
               <p className="text-xs text-muted uppercase tracking-wide mb-1">
                 Équilibre (TSB)
               </p>
@@ -274,7 +273,7 @@ export function TrainingLoadChart({
                     type="monotone"
                     dataKey="atl"
                     name="ATL (Fatigue)"
-                    stroke="var(--warning)"
+                    stroke="var(--error)"
                     strokeWidth={2}
                     dot={false}
                   />
@@ -282,7 +281,7 @@ export function TrainingLoadChart({
                     type="monotone"
                     dataKey="tsb"
                     name="TSB (Équilibre)"
-                    stroke="var(--accent)"
+                    stroke="var(--warning)"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
