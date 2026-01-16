@@ -13,6 +13,26 @@
  * TSS (Training Stress Score) is calculated per activity
  */
 
+/**
+ * Calcule le HrTSS (Heart Rate Training Stress Score)
+ * Basé sur le modèle standard TrainingPeaks/Coggan
+ */
+export function calculateHrTSS(
+  movingTimeSeconds: number,
+  avgHr: number,
+  lthr: number
+): number {
+  if (!movingTimeSeconds || !avgHr || !lthr || lthr === 0) {
+    return 0;
+  }
+
+  const intensityFactor = avgHr / lthr;
+  const durationInHours = movingTimeSeconds / 3600;
+  const hrTss = durationInHours * intensityFactor * intensityFactor * 100;
+
+  return Math.round(hrTss);
+}
+
 interface Activity {
   date: string;
   tss: number;

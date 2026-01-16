@@ -1,5 +1,6 @@
 import type { Json } from "@/types/database";
 import type { ImportedActivityData } from "@/lib/integrations/sync-helpers";
+import { calculateHrTSS } from "@/lib/calculations/training-load";
 
 /**
  * Strava API Integration
@@ -332,6 +333,14 @@ export interface TSSCalculationOptions {
   timeStream?: number[]; // Seconds from start
 }
 
+const DEFAULT_LTHR = 170;
+
+function resolveLthr(userLthr?: number, userHrMax?: number): number {
+  if (userLthr && userLthr > 0) return userLthr;
+  if (userHrMax && userHrMax > 0) return Math.round(userHrMax * 0.9);
+  return DEFAULT_LTHR;
+}
+
 /**
  * Calculate TSS from activity data using TrainingPeaks-compatible formulas
  *
@@ -382,28 +391,10 @@ export function calculateActivityTSS(
     return Math.round(tss);
   }
 
-  // Method 2: Running/Trail with HR data - hrTSS formula
-  // Use Normalized Heart Rate from streams if available (more accurate than average)
+  // Method 2: Running/Trail - pace-based rTSS preferred with HR fallback
   if (sportType === "Run" || sportType === "Trail Run") {
-    const hrValue = normalizedHeartRate || activity.average_heartrate;
-    if (hrValue) {
-      // LTHR: user provided, or estimate from HRmax (70% for running), or default
-      const lthr = userLthr || (userHrMax ? Math.round(userHrMax * 0.7) : 132);
-      const intensityFactor = hrValue / lthr;
-      const rtss = durationHours * Math.pow(intensityFactor, 2) * 100;
-      console.log(
-        `TSS calc (running HR): HR=${hrValue}${
-          normalizedHeartRate ? " (NHR)" : " (avg)"
-        }, LTHR=${lthr}, IF=${intensityFactor.toFixed(2)}, rTSS=${Math.round(
-          rtss
-        )}`
-      );
-      return Math.round(rtss);
-    }
-
-    // Fallback: pace-based if no HR
     const distanceKm = activity.distance / 1000;
-    if (distanceKm > 0.3) {
+    if (distanceKm > 0.3 && durationMinutes > 0) {
       const actualPace = durationMinutes / distanceKm; // min/km
       // Default threshold: 5:30/km (moderately fit runner)
       const thresholdPace = userThresholdPace || 5.5;
@@ -416,6 +407,21 @@ export function calculateActivityTSS(
         `TSS calc (running pace): pace=${actualPace.toFixed(
           1
         )}/km, threshold=${thresholdPace}/km, IF=${intensityFactor.toFixed(
+          2
+        )}, rTSS=${Math.round(rtss)}`
+      );
+      return Math.round(rtss);
+    }
+
+    const hrValue = normalizedHeartRate || activity.average_heartrate;
+    if (hrValue) {
+      const referenceLthr = resolveLthr(userLthr, userHrMax);
+      const rtss = calculateHrTSS(activity.moving_time, hrValue, referenceLthr);
+      const intensityFactor = hrValue / referenceLthr;
+      console.log(
+        `TSS calc (running HR fallback): HR=${hrValue}${
+          normalizedHeartRate ? " (NHR)" : " (avg)"
+        }, LTHR=${referenceLthr}, IF=${intensityFactor.toFixed(
           2
         )}, rTSS=${Math.round(rtss)}`
       );
@@ -447,19 +453,20 @@ export function calculateActivityTSS(
   }
 
   // Method 4: Heart rate based for strength, walking, hiking, and other activities
-  // Use Normalized Heart Rate from streams if available (more accurate)
-  // IF = NHR / 200 (reference HR of 200, Garmin approach)
-  // Then: hrTSS = Duration (h) × IF² × 100
+  // Uses HrTSS formula with the same LTHR cascade
   const hrValueGeneric = normalizedHeartRate || activity.average_heartrate;
   if (hrValueGeneric) {
-    // Using 200 as reference for non-pace/power activities (Garmin approach)
-    const referenceHr = 200;
-    const intensityFactor = hrValueGeneric / referenceHr;
-    const hrtss = durationHours * Math.pow(intensityFactor, 2) * 100;
+    const referenceLthr = resolveLthr(userLthr, userHrMax);
+    const hrtss = calculateHrTSS(
+      activity.moving_time,
+      hrValueGeneric,
+      referenceLthr
+    );
+    const intensityFactor = hrValueGeneric / referenceLthr;
     console.log(
       `TSS calc (hrTSS): HR=${hrValueGeneric}${
         normalizedHeartRate ? " (NHR)" : " (avg)"
-      }, refHR=${referenceHr}, IF=${intensityFactor.toFixed(
+      }, LTHR=${referenceLthr}, IF=${intensityFactor.toFixed(
         2
       )}, hrTSS=${Math.round(hrtss)}`
     );
