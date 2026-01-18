@@ -38,7 +38,9 @@ export function NextObjective({
     B: "bg-secondary",
     C: "bg-muted",
   };
-  const completionPercent = Math.round(Math.min(1, Math.max(0, planCompletion)) * 100);
+  const completionPercent = Math.round(
+    Math.min(1, Math.max(0, planCompletion)) * 100
+  );
   const confidenceBadgeClasses = {
     Haute: "bg-success/20 text-success",
     Moyenne: "bg-warning/20 text-warning",
@@ -75,47 +77,6 @@ export function NextObjective({
       <div className="flex items-baseline gap-2">
         <span className="text-4xl font-bold text-accent">{days}</span>
         <span className="text-muted">Jours restants</span>
-      </div>
-
-      <div className="mt-6 space-y-4">
-        <div>
-          <div className="flex items-center justify-between text-xs text-muted uppercase mb-1">
-            <span>Plan complété</span>
-            <span>{completionPercent}%</span>
-          </div>
-          <Progress value={completionPercent} max={100} />
-          {planVolume && planVolume.total > 0 && (
-            <p className="text-xs text-muted mt-1">
-              {formatVolume(planVolume.completed)} /{" "}
-              {formatVolume(planVolume.total)} du volume total prévu
-            </p>
-          )}
-        </div>
-
-        {(confidenceScore !== undefined || confidenceLabel) && (
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase text-muted">
-                Confiance IA
-              </span>
-              <Badge
-                variant="outline"
-                size="sm"
-                className={
-                  confidenceLabel
-                    ? confidenceBadgeClasses[confidenceLabel]
-                    : "bg-dark-200 text-muted"
-                }
-              >
-                {confidenceLabel || "En calcul"}{" "}
-                {confidenceScore !== undefined ? `• ${confidenceScore}%` : ""}
-              </Badge>
-            </div>
-            <span className="text-xs text-muted">
-              Basé sur les séances clés cochées
-            </span>
-          </div>
-        )}
       </div>
     </Card>
   );
