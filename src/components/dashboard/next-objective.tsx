@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Badge, Progress } from "@/components/ui";
-import { Flag, Calendar } from "lucide-react";
+import { Flag, Calendar, TrendingUp } from "lucide-react";
 import { daysUntil } from "@/lib/utils";
 
 interface NextObjectiveProps {
@@ -21,7 +21,7 @@ export function NextObjective({
   name,
   date,
   priority,
-  planCompletion = 0,
+  planCompletion,
   planVolume,
   confidenceScore,
   confidenceLabel,
@@ -34,50 +34,101 @@ export function NextObjective({
   });
 
   const priorityColors = {
-    A: "bg-accent",
-    B: "bg-secondary",
-    C: "bg-muted",
+    A: "bg-accent text-white",
+    B: "bg-secondary text-white",
+    C: "bg-muted text-foreground",
   };
-  const completionPercent = Math.round(
-    Math.min(1, Math.max(0, planCompletion)) * 100
-  );
+
+  const completionPercent = Math.round((planCompletion || 0) * 100);
+
   const confidenceBadgeClasses = {
-    Haute: "bg-success/20 text-success",
-    Moyenne: "bg-warning/20 text-warning",
-    Faible: "bg-error/20 text-error",
+    Haute: "bg-success/20 text-success border-success/30",
+    Moyenne: "bg-warning/20 text-warning border-warning/30",
+    Faible: "bg-error/20 text-error border-error/30",
   };
+
   const formatVolume = (minutes: number) => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (minutes <= 0) return "0h";
-    if (m === 0) return `${h}h`;
-    if (h === 0) return `${m} min`;
-    return `${h}h${m.toString().padStart(2, "0")}`;
+    return Math.round(minutes / 60) + "h";
   };
 
   return (
-    <Card className="bg-gradient-to-br from-secondary/20 to-accent/10 border-secondary/30">
-      <div className="flex items-center gap-2 mb-3">
-        <Flag className="h-4 w-4 text-muted" />
-        <span className="text-xs text-muted uppercase tracking-wide">
-          Prochain Objectif
-        </span>
+    <Card className="h-full bg-gradient-to-br from-secondary/10 to-accent/5 border-secondary/20">
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-2">
+          <Flag className="h-5 w-5 text-accent" />
+          <h3 className="font-semibold text-sm uppercase tracking-wide text-muted">
+            Prochain Objectif
+          </h3>
+        </div>
+        <Badge className={priorityColors[priority]}>Priorité {priority}</Badge>
       </div>
 
-      <h3 className="text-lg font-bold mb-1">{name}</h3>
-
-      <div className="flex items-center gap-2 text-sm text-muted mb-4">
-        <Calendar className="h-4 w-4" />
-        <span>{formattedDate}</span>
-        <Badge variant="default" size="sm" className={priorityColors[priority]}>
-          Course {priority}
-        </Badge>
+      <div className="mb-6">
+        <h4 className="text-xl font-bold mb-1">{name}</h4>
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Calendar className="h-4 w-4" />
+          <span>{formattedDate}</span>
+        </div>
       </div>
 
-      <div className="flex items-baseline gap-2">
-        <span className="text-4xl font-bold text-accent">{days}</span>
-        <span className="text-muted">Jours restants</span>
+      <div className="flex items-center gap-4 mb-6">
+        <div className="p-3 bg-dark-100/50 rounded-xl backdrop-blur-sm">
+          <span className="text-3xl font-bold text-accent">{days}</span>
+        </div>
+        <p className="text-sm text-muted">Jours avant<br/>l&apos;événement</p>
       </div>
+
+      {/* Plan Insights Section */}
+      {planCompletion !== undefined && (
+        <div className="pt-4 border-t border-dark-200/50">
+          <div className="flex justify-between items-center mb-3">
+            <h5 className="text-sm font-medium flex items-center gap-2 text-foreground">
+              <TrendingUp className="h-4 w-4 text-secondary" />
+              Préparation
+            </h5>
+            {confidenceLabel && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded border ${confidenceBadgeClasses[confidenceLabel]}`}
+              >
+                Confiance {confidenceLabel}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-muted">Avancement du plan</span>
+                <span className="font-medium">{completionPercent}%</span>
+              </div>
+              <Progress value={completionPercent} max={100} size="sm" />
+            </div>
+
+            {planVolume && planVolume.total > 0 && (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-dark-100/50 p-2 rounded backdrop-blur-sm">
+                  <span className="text-muted block mb-0.5">Réalisé</span>
+                  <span className="font-medium">
+                    {formatVolume(planVolume.completed)}
+                  </span>
+                </div>
+                <div className="bg-dark-100/50 p-2 rounded backdrop-blur-sm">
+                  <span className="text-muted block mb-0.5">Prévu</span>
+                  <span className="font-medium">
+                    {formatVolume(planVolume.total)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {confidenceScore !== undefined && (
+              <div className="text-xs text-muted mt-1 text-center">
+                Score de préparation: <span className="text-foreground font-medium">{confidenceScore}/100</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

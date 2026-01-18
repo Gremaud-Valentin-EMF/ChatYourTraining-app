@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { Card, Button, Badge } from "@/components/ui";
-import { Activity, Clock, Zap, Info, Check, X, Gauge } from "lucide-react";
+import {
+  Activity,
+  Clock,
+  Zap,
+  Gauge,
+  Info,
+} from "lucide-react";
 import { formatDuration, getSportColor } from "@/lib/utils";
 
 interface TodayWorkoutProps {

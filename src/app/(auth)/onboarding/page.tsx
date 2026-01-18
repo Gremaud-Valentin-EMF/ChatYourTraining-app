@@ -19,11 +19,8 @@ import {
   Activity,
   Heart,
   Target,
-  Bike,
-  Waves,
-  Dumbbell,
-  Trophy,
   Calendar,
+  Trophy,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 
@@ -168,11 +165,11 @@ const formatIconName = (icon?: string) => {
     .join("");
 };
 
-const getSportIconComponent = (icon?: string) => {
+const getSportIconComponent = (icon?: string): React.ElementType => {
   const formatted = formatIconName(icon);
   if (!formatted) return Activity;
-  const IconComponent =
-    LucideIcons[formatted as keyof typeof LucideIcons];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const IconComponent = (LucideIcons as any)[formatted];
   return IconComponent || Activity;
 };
 
@@ -213,14 +210,6 @@ interface ObjectiveData {
   event_type: string;
   target_time: string;
 }
-
-const sportIcons: Record<string, React.ReactNode> = {
-  running: <Activity className="h-6 w-6" />,
-  cycling: <Bike className="h-6 w-6" />,
-  swimming: <Waves className="h-6 w-6" />,
-  strength: <Dumbbell className="h-6 w-6" />,
-  triathlon: <Trophy className="h-6 w-6" />,
-};
 
 export default function OnboardingPage() {
   const router = useRouter();
