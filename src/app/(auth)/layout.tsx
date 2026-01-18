@@ -10,9 +10,7 @@ export default function AuthLayout({
 }) {
   return (
     <div className="min-h-screen flex">
-      {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-dark via-dark-50 to-dark relative overflow-hidden">
-        {/* Background pattern */}
+      {/* <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-dark via-dark-50 to-dark relative overflow-hidden">
         <div className="absolute inset-0 opacity-5">
           <div
             className="absolute inset-0"
@@ -23,11 +21,9 @@ export default function AuthLayout({
           />
         </div>
 
-        {/* Glow effects */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-accent/20 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-secondary/20 rounded-full blur-3xl" />
 
-        {/* Content */}
         <div className="relative z-10 flex flex-col justify-center p-12 lg:p-16">
           <div className="flex items-center gap-3 mb-8">
             <div className="p-3 bg-accent/20 rounded-xl">
@@ -49,7 +45,6 @@ export default function AuthLayout({
             et bénéficiez de conseils adaptés à votre forme du jour.
           </p>
 
-          {/* Features */}
           <div className="space-y-4">
             {[
               "Synchronisation Strava, Whoop & Garmin",
@@ -63,11 +58,11 @@ export default function AuthLayout({
             ))}
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Right side - Auth form */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-md">
+        <div className="w-full">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
             <div className="p-2 bg-accent/20 rounded-xl">

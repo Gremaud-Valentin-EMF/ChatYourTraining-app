@@ -84,6 +84,7 @@ export default function DashboardPage() {
       sportName: string;
       title: string;
       plannedDuration: number;
+      actualDuration: number | null;
       intensity: string;
       tss: number;
       status: "planned" | "completed" | "skipped" | "in_progress";
@@ -101,6 +102,8 @@ export default function DashboardPage() {
     targetMinutes: 0,
     completedTss: 0,
     targetTss: 0,
+    completedSessions: 0,
+    targetSessions: 0,
   });
 
   const loadData = useCallback(async () => {
@@ -295,13 +298,17 @@ export default function DashboardPage() {
         const { data: activities } = await (supabase as any)
           .from("activities")
           .select(
-            "id, title, planned_duration_minutes, intensity, tss, status, sport_id"
+            "id, title, planned_duration_minutes, actual_duration_minutes, intensity, tss, status, sport_id"
           )
           .eq("user_id", user.id)
-          .eq("scheduled_date", today)
-          .limit(1);
+          .eq("scheduled_date", today);
 
-        const todayActivity = activities?.[0];
+        const todayActivity =
+          activities?.find((a: { status: string }) => a.status === "completed") ||
+          activities?.find((a: { status: string }) => a.status === "in_progress") ||
+          activities?.find((a: { status: string }) => a.status === "planned") ||
+          activities?.find((a: { status: string }) => a.status === "skipped") ||
+          activities?.[0];
         if (todayActivity) {
           const sport = sportMap[todayActivity.sport_id];
           todayWorkout = {
@@ -309,7 +316,11 @@ export default function DashboardPage() {
             sport: sport?.name || "other",
             sportName: sport?.nameFr || "Autre",
             title: todayActivity.title,
-            plannedDuration: todayActivity.planned_duration_minutes || 60,
+            plannedDuration:
+              todayActivity.planned_duration_minutes ||
+              todayActivity.actual_duration_minutes ||
+              60,
+            actualDuration: todayActivity.actual_duration_minutes || null,
             intensity: todayActivity.intensity || "endurance",
             tss: todayActivity.tss || 0,
             status: todayActivity.status as
@@ -530,7 +541,7 @@ export default function DashboardPage() {
         const { data: weekActivities } = await (supabase as any)
           .from("activities")
           .select(
-            "id, title, scheduled_date, status, sport_id, planned_duration_minutes, tss, intensity"
+            "id, title, scheduled_date, status, sport_id, planned_duration_minutes, actual_duration_minutes, tss, intensity"
           )
           .eq("user_id", user.id)
           .gte("scheduled_date", weekStart)
@@ -552,6 +563,8 @@ export default function DashboardPage() {
         let completedTss = 0;
         let targetMinutes = 0;
         let targetTss = 0;
+        let completedSessions = 0;
+        let targetSessions = 0;
 
         for (let i = 0; i < 7; i++) {
           const date = new Date(monday);
@@ -589,13 +602,29 @@ export default function DashboardPage() {
           dayActivities.forEach(
             (a: {
               status: string;
-              planned_duration_minutes?: number;
-              tss?: number;
+              planned_duration_minutes?: number | null;
+              actual_duration_minutes?: number | null;
+              tss?: number | null;
             }) => {
-              targetMinutes += a.planned_duration_minutes || 0;
-              targetTss += a.tss || 0;
+              const hasPlannedDuration =
+                a.planned_duration_minutes !== null &&
+                a.planned_duration_minutes !== undefined;
+              const isPlannedSession =
+                a.status !== "completed" || hasPlannedDuration;
+
+              if (isPlannedSession) {
+                targetSessions += 1;
+                targetMinutes += a.planned_duration_minutes ?? 0;
+                targetTss += a.tss || 0;
+              }
+
               if (a.status === "completed") {
-                completedMinutes += a.planned_duration_minutes || 0;
+                completedSessions += 1;
+                const actualMinutes =
+                  a.actual_duration_minutes ??
+                  a.planned_duration_minutes ??
+                  0;
+                completedMinutes += actualMinutes;
                 completedTss += a.tss || 0;
               }
             }
@@ -608,6 +637,8 @@ export default function DashboardPage() {
           targetMinutes,
           completedTss,
           targetTss,
+          completedSessions,
+          targetSessions,
         });
       } catch {
         // Initialize empty week
@@ -629,6 +660,8 @@ export default function DashboardPage() {
           targetMinutes: 0,
           completedTss: 0,
           targetTss: 0,
+          completedSessions: 0,
+          targetSessions: 0,
         });
       }
 
@@ -755,6 +788,10 @@ export default function DashboardPage() {
         weeklyTss={{
           completed: weekStats.completedTss,
           target: weekStats.targetTss,
+        }}
+        weeklySessions={{
+          completed: weekStats.completedSessions,
+          target: weekStats.targetSessions,
         }}
       />
     </div>

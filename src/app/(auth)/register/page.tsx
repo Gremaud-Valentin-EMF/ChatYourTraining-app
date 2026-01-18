@@ -94,7 +94,7 @@ export default function RegisterPage() {
   // Show confirmation message if email needs to be verified
   if (showConfirmation) {
     return (
-      <div className="text-center">
+      <div className="text-center max-w-md mx-auto">
         <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-6">
           <Mail className="h-8 w-8 text-accent" />
         </div>
@@ -117,7 +117,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div>
+    <div className="max-w-md mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground mb-2">
           Créer un compte

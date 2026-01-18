@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Progress } from "@/components/ui";
-import { Calendar, Clock, Zap } from "lucide-react";
+import { Calendar, Clock, Zap, Activity } from "lucide-react";
 import { getSportColor } from "@/lib/utils";
 
 interface WeekActivity {
@@ -30,12 +30,17 @@ interface WeekCalendarProps {
     completed: number;
     target: number;
   };
+  weeklySessions: {
+    completed: number;
+    target: number;
+  };
 }
 
 export function WeekCalendar({
   weekData,
   weeklyHours,
   weeklyTss,
+  weeklySessions,
 }: WeekCalendarProps) {
   const formatHours = (minutes: number) => {
     const h = Math.floor(minutes / 60);
@@ -84,6 +89,12 @@ export function WeekCalendar({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-success" />
+            <span>Séances:</span>
+            <span className="font-bold">{weeklySessions.completed}</span>
+            <span className="text-muted">/ {weeklySessions.target}</span>
+          </div>
+          <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-warning" />
             <span>
               TSS{" "}
@@ -96,7 +107,7 @@ export function WeekCalendar({
       </div>
 
       {/* Progress bars */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div>
           <div className="flex justify-between text-xs mb-1">
             <span className="text-muted">Volume horaire</span>
@@ -121,6 +132,19 @@ export function WeekCalendar({
             value={weeklyTss.completed}
             max={Math.max(weeklyTss.target, 1)}
             variant="warning"
+          />
+        </div>
+        <div>
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-muted">Séances</span>
+            <span>
+              {getPercent(weeklySessions.completed, weeklySessions.target)}%
+            </span>
+          </div>
+          <Progress
+            value={weeklySessions.completed}
+            max={Math.max(weeklySessions.target, 1)}
+            variant="success"
           />
         </div>
       </div>

@@ -64,7 +64,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div>
+    <div className="max-w-md mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground mb-2">
           Content de vous revoir !

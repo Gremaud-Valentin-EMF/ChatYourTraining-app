@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -25,6 +25,7 @@ import {
   Trophy,
   Calendar,
 } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 
 type OnboardingStep = 1 | 2 | 3 | 4;
 
@@ -35,6 +36,159 @@ interface PhysioData {
   hr_max: string;
 }
 
+const SPORT_CATEGORIES = [
+  {
+    id: "pedestrian",
+    label: "Sports pédestres",
+    keywords: ["run", "trail", "walk", "hike", "race", "stroller", "jog"],
+  },
+  {
+    id: "cycling",
+    label: "Sports cyclistes",
+    keywords: ["cycl", "bike", "ride", "velo", "bmx", "mtb", "gravel", "spin"],
+  },
+  {
+    id: "nautical",
+    label: "Sports nautiques",
+    keywords: [
+      "swim",
+      "paddle",
+      "surf",
+      "row",
+      "canoe",
+      "kayak",
+      "sail",
+      "div",
+      "kite",
+      "wake",
+      "boat",
+      "water",
+      "windsurf",
+    ],
+  },
+  {
+    id: "winter",
+    label: "Sports d'hiver",
+    keywords: ["ski", "snow", "ice", "patin", "biathlon", "sled"],
+  },
+  {
+    id: "gym",
+    label: "Salle & Fitness",
+    keywords: [
+      "gym",
+      "yoga",
+      "pilates",
+      "fitness",
+      "training",
+      "strength",
+      "lift",
+      "hiit",
+      "barre",
+      "body",
+      "crossfit",
+      "weight",
+      "solidcore",
+      "reformer",
+    ],
+  },
+  {
+    id: "ball",
+    label: "Sports collectifs & raquette",
+    keywords: [
+      "ball",
+      "tennis",
+      "golf",
+      "basket",
+      "soccer",
+      "football",
+      "volley",
+      "rugby",
+      "hand",
+      "hockey",
+      "lacrosse",
+      "badminton",
+      "cricket",
+      "baseball",
+      "softball",
+      "pickle",
+      "padel",
+      "squash",
+      "racquet",
+      "table",
+      "futsal",
+      "netball",
+      "polo",
+      "ultimate",
+      "gaelic",
+      "water polo",
+    ],
+  },
+  {
+    id: "lifestyle",
+    label: "Lifestyle & activités diverses",
+    keywords: [
+      "yard",
+      "commut",
+      "parent",
+      "baby",
+      "gardening",
+      "operations",
+      "coaching",
+      "manual",
+      "work",
+      "gaming",
+      "driving",
+      "musical",
+      "circus",
+      "clean",
+      "public",
+      "watch",
+      "bartend",
+      "chess",
+      "dedicated",
+      "cadd",
+      "drawing",
+    ],
+  },
+  {
+    id: "other",
+    label: "Autres sports",
+    keywords: [],
+  },
+] as const;
+
+type SportCategoryId = (typeof SPORT_CATEGORIES)[number]["id"];
+
+const formatIconName = (icon?: string) => {
+  if (!icon) return "";
+  return icon
+    .replace(/[_\s]+/g, "-")
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+};
+
+const getSportIconComponent = (icon?: string) => {
+  const formatted = formatIconName(icon);
+  if (!formatted) return Activity;
+  const IconComponent =
+    LucideIcons[formatted as keyof typeof LucideIcons];
+  return IconComponent || Activity;
+};
+
+const getSportCategory = (sportName: string): SportCategoryId => {
+  const normalized = sportName.toLowerCase();
+  for (const category of SPORT_CATEGORIES) {
+    if (
+      category.keywords.length > 0 &&
+      category.keywords.some((keyword) => normalized.includes(keyword))
+    ) {
+      return category.id;
+    }
+  }
+  return "other";
+};
+
 interface SportSelection {
   id: string;
   name: string;
@@ -42,6 +196,7 @@ interface SportSelection {
   icon: string;
   selected: boolean;
   level: string;
+  category: SportCategoryId;
 }
 
 interface SportMetrics {
@@ -91,6 +246,7 @@ export default function OnboardingPage() {
       icon: "running",
       selected: false,
       level: "intermediate",
+      category: "pedestrian",
     },
     {
       id: "00000000-0000-0000-0000-000000000002",
@@ -99,6 +255,7 @@ export default function OnboardingPage() {
       icon: "bike",
       selected: false,
       level: "intermediate",
+      category: "cycling",
     },
     {
       id: "00000000-0000-0000-0000-000000000003",
@@ -107,6 +264,7 @@ export default function OnboardingPage() {
       icon: "waves",
       selected: false,
       level: "intermediate",
+      category: "nautical",
     },
     {
       id: "00000000-0000-0000-0000-000000000004",
@@ -115,6 +273,7 @@ export default function OnboardingPage() {
       icon: "trophy",
       selected: false,
       level: "intermediate",
+      category: "other",
     },
     {
       id: "00000000-0000-0000-0000-000000000005",
@@ -123,6 +282,7 @@ export default function OnboardingPage() {
       icon: "dumbbell",
       selected: false,
       level: "intermediate",
+      category: "gym",
     },
     {
       id: "00000000-0000-0000-0000-000000000006",
@@ -131,8 +291,11 @@ export default function OnboardingPage() {
       icon: "activity",
       selected: false,
       level: "intermediate",
+      category: "other",
     },
   ]);
+  const [selectedCategory, setSelectedCategory] =
+    useState<SportCategoryId>("pedestrian");
 
   // Step 3: Sport-specific metrics
   const [sportMetrics, setSportMetrics] = useState<SportMetrics>({
@@ -200,6 +363,7 @@ export default function OnboardingPage() {
                 icon: sport.icon,
                 selected: false,
                 level: "intermediate",
+                category: getSportCategory(sport.name),
               })
             )
           );
@@ -234,6 +398,29 @@ export default function OnboardingPage() {
   };
 
   const selectedSports = sports.filter((s) => s.selected);
+  const categoriesWithSports = useMemo(() => {
+    return SPORT_CATEGORIES.map((category) => ({
+      ...category,
+      count: sports.filter((sport) => sport.category === category.id).length,
+    })).filter((category) => category.count > 0);
+  }, [sports]);
+
+  useEffect(() => {
+    if (
+      categoriesWithSports.length > 0 &&
+      !categoriesWithSports.some((cat) => cat.id === selectedCategory)
+    ) {
+      setSelectedCategory(categoriesWithSports[0].id);
+    }
+  }, [categoriesWithSports, selectedCategory]);
+
+  const filteredSports = useMemo(
+    () =>
+      sports.filter(
+        (sport) => sport.category === selectedCategory
+      ),
+    [sports, selectedCategory]
+  );
   const hasRunning = selectedSports.some((s) => s.name === "running");
   const hasCycling = selectedSports.some((s) => s.name === "cycling");
   const hasSwimming = selectedSports.some((s) => s.name === "swimming");
@@ -424,24 +611,24 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-dark py-8 px-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="mx-auto w-full max-w-2xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
+        <div className="text-center mb-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
             <Activity className="h-8 w-8 text-accent" />
             <span className="text-xl font-bold">ChatYourTraining</span>
           </div>
-          <h1 className="text-2xl font-bold mb-2">
+          <h1 className="text-2xl font-bold mb-1">
             Configuration de votre profil
           </h1>
           <p className="text-muted">Étape {currentStep} sur 4</p>
         </div>
 
         {/* Progress bar */}
-        <Progress value={currentStep} max={4} className="mb-8" />
+        <Progress value={currentStep} max={4} className="mb-4" />
 
         {/* Step content */}
-        <Card className="mb-8">
+        <Card className="mb-4">
           {/* Step 1: Physiological Data */}
           {currentStep === 1 && (
             <div className="space-y-6">
@@ -506,8 +693,8 @@ export default function OnboardingPage() {
 
           {/* Step 2: Sports */}
           {currentStep === 2 && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 mb-6">
+            <div className="flex flex-col h-[calc(100vh-240px)] min-h-[400px]">
+              <div className="flex items-center gap-3 mb-4 shrink-0">
                 <div className="p-3 bg-accent/20 rounded-xl">
                   <Activity className="h-6 w-6 text-accent" />
                 </div>
@@ -519,55 +706,116 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {sports.map((sport) => (
-                  <div
-                    key={sport.id}
-                    onClick={() => toggleSport(sport.id)}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      sport.selected
-                        ? "border-accent bg-accent/10"
-                        : "border-dark-200 hover:border-dark-300"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        {sportIcons[sport.name] || (
-                          <Activity className="h-6 w-6" />
-                        )}
-                        <span className="font-medium">{sport.name_fr}</span>
-                      </div>
-                      {sport.selected && (
-                        <div className="h-6 w-6 bg-accent rounded-full flex items-center justify-center">
-                          <Check className="h-4 w-4 text-dark" />
-                        </div>
-                      )}
-                    </div>
+              <div className="flex flex-col md:flex-row flex-1 gap-4 overflow-hidden">
+                {/* Categories Sidebar */}
+                <div className="w-full md:w-48 shrink-0 overflow-x-auto md:overflow-y-auto flex md:flex-col gap-1 border-b md:border-b-0 md:border-r border-white/10 pb-4 md:pb-0 md:pr-4 snap-x">
+                  {SPORT_CATEGORIES.map((category) => {
+                    const count = sports.filter(
+                      (s) => s.category === category.id
+                    ).length;
+                    if (count === 0 && category.id !== "other") return null;
 
-                    {sport.selected && (
-                      <Select
-                        options={[
-                          { value: "beginner", label: "Débutant" },
-                          { value: "intermediate", label: "Intermédiaire" },
-                          { value: "advanced", label: "Avancé" },
-                          { value: "elite", label: "Élite" },
-                        ]}
-                        value={sport.level}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          updateSportLevel(sport.id, e.target.value);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    )}
+                    const isSelected = selectedCategory === category.id;
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => setSelectedCategory(category.id)}
+                        className={`shrink-0 w-auto md:w-full text-left px-3 py-2 rounded-lg transition-all flex items-center justify-between group snap-start whitespace-nowrap md:whitespace-normal ${
+                          isSelected
+                            ? "bg-accent text-dark font-medium shadow-lg shadow-accent/20"
+                            : "bg-white/5 md:bg-transparent hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <span className="text-sm leading-tight block">
+                          {category.label}
+                        </span>
+                        {isSelected && (
+                          <div className="h-1.5 w-1.5 rounded-full bg-dark/30 hidden md:block shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Sports List (Single Column) */}
+                <div className="flex-1 overflow-y-auto pb-2 min-h-0 pr-1">
+                  <div className="grid grid-cols-1 gap-3">
+                    {filteredSports.map((sport) => {
+                      const IconComponent = getSportIconComponent(sport.icon);
+                      return (
+                        <div
+                          key={sport.id}
+                          onClick={() => toggleSport(sport.id)}
+                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            sport.selected
+                              ? "border-accent bg-accent/10"
+                              : "border-dark-200 hover:border-dark-300 bg-card"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`p-2.5 rounded-lg shrink-0 ${
+                                  sport.selected
+                                    ? "bg-accent/20 text-accent-foreground"
+                                    : "bg-dark-100 text-muted-foreground"
+                                }`}
+                              >
+                                <IconComponent className="h-5 w-5" />
+                              </div>
+                              <span className="font-medium">{sport.name_fr}</span>
+                            </div>
+                            {sport.selected && (
+                              <div className="h-5 w-5 bg-accent rounded-full flex items-center justify-center shadow-sm shrink-0">
+                                <Check className="h-3 w-3 text-dark" />
+                              </div>
+                            )}
+                          </div>
+
+                          {sport.selected && (
+                            <div className="mt-3 pt-3 border-t border-dark-200/50 animate-in fade-in slide-in-from-top-2">
+                              <label className="text-xs text-muted-foreground mb-1.5 block">
+                                Niveau
+                              </label>
+                              <Select
+                                options={[
+                                  { value: "beginner", label: "Débutant" },
+                                  {
+                                    value: "intermediate",
+                                    label: "Intermédiaire",
+                                  },
+                                  { value: "advanced", label: "Avancé" },
+                                  { value: "elite", label: "Élite" },
+                                ]}
+                                value={sport.level}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  updateSportLevel(sport.id, e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-11 text-sm"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+
+                  {filteredSports.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center opacity-60">
+                      <Trophy className="h-12 w-12 mb-3 stroke-1" />
+                      <p>Aucun sport trouvé dans cette catégorie</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {selectedSports.length === 0 && (
-                <p className="text-center text-muted text-sm">
-                  Sélectionnez au moins un sport pour continuer
-                </p>
+                <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center justify-center gap-2 text-yellow-500 text-sm animate-pulse shrink-0">
+                  <Activity className="h-4 w-4" />
+                  <span>Sélectionnez au moins un sport</span>
+                </div>
               )}
             </div>
           )}

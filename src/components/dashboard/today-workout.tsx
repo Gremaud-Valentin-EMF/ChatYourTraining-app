@@ -12,6 +12,7 @@ interface TodayWorkoutProps {
     sportName: string;
     title: string;
     plannedDuration: number;
+    actualDuration: number | null;
     intensity: string;
     tss: number;
     status: "planned" | "completed" | "skipped" | "in_progress";
@@ -55,11 +56,19 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
     anaerobic: "Anaérobie",
   };
 
+  const isCompleted = workout.status === "completed";
+  const durationLabel = isCompleted ? "Durée réalisée" : "Durée prévue";
+  const durationValue = formatDuration(
+    isCompleted && workout.actualDuration
+      ? workout.actualDuration
+      : workout.plannedDuration
+  );
+
   const metrics = [
     {
       key: "duration",
-      label: "Durée",
-      value: formatDuration(workout.plannedDuration),
+      label: durationLabel,
+      value: durationValue,
       icon: Clock,
     },
     {
@@ -150,25 +159,6 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
             Détail de l&apos;entraînement
           </Button>
         </Link>
-
-        {workout.status === "planned" && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-success hover:bg-success/20"
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-error hover:bg-error/20"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </>
-        )}
       </div>
     </Card>
   );
