@@ -52,8 +52,8 @@ export function NextObjective({
   };
 
   return (
-    <Card className="h-full bg-gradient-to-br from-secondary/10 to-accent/5 border-secondary/20">
-      <div className="flex justify-between items-start mb-4">
+    <Card padding="sm" className="bg-gradient-to-br from-secondary/10 to-accent/5 border-secondary/20">
+      <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2">
           <Flag className="h-5 w-5 text-accent" />
           <h3 className="font-semibold text-sm uppercase tracking-wide text-muted">
@@ -63,7 +63,7 @@ export function NextObjective({
         <Badge className={priorityColors[priority]}>Priorité {priority}</Badge>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4">
         <h4 className="text-xl font-bold mb-1">{name}</h4>
         <div className="flex items-center gap-2 text-sm text-muted">
           <Calendar className="h-4 w-4" />
@@ -71,8 +71,8 @@ export function NextObjective({
         </div>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="p-3 bg-dark-100/50 rounded-xl backdrop-blur-sm">
+      <div className="flex items-center gap-4 mb-4">
+        <div className="p-2 bg-dark-100/50 rounded-xl backdrop-blur-sm">
           <span className="text-3xl font-bold text-accent">{days}</span>
         </div>
         <p className="text-sm text-muted">Jours avant<br/>l&apos;événement</p>

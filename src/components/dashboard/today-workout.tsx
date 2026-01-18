@@ -16,6 +16,7 @@ interface TodayWorkoutProps {
     id: string;
     sport: string;
     sportName: string;
+    sportColor?: string;
     title: string;
     plannedDuration: number;
     actualDuration: number | null;
@@ -44,7 +45,7 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
     );
   }
 
-  const sportColor = getSportColor(workout.sport);
+  const sportColor = workout.sportColor || getSportColor(workout.sport);
 
   const statusConfig = {
     planned: { label: "À faire", color: "bg-secondary" },
@@ -86,7 +87,13 @@ export function TodayWorkout({ workout }: TodayWorkoutProps) {
   ];
 
   return (
-    <Card className="h-full">
+    <Card 
+      className="h-full border-2" 
+      style={{ 
+        borderColor: `${sportColor}30`,
+        background: `linear-gradient(135deg, ${sportColor}15 0%, ${sportColor}05 100%)`
+      }}
+    >
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* Sport icon/color */}
         <div

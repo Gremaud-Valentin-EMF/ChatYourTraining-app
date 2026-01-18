@@ -12,6 +12,7 @@ import {
   WeekCalendar,
 } from "@/components/dashboard";
 import { calculateTrainingLoad } from "@/lib/calculations/training-load";
+import { toLocalDateString } from "@/lib/utils";
 
 interface TrainingLoadDataPoint {
   date: string;
@@ -82,6 +83,7 @@ export default function DashboardPage() {
       id: string;
       sport: string;
       sportName: string;
+      sportColor?: string;
       title: string;
       plannedDuration: number;
       actualDuration: number | null;
@@ -116,7 +118,7 @@ export default function DashboardPage() {
         return;
       }
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = toLocalDateString(new Date());
       const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
       // Load user profile
@@ -168,7 +170,7 @@ export default function DashboardPage() {
               "scheduled_date, planned_duration_minutes, actual_duration_minutes, status, intensity"
             )
             .eq("user_id", user.id)
-            .gte("scheduled_date", planStart.toISOString().split("T")[0])
+            .gte("scheduled_date", toLocalDateString(planStart))
             .lte("scheduled_date", objective.date);
 
           if (planActivities && planActivities.length > 0) {
@@ -329,6 +331,7 @@ export default function DashboardPage() {
             id: todayActivity.id,
             sport: sport?.name || "other",
             sportName: sport?.nameFr || "Autre",
+            sportColor: sport?.color,
             title: todayActivity.title,
             plannedDuration:
               todayActivity.planned_duration_minutes ||
@@ -468,7 +471,7 @@ export default function DashboardPage() {
       const fallbackStart = new Date();
       fallbackStart.setDate(fallbackStart.getDate() - trainingLoadFallbackDays);
       let trainingLoadStartDate =
-        fallbackStart.toISOString().split("T")[0] ?? undefined;
+        toLocalDateString(fallbackStart) ?? undefined;
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -547,8 +550,8 @@ export default function DashboardPage() {
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
 
-      const weekStart = monday.toISOString().split("T")[0];
-      const weekEnd = sunday.toISOString().split("T")[0];
+      const weekStart = toLocalDateString(monday);
+      const weekEnd = toLocalDateString(sunday);
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -583,7 +586,7 @@ export default function DashboardPage() {
         for (let i = 0; i < 7; i++) {
           const date = new Date(monday);
           date.setDate(monday.getDate() + i);
-          const dateStr = date.toISOString().split("T")[0];
+          const dateStr = toLocalDateString(date);
           const dayActivities = activitiesByDate[dateStr] || [];
 
           week.push({
@@ -665,7 +668,7 @@ export default function DashboardPage() {
             date,
             dayName: dayNames[i],
             dayNumber: date.getDate(),
-            isToday: date.toISOString().split("T")[0] === today,
+            isToday: toLocalDateString(date) === today,
             activities: [],
           });
         }
