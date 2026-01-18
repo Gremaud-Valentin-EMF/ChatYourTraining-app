@@ -27,6 +27,7 @@ import {
   Zap,
   Edit2,
   NotebookPen,
+  Check,
 } from "lucide-react";
 import { cn, getSportColor, formatDuration } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ interface Activity {
   sport_id: string;
   sport_name: string;
   sport_name_fr: string;
+  sport_color?: string;
   scheduled_date: string;
   status: "planned" | "completed" | "skipped" | "in_progress";
   planned_duration_minutes: number | null;
@@ -81,6 +83,7 @@ export default function CalendarPage() {
   const [fatigueValue, setFatigueValue] = useState<number | null>(null);
   const [notesValue, setNotesValue] = useState("");
   const [isSavingMetrics, setIsSavingMetrics] = useState(false);
+  const [completingActivityId, setCompletingActivityId] = useState<string | null>(null);
 
   // Get calendar data
   const year = currentDate.getFullYear();
@@ -256,7 +259,7 @@ export default function CalendarPage() {
           tss,
           intensity,
           rpe,
-          sports (name, name_fr)
+          sports (name, name_fr, color)
         `
         )
         .eq("user_id", user.id)
@@ -281,6 +284,7 @@ export default function CalendarPage() {
             rpe: a.rpe,
             sport_name: a.sports?.name || "other",
             sport_name_fr: a.sports?.name_fr || "Autre",
+            sport_color: a.sports?.color,
           }))
         );
       }
@@ -325,6 +329,38 @@ export default function CalendarPage() {
     setDailyMetrics(data);
     setFatigueValue(data?.fatigue_level || null);
     setNotesValue(data?.notes || "");
+  };
+
+  const handleMarkAsDone = async (activity: Activity) => {
+    setCompletingActivityId(activity.id);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase
+        .from("activities")
+        .update({
+          status: "completed",
+          actual_duration_minutes: activity.planned_duration_minutes,
+          actual_distance_km: activity.planned_distance_km,
+          // We can also copy intensity/RPE if they were set in planned, or leave them null for user to refine later
+          // For now, prompt implies taking what was planned.
+        })
+        .eq("id", activity.id)
+        .eq("user_id", user.id);
+
+      await loadActivities();
+      if (selectedDate) {
+        // Refresh day view if we are on the same day (likely yes since we clicked it)
+        // Optimization: we could just update the local state, but reloading ensures consistency
+      }
+    } catch (error) {
+      console.error("Error marking activity as done:", error);
+    } finally {
+      setCompletingActivityId(null);
+    }
   };
 
   const navigateMonth = (direction: number) => {
@@ -643,19 +679,25 @@ export default function CalendarPage() {
                               key={activity.id}
                               className={cn(
                                 "px-2 py-1 rounded text-xs font-medium truncate",
-                                activity.status === "completed"
-                                  ? "bg-success/20 text-success"
-                                  : activity.status === "skipped"
+                                activity.status === "skipped"
                                   ? "bg-error/20 text-error"
                                   : ""
                               )}
                               style={
-                                activity.status === "planned"
+                                activity.status !== "skipped"
                                   ? {
-                                      backgroundColor: `${getSportColor(
-                                        activity.sport_name
-                                      )}20`,
-                                      color: getSportColor(activity.sport_name),
+                                      backgroundColor: activity.sport_color
+                                        ? `${activity.sport_color}20`
+                                        : `${getSportColor(
+                                            activity.sport_name
+                                          )}20`,
+                                      color:
+                                        activity.sport_color ||
+                                        getSportColor(activity.sport_name),
+                                      // Add a border for completed items to distinguish them
+                                      border: activity.status === "completed" 
+                                        ? `1px solid ${activity.sport_color || getSportColor(activity.sport_name)}` 
+                                        : "1px solid transparent"
                                     }
                                   : undefined
                               }
@@ -759,10 +801,12 @@ export default function CalendarPage() {
                             key={activity.id}
                             className="px-3 py-1 rounded-full text-xs font-medium"
                             style={{
-                              backgroundColor: `${getSportColor(
-                                activity.sport_name
-                              )}20`,
-                              color: getSportColor(activity.sport_name),
+                              backgroundColor: activity.sport_color
+                                ? `${activity.sport_color}20`
+                                : `${getSportColor(activity.sport_name)}20`,
+                              color:
+                                activity.sport_color ||
+                                getSportColor(activity.sport_name),
                             }}
                           >
                             {activity.title}
@@ -888,8 +932,11 @@ export default function CalendarPage() {
                         variant="primary"
                         size="sm"
                         className="w-full mt-3"
+                        onClick={() => handleMarkAsDone(activity)}
+                        isLoading={completingActivityId === activity.id}
+                        leftIcon={<Check className="h-4 w-4" />}
                       >
-                        Saisir
+                        Marquer comme fait
                       </Button>
                     )}
                   </Card>

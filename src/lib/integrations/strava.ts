@@ -301,15 +301,81 @@ export function calculateNormalizedPower(powerData: number[]): number {
  */
 export function mapStravaSportType(sportType: string): string {
   const mapping: Record<string, string> = {
+    // Running
     Run: "running",
     "Trail Run": "running",
+    VirtualRun: "running",
+    
+    // Cycling
     Ride: "cycling",
-    VirtualRide: "cycling",
+    MountainBikeRide: "cycling",
+    GravelRide: "cycling",
+    EBikeRide: "cycling",
+    EMountainBikeRide: "cycling",
+    Velomobile: "cycling",
+    Handcycle: "cycling",
+    VirtualRide: "spin",
+
+    // Swimming & Water
     Swim: "swimming",
+    Canoeing: "kayaking",
+    Kayaking: "kayaking",
+    Rowing: "kayaking", // Closest match available or "rowing" if added
+    StandUpPaddling: "paddleboarding",
+    Kitesurf: "kite_boarding",
+    Windsurf: "kite_boarding",
+    Surfing: "surfing", // Use direct mapping, fallback to other
+    Wakeboarding: "wakeboarding",
+    WaterSkiing: "water_skiing",
+    Sail: "sailing",
+
+    // Winter
+    AlpineSki: "skiing",
+    BackcountrySki: "skiing",
+    Snowboard: "snowboarding", // Use direct mapping
+    RollerSki: "skiing",
+    NordicSki: "cross_country_skiing",
+    IceSkate: "ice_skating", // Use direct mapping
+    WinterBiathlon: "winter_biathlon",
+    Snowshoe: "snowshoeing", // Use direct mapping
+
+    // Fitness & Gym
     WeightTraining: "strength",
     Workout: "strength",
-    Walk: "other",
-    Hike: "other",
+    CrossFit: "crossfit", // Use direct mapping
+    HighIntensityIntervalTraining: "hiit", // Use direct mapping
+    Yoga: "yoga", // Use direct mapping
+    Pilates: "pilates", // Use direct mapping
+    Barre: "barre",
+    Elliptical: "elliptical", // Use direct mapping
+    StairStepper: "stairmaster",
+    
+    // Team & Ball Sports
+    Soccer: "soccer",
+    Football: "football_american",
+    Basketball: "basketball",
+    Baseball: "baseball",
+    Softball: "softball",
+    Volleyball: "volleyball",
+    Handball: "handball",
+    Rugby: "rugby",
+    Cricket: "cricket",
+    Golf: "golf",
+    Badminton: "badminton", // Use direct mapping
+    Tennis: "tennis", // Use direct mapping
+    Pickleball: "pickleball", // Use direct mapping
+    Squash: "squash",
+    Racquetball: "racquetball", // Use direct mapping
+    TableTennis: "table_tennis_pingpong",
+
+    // Other
+    Walk: "walking", // Direct mapping as requested
+    Hike: "hiking", // Direct mapping
+    RockClimbing: "rock_climbing",
+    InlineSkate: "inline_skating",
+    Skateboard: "skateboarding", // Use direct mapping
+    Wheelchair: "wheelchair_pushing",
+
     default: "other",
   };
 

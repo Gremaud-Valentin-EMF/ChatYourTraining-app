@@ -197,6 +197,7 @@ interface SportSelection {
   selected: boolean;
   level: string;
   category: SportCategoryId;
+  color?: string;
 }
 
 interface SportMetrics {
@@ -364,6 +365,7 @@ export default function OnboardingPage() {
                 selected: false,
                 level: "intermediate",
                 category: getSportCategory(sport.name),
+                color: sport.color,
               })
             )
           );
@@ -757,17 +759,35 @@ export default function OnboardingPage() {
                               <div
                                 className={`p-2.5 rounded-lg shrink-0 ${
                                   sport.selected
-                                    ? "bg-accent/20 text-accent-foreground"
+                                    ? "" // Handled by inline style
                                     : "bg-dark-100 text-muted-foreground"
                                 }`}
+                                style={
+                                  sport.selected && sport.color
+                                    ? {
+                                        backgroundColor: `${sport.color}20`,
+                                        color: sport.color,
+                                      }
+                                    : sport.selected
+                                    ? {
+                                        backgroundColor: "rgba(34, 197, 94, 0.2)", // fallback accent color (green-500)
+                                        color: "#22c55e",
+                                      }
+                                    : {}
+                                }
                               >
                                 <IconComponent className="h-5 w-5" />
                               </div>
                               <span className="font-medium">{sport.name_fr}</span>
                             </div>
                             {sport.selected && (
-                              <div className="h-5 w-5 bg-accent rounded-full flex items-center justify-center shadow-sm shrink-0">
-                                <Check className="h-3 w-3 text-dark" />
+                              <div
+                                className="h-5 w-5 rounded-full flex items-center justify-center shadow-sm shrink-0"
+                                style={{
+                                  backgroundColor: sport.color || "#22c55e",
+                                }}
+                              >
+                                <Check className="h-3 w-3 text-white" />
                               </div>
                             )}
                           </div>

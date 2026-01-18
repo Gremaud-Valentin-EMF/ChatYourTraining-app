@@ -7,6 +7,7 @@ import { getSportColor } from "@/lib/utils";
 interface WeekActivity {
   id: string;
   sport: string;
+  sportColor?: string;
   title: string;
   status: "planned" | "completed" | "skipped";
   intensity?: string | null;
@@ -188,7 +189,9 @@ export function WeekCalendar({
                           <span
                             className="h-2.5 w-2.5 rounded-full flex-shrink-0"
                             style={{
-                              backgroundColor: getSportColor(activity.sport),
+                              backgroundColor:
+                                activity.sportColor ||
+                                getSportColor(activity.sport),
                             }}
                           />
                           <span className="truncate">{activity.title}</span>

@@ -72,7 +72,6 @@ export default function AuthLayout({
               ChatYourTraining
             </span>
           </div>
-
           {children}
         </div>
       </div>

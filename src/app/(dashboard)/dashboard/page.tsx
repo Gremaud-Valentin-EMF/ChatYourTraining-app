@@ -278,15 +278,29 @@ export default function DashboardPage() {
       }
 
       // Load sports for mapping
-      const sportMap: Record<string, { name: string; nameFr: string }> = {};
+      const sportMap: Record<
+        string,
+        { name: string; nameFr: string; color?: string }
+      > = {};
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: sports } = await (supabase as any)
           .from("sports")
-          .select("id, name, name_fr");
-        sports?.forEach((s: { id: string; name: string; name_fr: string }) => {
-          sportMap[s.id] = { name: s.name, nameFr: s.name_fr };
-        });
+          .select("id, name, name_fr, color");
+        sports?.forEach(
+          (s: {
+            id: string;
+            name: string;
+            name_fr: string;
+            color: string;
+          }) => {
+            sportMap[s.id] = {
+              name: s.name,
+              nameFr: s.name_fr,
+              color: s.color,
+            };
+          }
+        );
       } catch {
         // Ignore
       }
@@ -587,6 +601,7 @@ export default function DashboardPage() {
               }) => ({
                 id: a.id,
                 sport: sportMap[a.sport_id]?.name || "other",
+                sportColor: sportMap[a.sport_id]?.color,
                 title: a.title,
                 // Map "in_progress" to "planned" for display
                 status: (a.status === "in_progress" ? "planned" : a.status) as
