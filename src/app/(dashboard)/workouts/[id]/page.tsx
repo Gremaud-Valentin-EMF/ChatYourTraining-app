@@ -5,15 +5,35 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, Badge, Button, Spinner } from "@/components/ui";
-import {
-  Clock,
-  MapPin,
-  Mountain,
-  Heart,
-  Zap,
-  ArrowLeft,
-} from "lucide-react";
-import { formatDuration, getSportColor } from "@/lib/utils";
+import { ArrowLeft, BarChart3, ShieldCheck, Activity } from "lucide-react";
+import { formatDuration, formatDistance, getSportColor } from "@/lib/utils";
+import type { Json } from "@/types/database";
+
+const sportIconMap: Record<string, string> = {
+  running: "🏃",
+  cycling: "🚴",
+  swimming: "🏊",
+  strength: "🏋️",
+  triathlon: "🏅",
+  other: "⚡",
+};
+
+const focusByIntensity: Record<string, string> = {
+  endurance: "Endurance fondamentale",
+  tempo: "Développement VMA",
+  threshold: "Seuil / tenue de puissance",
+  vo2max: "Augmentation de VO2max",
+  recovery: "Récupération active",
+};
+
+const intensityRpeMap: Record<string, { value: number; description: string }> =
+  {
+    endurance: { value: 5, description: "Modéré / stable" },
+    tempo: { value: 7, description: "Difficile" },
+    threshold: { value: 8, description: "Très exigeant" },
+    vo2max: { value: 9, description: "Très intense" },
+    recovery: { value: 3, description: "Facile / relâché" },
+  };
 
 interface ActivityDetail {
   id: string;
@@ -30,9 +50,11 @@ interface ActivityDetail {
   elevation_gain_m: number | null;
   avg_hr: number | null;
   max_hr: number | null;
+  avg_power_watts: number | null;
   tss: number | null;
   intensity: string | null;
   source: string;
+  raw_data: Json | null;
 }
 
 export default function WorkoutDetailPage({
@@ -44,6 +66,8 @@ export default function WorkoutDetailPage({
   const router = useRouter();
   const [activity, setActivity] = useState<ActivityDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [ftpWatts, setFtpWatts] = useState<number | null>(null);
+  const [lthrValue, setLthrValue] = useState<number | null>(null);
 
   useEffect(() => {
     loadActivity();
@@ -52,6 +76,14 @@ export default function WorkoutDetailPage({
 
   const loadActivity = async () => {
     setIsLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     const { data } = await supabase
       .from("activities")
       .select(
@@ -70,9 +102,11 @@ export default function WorkoutDetailPage({
         max_hr,
         tss,
         intensity,
-        source
+        source,
+        avg_power_watts,
+        raw_data
       `
-      )
+    )
       .eq("id", params.id)
       .single();
 
@@ -90,6 +124,26 @@ export default function WorkoutDetailPage({
           sportLabel = sportInfo.name_fr || sportLabel;
         }
       }
+
+      const [physioResponse, sportResponse] = await Promise.all([
+        supabase
+          .from("physiological_data")
+          .select("lthr")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("user_sports")
+          .select("ftp_watts")
+          .eq("user_id", user.id)
+          .eq("sport_id", data.sport_id)
+          .maybeSingle(),
+      ]);
+
+      const physioData = physioResponse.data as { lthr?: number } | null;
+      const sportData = sportResponse.data as { ftp_watts?: number } | null;
+      setLthrValue(physioData?.lthr ?? null);
+      setFtpWatts(sportData?.ftp_watts ?? null);
+
       setActivity({
         id: data.id,
         title: data.title,
@@ -105,9 +159,11 @@ export default function WorkoutDetailPage({
         elevation_gain_m: data.elevation_gain_m,
         avg_hr: data.avg_hr,
         max_hr: data.max_hr,
+        avg_power_watts: data.avg_power_watts ?? null,
         tss: data.tss,
         intensity: data.intensity,
         source: data.source,
+        raw_data: data.raw_data ?? null,
       });
     } else {
       setActivity(null);
@@ -138,12 +194,235 @@ export default function WorkoutDetailPage({
   }
 
   const sportColor = getSportColor(activity.sport_name);
+  const sportIcon =
+    sportIconMap[activity.sport_name] ?? activity.sport_label[0];
   const date = new Date(activity.scheduled_date).toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
   });
+  type BadgeVariant = "default" | "success" | "warning" | "error" | "info" | "outline";
 
+  const statusLabelMap: Record<string, string> = {
+    planned: "Prévu",
+    completed: "Réalisé",
+    in_progress: "En cours",
+    skipped: "Annulé",
+  };
+  const statusVariantMap: Record<string, BadgeVariant> = {
+    planned: "outline",
+    completed: "success",
+    // "secondary" is not part of BadgeVariant, map it to "info" (or another valid variant)
+    in_progress: "info",
+    skipped: "error",
+  };
+  const statusLabel = statusLabelMap[activity.status] ?? "Prévu";
+  const statusVariant: BadgeVariant = statusVariantMap[activity.status] ?? "outline";
+  const plannedDuration = activity.planned_duration_minutes;
+  const actualDuration = activity.actual_duration_minutes; // This is already a number or null
+  const intensityKey = (activity.intensity ?? "endurance").toLowerCase();
+  const rpeInfo = intensityRpeMap[intensityKey] ?? {
+    value: 6,
+    description: "Effort équilibré",
+  };
+  const focusLabel =
+    focusByIntensity[intensityKey] ?? "Approche guidée pour cette séance";
+  const rawData = (activity.raw_data as Record<string, unknown> | null) ?? null;
+  const calculated = rawData?._calculated as Record<string, unknown> | undefined;
+  const normalizedPower =
+    typeof calculated?.normalized_power === "number"
+      ? calculated.normalized_power
+      : null;
+  const normalizedHeartRate =
+    typeof calculated?.normalized_hr === "number"
+      ? calculated.normalized_hr
+      : null;
+  const normalizedPaceSeconds =
+    typeof calculated?.normalized_pace === "number"
+      ? calculated.normalized_pace
+      : null;
+  const elapsedTimeSeconds =
+    typeof rawData?.elapsed_time === "number" ? rawData.elapsed_time : null;
+  const movingTimeSeconds =
+    typeof rawData?.moving_time === "number" ? rawData.moving_time : null;
+  const workKilojoules =
+    typeof rawData?.kilojoules === "number" ? rawData.kilojoules : null;
+  const distanceKm =
+    activity.actual_distance_km ?? activity.planned_distance_km ?? null;
+  const durationMinutesValue =
+    elapsedTimeSeconds !== null
+      ? elapsedTimeSeconds / 60
+      : activity.actual_duration_minutes ?? null;
+  const movingMinutesValue =
+    movingTimeSeconds !== null
+      ? movingTimeSeconds / 60
+      : activity.actual_duration_minutes ?? null;
+  const isCycling = activity.sport_name === "cycling";
+  const isRunning = activity.sport_name === "running";
+  const formatDurationValue = (minutes: number) =>
+    formatDuration(Math.round(minutes));
+  const formatPaceValue = (secondsPerKm: number) => {
+    if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return "--";
+    const minutes = Math.floor(secondsPerKm / 60);
+    const seconds = Math.round(secondsPerKm % 60);
+    return `${minutes}'${String(seconds).padStart(2, "0")}" /km`;
+  };
+  const ngpSeconds =
+    normalizedPaceSeconds ??
+    (isRunning && elapsedTimeSeconds && distanceKm
+      ? elapsedTimeSeconds / distanceKm
+      : null);
+  const intensityFactorPower =
+    normalizedPower && ftpWatts ? normalizedPower / ftpWatts : null;
+  const intensityFactorHeart =
+    normalizedHeartRate && lthrValue
+      ? normalizedHeartRate / lthrValue
+      : null;
+  const intensityFactor =
+    intensityFactorPower ?? intensityFactorHeart ?? null;
+  const intensitySource = intensityFactorPower
+    ? "Puissance"
+    : intensityFactorHeart
+    ? "Fréquence cardiaque"
+    : undefined;
+  const averagePower =
+    typeof rawData?.avg_power_watts === "number"
+      ? rawData.avg_power_watts
+      : activity.avg_power_watts ?? null;
+  const variabilityIndex =
+    normalizedPower && averagePower && averagePower > 0
+      ? normalizedPower / averagePower
+      : null;
+  const trainingDataEntries: {
+    label: string;
+    value: string;
+    helper?: string;
+  }[] = [];
+
+  if (activity.tss !== null && activity.tss !== undefined) {
+    trainingDataEntries.push({
+      label: "TSS",
+      value: `${activity.tss}`,
+      helper: "Training Stress Score",
+    });
+  }
+  if (intensityFactor && (isCycling || isRunning)) {
+    trainingDataEntries.push({
+      label: "IF",
+      value: intensityFactor.toFixed(2),
+      helper: intensitySource ? `Basé sur ${intensitySource}` : undefined,
+    });
+  }
+  if (isCycling && normalizedPower) {
+    trainingDataEntries.push({
+      label: "NP",
+      value: `${Math.round(normalizedPower)} W`,
+      helper: "Normalized Power",
+    });
+  }
+  if (isCycling && variabilityIndex) {
+    trainingDataEntries.push({
+      label: "VI",
+      value: variabilityIndex.toFixed(2),
+      helper: "Variation Index (NP / puissance moyenne)",
+    });
+  }
+  if (isRunning && ngpSeconds) {
+    trainingDataEntries.push({
+      label: "NGP",
+      value: formatPaceValue(ngpSeconds),
+      helper: "Normalized Graded Pace",
+    });
+  }
+  if (durationMinutesValue !== null) {
+    trainingDataEntries.push({
+      label: "Durée totale",
+      value: formatDurationValue(durationMinutesValue),
+      helper: elapsedTimeSeconds
+        ? "Inclut les pauses"
+        : "Durée réelle rapportée",
+    });
+  }
+  if (movingMinutesValue !== null) {
+    trainingDataEntries.push({
+      label: "Moving time",
+      value: formatDurationValue(movingMinutesValue),
+      helper: "Temps passé en mouvement",
+    });
+  }
+  if (distanceKm !== null) {
+    trainingDataEntries.push({
+      label: "Distance",
+      value: formatDistance(distanceKm),
+      helper: "Distance effectuée",
+    });
+  }
+  if (isCycling && workKilojoules !== null) {
+    trainingDataEntries.push({
+      label: "Work",
+      value: `${Math.round(workKilojoules)} kJ`,
+      helper: "Travail énergétique",
+    });
+  }
+  const totalDuration = Math.max(actualDuration ?? plannedDuration ?? 60, 15);
+  const warmupMinutes = Math.max(8, Math.round(totalDuration * 0.15));
+  const mainMinutes = Math.max(10, Math.round(totalDuration * 0.55));
+  const cooldownMinutes = Math.max(
+    5,
+    totalDuration - warmupMinutes - mainMinutes
+  );
+  const targetIntensity = Math.min(10, Math.max(3, rpeInfo.value)); // Ensure rpeInfo.value is treated as a number
+  const structureSegments = [
+    {
+      label: "Échauffement",
+      intensity: Math.max(2, targetIntensity - 2), // Ensure targetIntensity is a number
+      duration: warmupMinutes,
+    },
+    {
+      label: "Blocs ciblés",
+      intensity: targetIntensity,
+      duration: mainMinutes,
+    },
+    {
+      label: "Retour au calme",
+      intensity: Math.max(2, targetIntensity - 3), // Ensure targetIntensity is a number
+      duration: cooldownMinutes,
+    },
+  ];
+  const maxStructureIntensity = Math.max(
+    ...structureSegments.map((segment) => segment.intensity),
+    1
+  );
+  const compliancePercent =
+    typeof plannedDuration === 'number' && typeof actualDuration === 'number' && plannedDuration > 0
+      ? Math.min(100, Math.round((actualDuration / plannedDuration) * 100))
+      : null;
+  const complianceBadgeVariant =
+    compliancePercent === null
+      ? "outline"
+      : compliancePercent >= 95 // Adjusted threshold for 'success'
+      ? "success"
+      : compliancePercent >= 90
+      ? "info"
+      : "warning";
+  const heartDriftPercent =
+    activity.avg_hr && activity.max_hr
+      ? Math.round(
+          ((activity.max_hr - activity.avg_hr) / activity.avg_hr) * 100 // Ensure avg_hr is not zero
+        )
+      : null;
+  const heartDriftMessage =
+    heartDriftPercent !== null
+      ? `Ta FC a augmenté de ${heartDriftPercent}% en fin de séance pour la même puissance. Vérifie l'hydratation.`
+      : "Données cardio insuffisantes pour mesurer la dérive.";
+  const coachComment =
+    compliancePercent === null
+      ? "Ton coach IA attend plus de données pour analyser la régularité."
+      : compliancePercent >= 95 // Adjusted threshold for 'bravo'
+      ? "Tu as respecté le plan à la lettre, bravo."
+      : compliancePercent >= 85
+      ? "Quelques écarts sur la durée mais les blocs restent dans la cible."
+      : "Tu t'es un peu écarté du plan ; ajuste la cadence la prochaine fois.";
   return (
     <div className="space-y-6">
       <Link
@@ -155,92 +434,152 @@ export default function WorkoutDetailPage({
       </Link>
 
       <Card>
-        <div className="flex flex-col gap-2 border-b border-dark-200 pb-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div
-              className="h-12 w-12 rounded-xl flex items-center justify-center text-white text-xl font-bold"
-              style={{ backgroundColor: sportColor }}
-            >
-              {activity.sport_label[0]}
+        <div className="space-y-6">
+          <header className="border-b border-dark-200 pb-4 space-y-3">
+            <div className="flex items-start gap-4">
+              <div
+                className="h-16 w-16 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ backgroundColor: sportColor }}
+              >
+                <span role="presentation">{sportIcon}</span>
+              </div>
+              <div className="flex-1 space-y-1">
+                <div>
+                  <p className="text-xs text-muted uppercase">{date}</p>
+                </div>
+                <div className="flex flex-row items-center gap-3">
+                  <h1 className="text-2xl font-bold">{activity.title}</h1>
+                  <Badge
+                    variant={statusVariant}
+                    className="uppercase text-xs tracking-wide"
+                  >
+                    {statusLabel}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="uppercase text-xs tracking-wide"
+                  >
+                    {activity.source.toUpperCase()}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted">{activity.sport_label}</p>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-xs uppercase text-muted">
+                    Objectif de la séance
+                  </span>
+                  <span className="font-medium">{focusLabel}</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-muted uppercase">{date}</p>
-              <h1 className="text-2xl font-bold">{activity.title}</h1>
-            </div>
-            <Badge className="ml-auto" variant="outline">
-              {activity.source.toUpperCase()}
-            </Badge>
-          </div>
-          <p className="text-sm text-muted">{activity.sport_label}</p>
-        </div>
+          </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-muted" />
-            <div>
-              <p className="text-xs text-muted uppercase">Durée prévue / réelle</p>
-              <p className="font-semibold">
-                {activity.planned_duration_minutes
-                  ? formatDuration(activity.planned_duration_minutes)
-                  : "--"}{" "}
-                •{" "}
-                {activity.actual_duration_minutes
-                  ? formatDuration(activity.actual_duration_minutes)
-                  : "--"}
-              </p>
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Données d&apos;entraînement
+              </h3>
+              <span className="text-xs uppercase text-muted">
+                {trainingDataEntries.length ? "Détails" : "Relevé indisponible"}
+              </span>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-muted" />
-            <div>
-              <p className="text-xs text-muted uppercase">Distance</p>
-              <p className="font-semibold">
-                {activity.actual_distance_km?.toFixed(1) ??
-                  activity.planned_distance_km?.toFixed(1) ??
-                  "--"}{" "}
-                km
+            {trainingDataEntries.length ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {trainingDataEntries.map((entry) => (
+                  <div
+                    key={entry.label}
+                    className="rounded-2xl border border-dark-200 bg-dark-100 p-4 space-y-1"
+                  >
+                    <p className="text-xs uppercase text-muted">{entry.label}</p>
+                    <p className="text-lg font-semibold">{entry.value}</p>
+                    {entry.helper && (
+                      <p className="text-xs text-muted">{entry.helper}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted">
+                Aucune donnée spécifique n&apos;est disponible pour cette séance.
               </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Mountain className="h-5 w-5 text-muted" />
-            <div>
-              <p className="text-xs text-muted uppercase">Dénivelé</p>
-              <p className="font-semibold">
-                {activity.elevation_gain_m ?? "--"} m
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-error" />
-            <div>
-              <p className="text-xs text-muted uppercase">Fréquence cardiaque</p>
-              <p className="font-semibold">
-                {activity.avg_hr || "--"}
-                <span className="text-muted">
-                  /{activity.max_hr || "--"} bpm
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
+            )}
+          </section>
 
-        <div className="flex items-center justify-between border-t border-dark-200 pt-4">
-          <Badge
-            variant={
-              activity.tss && activity.tss > 100 ? "error" : "warning"
-            }
-          >
-            <Zap className="h-4 w-4 mr-1" />
-            {activity.tss || "--"} TSS
-          </Badge>
-          {activity.intensity && (
-            <span className="text-sm text-muted uppercase">
-              Intensité: {activity.intensity}
-            </span>
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Corps de séance
+              </h3>
+              <span className="text-xs uppercase text-muted">Structure</span>
+            </div>
+            <div className="flex items-end gap-3 h-32">
+              {structureSegments.map((segment) => (
+                <div
+                  key={segment.label}
+                  className="flex-1 flex flex-col items-center gap-2"
+                >
+                  <div className="h-24 w-full rounded-full bg-dark-200">
+                    <div
+                      className="h-full rounded-full bg-accent"
+                      style={{
+                        height: `${
+                          (segment.intensity / maxStructureIntensity) * 100
+                        }%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-center">{segment.label}</p>
+                  <p className="text-xs text-muted">{segment.duration} min</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted uppercase">
+              <span>RPE</span>
+              <span className="font-semibold text-foreground">
+                {rpeInfo.value}/10 ({rpeInfo.description})
+              </span>
+            </div>
+          </section>
+
+          {activity.status === "completed" && (
+            <section className="space-y-3 border-t border-dark-200 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted uppercase">Compliance</p>
+                  <p className="text-lg font-semibold">
+                    Respect du plan :{" "}
+                    <span className="text-accent">
+                      {compliancePercent !== null
+                        ? `${compliancePercent}%`
+                        : "—"}
+                    </span>
+                  </p>
+                </div>
+                <Badge
+                    variant={complianceBadgeVariant}
+                    className="uppercase text-xs tracking-wide"
+                  >
+                    {compliancePercent !== null ? `${compliancePercent}%` : "—"}
+                  </Badge>
+              </div>
+              <div className="rounded-2xl border border-dark-200 bg-dark-100 p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs uppercase text-muted">
+                  <span>Dérive cardiaque</span>
+                  <ShieldCheck className="h-4 w-4 text-muted" />
+                </div>
+                <p className="text-sm">{heartDriftMessage}</p>
+              </div>
+              <div className="rounded-2xl border border-dark-200 bg-dark-100 p-4 space-y-2">
+                <p className="text-xs uppercase text-muted">
+                  Commentaire du coach IA
+                </p>
+                <p className="font-semibold">{coachComment}</p>
+              </div>
+            </section>
           )}
-        </div>
 
+        </div>
       </Card>
     </div>
   );

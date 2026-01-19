@@ -297,6 +297,7 @@ export interface Database {
           sleep_rem_minutes: number | null;
           sleep_light_minutes: number | null;
           sleep_awake_minutes: number | null;
+          sleep_needed_minutes: number | null;
           hrv_ms: number | null;
           resting_hr: number | null;
           respiratory_rate: number | null;
@@ -320,6 +321,7 @@ export interface Database {
           sleep_rem_minutes?: number | null;
           sleep_light_minutes?: number | null;
           sleep_awake_minutes?: number | null;
+          sleep_needed_minutes?: number | null;
           hrv_ms?: number | null;
           resting_hr?: number | null;
           respiratory_rate?: number | null;
@@ -343,6 +345,7 @@ export interface Database {
           sleep_rem_minutes?: number | null;
           sleep_light_minutes?: number | null;
           sleep_awake_minutes?: number | null;
+          sleep_needed_minutes?: number | null;
           hrv_ms?: number | null;
           resting_hr?: number | null;
           respiratory_rate?: number | null;

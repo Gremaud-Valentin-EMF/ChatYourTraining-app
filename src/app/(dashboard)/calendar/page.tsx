@@ -58,6 +58,7 @@ interface Activity {
 interface DailyMetrics {
   sleep_duration_minutes: number | null;
   sleep_score: number | null;
+  sleep_needed_minutes: number | null;
   mood: number | null;
   fatigue_level: number | null;
   notes: string | null;
@@ -140,6 +141,8 @@ export default function CalendarPage() {
     const m = safeMinutes % 60;
     return `${h}h${m.toString().padStart(2, "0")}`;
   };
+
+  const DEFAULT_SLEEP_GOAL_MINUTES = 8 * 60;
 
   const weekRange = useMemo(() => {
     const base = new Date(currentDate);
@@ -338,6 +341,10 @@ export default function CalendarPage() {
       return;
     }
 
+    setDailyMetrics(null);
+    setFatigueValue(null);
+    setNotesValue("");
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -345,16 +352,27 @@ export default function CalendarPage() {
 
     const dateStr = toLocalDateString(date);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("daily_metrics")
-      .select("sleep_duration_minutes, sleep_score, mood, fatigue_level, notes")
+      .select(
+        "sleep_duration_minutes, sleep_score, sleep_needed_minutes, mood, fatigue_level, notes"
+      )
       .eq("user_id", user.id)
       .eq("date", dateStr)
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error loading daily metrics:", error);
+      return;
+    }
+
+    if (!data) {
+      return;
+    }
 
     setDailyMetrics(data);
-    setFatigueValue(data?.fatigue_level || null);
-    setNotesValue(data?.notes || "");
+    setFatigueValue(data.fatigue_level || null);
+    setNotesValue(data.notes || "");
   };
 
   const handleMarkAsDone = async (activity: Activity) => {
@@ -417,13 +435,18 @@ export default function CalendarPage() {
       const dateStr = toLocalDateString(selectedDate);
       const { data, error } = await supabase
         .from("daily_metrics")
-        .upsert({
-          user_id: user.id,
-          date: dateStr,
-          fatigue_level:
-            fatigueValue !== null ? fatigueValue : dailyMetrics?.fatigue_level,
-          notes: notesValue || null,
-        })
+        .upsert(
+          {
+            user_id: user.id,
+            date: dateStr,
+            fatigue_level:
+              fatigueValue !== null
+                ? fatigueValue
+                : dailyMetrics?.fatigue_level,
+            notes: notesValue || null,
+          },
+          { onConflict: "user_id,date" }
+        )
         .select()
         .single();
 
@@ -528,6 +551,18 @@ export default function CalendarPage() {
     ? dailyMetrics?.sleep_duration_minutes
     : null;
   const sleepScore = !isFutureSelection ? dailyMetrics?.sleep_score : null;
+  const sleepNeededMinutes = !isFutureSelection
+    ? dailyMetrics?.sleep_needed_minutes ?? null
+    : null;
+  const sleepGoalMinutes = Math.max(
+    1,
+    sleepNeededMinutes ?? DEFAULT_SLEEP_GOAL_MINUTES
+  );
+  const hasSleepDuration = typeof sleepMinutes === "number";
+  const sleepGaugeValue = hasSleepDuration
+    ? Math.min(sleepMinutes!, sleepGoalMinutes)
+    : 0;
+  const sleepGoalLabel = sleepNeededMinutes ? "Objectif" : "Objectif estimé";
   const resolvedFatigue = fatigueValue ?? dailyMetrics?.fatigue_level ?? null;
   const fatigueStatus =
     resolvedFatigue === null
@@ -1072,18 +1107,31 @@ export default function CalendarPage() {
                       ? "--"
                       : "Non renseigné"}
                   </p>
-                  {sleepScore ? (
-                    <Progress
-                      value={sleepScore}
-                      max={100}
-                      size="sm"
-                      className="mt-2"
-                    />
+                  {hasSleepDuration ? (
+                    <>
+                      <Progress
+                        value={sleepGaugeValue}
+                        max={sleepGoalMinutes}
+                        size="sm"
+                        className="mt-2"
+                      />
+                      <div className="flex justify-between text-xs text-muted mt-2">
+                        <span>
+                          {sleepScore !== null && sleepScore !== undefined
+                            ? `Score : ${sleepScore}%`
+                            : "Score indisponible"}
+                        </span>
+                        <span>
+                          {sleepGoalLabel} :{" "}
+                          {formatHoursFromMinutes(sleepGoalMinutes)}
+                        </span>
+                      </div>
+                    </>
                   ) : (
                     <p className="text-xs text-muted mt-2">
                       {isFutureSelection
                         ? "Les données apparaîtront après la nuit."
-                        : "Aucune donnée WHOOP pour ce jour."}
+                        : "Aucune donnée pour ce jour."}
                     </p>
                   )}
                 </div>

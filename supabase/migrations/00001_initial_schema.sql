@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS public.daily_metrics (
     sleep_rem_minutes INTEGER,
     sleep_light_minutes INTEGER,
     sleep_awake_minutes INTEGER,
+    sleep_needed_minutes INTEGER,
     -- Biometrics
     hrv_ms INTEGER,                 -- Heart Rate Variability
     resting_hr INTEGER,

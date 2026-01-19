@@ -253,6 +253,16 @@ export async function POST() {
         const date = sleep.end.split("T")[0];
         const sleepScore = sleep.score;
         const sleepStages = sleepScore?.stage_summary;
+        const sleepNeeded = sleepScore?.sleep_needed;
+        const sleepNeededMinutes = sleepNeeded
+          ? Math.round(
+              ((sleepNeeded.baseline_milli ?? 0) +
+                (sleepNeeded.need_from_sleep_debt_milli ?? 0) +
+                (sleepNeeded.need_from_recent_strain_milli ?? 0) +
+                (sleepNeeded.need_from_recent_nap_milli ?? 0)) /
+                60000
+            )
+          : null;
 
         const metricsData: any = {
           date,
@@ -274,6 +284,7 @@ export async function POST() {
           sleep_awake_minutes: sleepStages
             ? Math.round(sleepStages.total_awake_time_milli / 60000)
             : null,
+          sleep_needed_minutes: sleepNeededMinutes,
           respiratory_rate: sleepScore?.respiratory_rate || null,
           source: "whoop",
         };
