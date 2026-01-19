@@ -117,7 +117,7 @@ export function TrainingLoadChart({
     return {
       label: "Maintien",
       color: "text-muted",
-      barColor: "var(--dark-300)",
+      barColor: "#3a3a4a",
       description: "Charge stable, focus technique.",
     };
   };

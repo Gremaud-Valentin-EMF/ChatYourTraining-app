@@ -151,8 +151,8 @@ export function WeekCalendar({
       </div>
 
       {/* Week grid */}
-      <div className="overflow-x-auto pb-2">
-        <div className="grid grid-cols-7 min-w-[560px] gap-2">
+      <div className="pb-2">
+        <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
           {weekData.map((day) => (
             <div
               key={day.date.toISOString()}

@@ -415,14 +415,27 @@ export default function CalendarPage() {
       if (!user) return;
 
       const dateStr = toLocalDateString(selectedDate);
-      await supabase.from("daily_metrics").upsert({
-        user_id: user.id,
-        date: dateStr,
-        fatigue_level:
-          fatigueValue !== null ? fatigueValue : dailyMetrics?.fatigue_level,
-        notes: notesValue || null,
-      });
-      await loadDayDetails(selectedDate);
+      const { data, error } = await supabase
+        .from("daily_metrics")
+        .upsert({
+          user_id: user.id,
+          date: dateStr,
+          fatigue_level:
+            fatigueValue !== null ? fatigueValue : dailyMetrics?.fatigue_level,
+          notes: notesValue || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setDailyMetrics(data);
+        setFatigueValue(data.fatigue_level);
+        setNotesValue(data.notes || "");
+      }
+    } catch (err) {
+      console.error("Error saving journal:", err);
     } finally {
       setIsSavingMetrics(false);
     }
@@ -663,12 +676,12 @@ export default function CalendarPage() {
           {viewMode === "month" ? (
             <Card>
               <div className="overflow-x-auto">
-                <div className="min-w-[720px]">
+                <div className="w-full md:min-w-[720px]">
                   <div className="grid grid-cols-7 gap-px border-b border-dark-200 mb-2">
                     {dayNames.map((day) => (
                       <div
                         key={day}
-                        className="p-3 text-center text-sm text-muted font-medium"
+                        className="p-1 md:p-3 text-center text-xs md:text-sm text-muted font-medium"
                       >
                         {day}
                       </div>
@@ -679,7 +692,7 @@ export default function CalendarPage() {
                     {Array.from({ length: startingDay }).map((_, i) => (
                       <div
                         key={`empty-${i}`}
-                        className="min-h-[100px] p-2 bg-dark-100/50"
+                        className="min-h-[60px] md:min-h-[100px] p-1 md:p-2 bg-dark-100/50"
                       />
                     ))}
 
@@ -698,7 +711,7 @@ export default function CalendarPage() {
                             setSelectedDate(new Date(year, month, day))
                           }
                           className={cn(
-                            "min-h-[100px] p-2 cursor-pointer transition-colors border",
+                            "min-h-[60px] md:min-h-[100px] p-1 md:p-2 cursor-pointer transition-colors border relative",
                             isCurrentDay(day)
                               ? "border-accent bg-accent/5"
                               : isSelected
@@ -708,17 +721,18 @@ export default function CalendarPage() {
                         >
                           <div
                             className={cn(
-                              "text-sm font-medium mb-2",
+                              "text-xs md:text-sm font-medium mb-1 md:mb-2",
                               isCurrentDay(day) && "text-accent"
                             )}
                           >
                             {day}
                             {isCurrentDay(day) && (
-                              <span className="ml-1 h-1.5 w-1.5 bg-accent rounded-full inline-block" />
+                              <span className="ml-1 h-1 w-1 md:h-1.5 md:w-1.5 bg-accent rounded-full inline-block" />
                             )}
                           </div>
 
-                          <div className="space-y-1">
+                          {/* Desktop: Full List */}
+                          <div className="hidden md:block space-y-1">
                             {dayActivities.slice(0, 3).map((activity) => (
                               <div
                                 key={activity.id}
@@ -739,7 +753,6 @@ export default function CalendarPage() {
                                         color:
                                           activity.sport_color ||
                                           getSportColor(activity.sport_name),
-                                        // Add a border for completed items to distinguish them
                                         border:
                                           activity.status === "completed"
                                             ? `1px solid ${
@@ -763,6 +776,23 @@ export default function CalendarPage() {
                                 +{dayActivities.length - 3} autres
                               </div>
                             )}
+                          </div>
+
+                          {/* Mobile: Dots */}
+                          <div className="flex md:hidden flex-wrap gap-1 mt-1">
+                            {dayActivities.map((activity) => (
+                              <div
+                                key={activity.id}
+                                className="h-2 w-2 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    activity.status === "skipped"
+                                      ? "var(--error)"
+                                      : activity.sport_color ||
+                                        getSportColor(activity.sport_name),
+                                }}
+                              />
+                            ))}
                           </div>
                         </div>
                       );
@@ -1154,6 +1184,7 @@ export default function CalendarPage() {
             <Input
               label="Date"
               type="date"
+              className="w-full"
               value={newSession.date}
               onChange={(e) =>
                 setNewSession((prev) => ({ ...prev, date: e.target.value }))
