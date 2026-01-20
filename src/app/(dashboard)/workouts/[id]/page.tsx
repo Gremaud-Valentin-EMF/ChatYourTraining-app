@@ -7,16 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, Badge, Button, Spinner } from "@/components/ui";
 import { ArrowLeft, BarChart3, ShieldCheck, Activity } from "lucide-react";
 import { formatDuration, formatDistance, getSportColor } from "@/lib/utils";
+import { getSportIconComponent } from "@/lib/sport-icons";
 import type { Json } from "@/types/database";
-
-const sportIconMap: Record<string, string> = {
-  running: "🏃",
-  cycling: "🚴",
-  swimming: "🏊",
-  strength: "🏋️",
-  triathlon: "🏅",
-  other: "⚡",
-};
 
 const focusByIntensity: Record<string, string> = {
   endurance: "Endurance fondamentale",
@@ -43,6 +35,7 @@ interface ActivityDetail {
   sport_id: string | null;
   sport_name: string;
   sport_label: string;
+  sport_icon: string | null;
   planned_duration_minutes: number | null;
   actual_duration_minutes: number | null;
   planned_distance_km: number | null;
@@ -113,15 +106,17 @@ export default function WorkoutDetailPage({
     if (data) {
       let sportName = "other";
       let sportLabel = "Autre";
+      let sportIconName: string | null = null;
       if (data.sport_id) {
         const { data: sportInfo } = await supabase
           .from("sports")
-          .select("name, name_fr")
+          .select("name, name_fr, icon")
           .eq("id", data.sport_id)
           .single();
         if (sportInfo) {
           sportName = sportInfo.name || sportName;
           sportLabel = sportInfo.name_fr || sportLabel;
+          sportIconName = sportInfo.icon ?? null;
         }
       }
 
@@ -152,6 +147,7 @@ export default function WorkoutDetailPage({
         sport_id: data.sport_id,
         sport_name: sportName,
         sport_label: sportLabel,
+        sport_icon: sportIconName,
         planned_duration_minutes: data.planned_duration_minutes,
         actual_duration_minutes: data.actual_duration_minutes,
         planned_distance_km: data.planned_distance_km,
@@ -194,8 +190,7 @@ export default function WorkoutDetailPage({
   }
 
   const sportColor = getSportColor(activity.sport_name);
-  const sportIcon =
-    sportIconMap[activity.sport_name] ?? activity.sport_label[0];
+  const SportIcon = getSportIconComponent(activity.sport_icon ?? undefined);
   const date = new Date(activity.scheduled_date).toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
@@ -267,11 +262,9 @@ export default function WorkoutDetailPage({
     const seconds = Math.round(secondsPerKm % 60);
     return `${minutes}'${String(seconds).padStart(2, "0")}" /km`;
   };
-  const ngpSeconds =
+  const averagePaceSeconds =
     normalizedPaceSeconds ??
-    (isRunning && elapsedTimeSeconds && distanceKm
-      ? elapsedTimeSeconds / distanceKm
-      : null);
+    (elapsedTimeSeconds && distanceKm ? elapsedTimeSeconds / distanceKm : null);
   const intensityFactorPower =
     normalizedPower && ftpWatts ? normalizedPower / ftpWatts : null;
   const intensityFactorHeart =
@@ -293,77 +286,133 @@ export default function WorkoutDetailPage({
     normalizedPower && averagePower && averagePower > 0
       ? normalizedPower / averagePower
       : null;
-  const trainingDataEntries: {
+  const elevationGain =
+    typeof activity.elevation_gain_m === "number"
+      ? activity.elevation_gain_m
+      : null;
+  const getRawNumber = (key: string) =>
+    typeof rawData?.[key] === "number" ? (rawData[key] as number) : null;
+  const calories =
+    getRawNumber("calories") ??
+    getRawNumber("kcal") ??
+    getRawNumber("calories_kcal") ??
+    getRawNumber("estimated_calories");
+  type ComparisonRow = {
     label: string;
-    value: string;
     helper?: string;
-  }[] = [];
+    planned?: string | null;
+    actual?: string | null;
+  };
 
-  if (activity.tss !== null && activity.tss !== undefined) {
-    trainingDataEntries.push({
-      label: "TSS",
-      value: `${activity.tss}`,
-      helper: "Training Stress Score",
-    });
-  }
-  if (intensityFactor && (isCycling || isRunning)) {
-    trainingDataEntries.push({
-      label: "IF",
-      value: intensityFactor.toFixed(2),
-      helper: intensitySource ? `Basé sur ${intensitySource}` : undefined,
-    });
-  }
-  if (isCycling && normalizedPower) {
-    trainingDataEntries.push({
-      label: "NP",
-      value: `${Math.round(normalizedPower)} W`,
-      helper: "Normalized Power",
-    });
-  }
-  if (isCycling && variabilityIndex) {
-    trainingDataEntries.push({
-      label: "VI",
-      value: variabilityIndex.toFixed(2),
-      helper: "Variation Index (NP / puissance moyenne)",
-    });
-  }
-  if (isRunning && ngpSeconds) {
-    trainingDataEntries.push({
-      label: "NGP",
-      value: formatPaceValue(ngpSeconds),
-      helper: "Normalized Graded Pace",
-    });
-  }
-  if (durationMinutesValue !== null) {
-    trainingDataEntries.push({
+  const plannedDurationMinutes = activity.planned_duration_minutes;
+  const plannedDistanceKm = activity.planned_distance_km;
+  const plannedDurationString =
+    typeof plannedDurationMinutes === "number"
+      ? formatDurationValue(plannedDurationMinutes)
+      : null;
+  const plannedDistanceString =
+    typeof plannedDistanceKm === "number"
+      ? formatDistance(plannedDistanceKm)
+      : null;
+  const plannedPaceSeconds =
+    typeof plannedDurationMinutes === "number" &&
+    typeof plannedDistanceKm === "number" &&
+    plannedDistanceKm > 0
+      ? (plannedDurationMinutes * 60) / plannedDistanceKm
+      : null;
+  const plannedPaceString =
+    plannedPaceSeconds !== null ? formatPaceValue(plannedPaceSeconds) : null;
+  const actualDurationString =
+    durationMinutesValue !== null
+      ? formatDurationValue(durationMinutesValue)
+      : null;
+  const actualMovingString =
+    movingMinutesValue !== null
+      ? formatDurationValue(movingMinutesValue)
+      : null;
+  const actualDistanceString =
+    distanceKm !== null ? formatDistance(distanceKm) : null;
+  const actualPaceString =
+    averagePaceSeconds !== null ? formatPaceValue(averagePaceSeconds) : null;
+
+  const comparisonRows: ComparisonRow[] = [
+    {
       label: "Durée totale",
-      value: formatDurationValue(durationMinutesValue),
       helper: elapsedTimeSeconds
         ? "Inclut les pauses"
         : "Durée réelle rapportée",
-    });
-  }
-  if (movingMinutesValue !== null) {
-    trainingDataEntries.push({
+      planned: plannedDurationString,
+      actual: actualDurationString,
+    },
+    {
       label: "Moving time",
-      value: formatDurationValue(movingMinutesValue),
       helper: "Temps passé en mouvement",
-    });
-  }
-  if (distanceKm !== null) {
-    trainingDataEntries.push({
+      actual: actualMovingString,
+    },
+    {
       label: "Distance",
-      value: formatDistance(distanceKm),
       helper: "Distance effectuée",
-    });
-  }
-  if (isCycling && workKilojoules !== null) {
-    trainingDataEntries.push({
+      planned: plannedDistanceString,
+      actual: actualDistanceString,
+    },
+    {
+      label: "Moyenne / rythme moyen",
+      helper: "Rythme moyen sur la distance parcourue",
+      planned: plannedPaceString,
+      actual: actualPaceString,
+    },
+    {
+      label: "NP",
+      helper: "Normalized Power",
+      actual:
+        isCycling && normalizedPower
+          ? `${Math.round(normalizedPower)} W`
+          : null,
+    },
+    {
+      label: "VI",
+      helper: "Variation Index (NP / puissance moyenne)",
+      actual:
+        isCycling && variabilityIndex ? variabilityIndex.toFixed(2) : null,
+    },
+    {
       label: "Work",
-      value: `${Math.round(workKilojoules)} kJ`,
       helper: "Travail énergétique",
-    });
-  }
+      actual:
+        isCycling && workKilojoules !== null
+          ? `${Math.round(workKilojoules)} kJ`
+          : null,
+    },
+    {
+      label: "Calories",
+      helper: "Énergie dépensée estimée",
+      actual: calories !== null ? `${Math.round(calories)} kcal` : null,
+    },
+    {
+      label: "Dénivelé",
+      helper: "Gain d'altitude",
+      actual:
+        elevationGain !== null ? `${Math.round(elevationGain)} m` : null,
+    },
+    {
+      label: "TSS",
+      helper: "Training Stress Score",
+      actual:
+        activity.tss !== null && activity.tss !== undefined
+          ? `${activity.tss}`
+          : null,
+    },
+    {
+      label: "IF",
+      helper: intensitySource
+        ? `Basé sur ${intensitySource}`
+        : undefined,
+      actual:
+        intensityFactor && (isCycling || isRunning)
+          ? intensityFactor.toFixed(2)
+          : null,
+    },
+  ].filter((row) => row.planned || row.actual);
   const totalDuration = Math.max(actualDuration ?? plannedDuration ?? 60, 15);
   const warmupMinutes = Math.max(8, Math.round(totalDuration * 0.15));
   const mainMinutes = Math.max(10, Math.round(totalDuration * 0.55));
@@ -441,7 +490,7 @@ export default function WorkoutDetailPage({
                 className="h-16 w-16 rounded-2xl flex items-center justify-center text-3xl"
                 style={{ backgroundColor: sportColor }}
               >
-                <span role="presentation">{sportIcon}</span>
+                <SportIcon className="h-8 w-8" aria-hidden="true" />
               </div>
               <div className="flex-1 space-y-1">
                 <div>
@@ -480,21 +529,36 @@ export default function WorkoutDetailPage({
                 Données d&apos;entraînement
               </h3>
               <span className="text-xs uppercase text-muted">
-                {trainingDataEntries.length ? "Détails" : "Relevé indisponible"}
+                {comparisonRows.length ? "Détails" : "Relevé indisponible"}
               </span>
             </div>
-            {trainingDataEntries.length ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {trainingDataEntries.map((entry) => (
+            {comparisonRows.length ? (
+              <div className="grid gap-3">
+                {comparisonRows.map((row) => (
                   <div
-                    key={entry.label}
-                    className="rounded-2xl border border-dark-200 bg-dark-100 p-4 space-y-1"
+                    key={row.label}
+                    className="rounded-2xl border border-dark-200 bg-dark-100 p-4 shadow-inner"
                   >
-                    <p className="text-xs uppercase text-muted">{entry.label}</p>
-                    <p className="text-lg font-semibold">{entry.value}</p>
-                    {entry.helper && (
-                      <p className="text-xs text-muted">{entry.helper}</p>
-                    )}
+                    <div>
+                      <p className="text-xs uppercase text-muted">{row.label}</p>
+                      {row.helper && (
+                        <p className="text-xs text-muted">{row.helper}</p>
+                      )}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-xs uppercase text-muted">Prévu</p>
+                        <p className="text-lg font-semibold">
+                          {row.planned ?? "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-muted">Réalisé</p>
+                        <p className="text-lg font-semibold">
+                          {row.actual ?? "—"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
