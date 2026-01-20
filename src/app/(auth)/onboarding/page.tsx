@@ -22,7 +22,7 @@ import {
   Calendar,
   Trophy,
 } from "lucide-react";
-import * as LucideIcons from "lucide-react";
+import { getSportIconComponent } from "@/lib/sport-icons";
 
 type OnboardingStep = 1 | 2 | 3 | 4;
 
@@ -155,23 +155,6 @@ const SPORT_CATEGORIES = [
 ] as const;
 
 type SportCategoryId = (typeof SPORT_CATEGORIES)[number]["id"];
-
-const formatIconName = (icon?: string) => {
-  if (!icon) return "";
-  return icon
-    .replace(/[_\s]+/g, "-")
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("");
-};
-
-const getSportIconComponent = (icon?: string): React.ElementType => {
-  const formatted = formatIconName(icon);
-  if (!formatted) return Activity;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const IconComponent = (LucideIcons as any)[formatted];
-  return IconComponent || Activity;
-};
 
 const getSportCategory = (sportName: string): SportCategoryId => {
   const normalized = sportName.toLowerCase();

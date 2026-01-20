@@ -18,6 +18,7 @@ import {
   Filter,
 } from "lucide-react";
 import { cn, formatDuration, getSportColor } from "@/lib/utils";
+import { getSportIconComponent } from "@/lib/sport-icons";
 import type { IntegrationProvider } from "@/types/database";
 
 interface Activity {
@@ -36,6 +37,8 @@ interface Activity {
   sport: {
     name: string;
     name_fr: string;
+    color?: string;
+    icon?: string | null;
   };
 }
 
@@ -110,7 +113,7 @@ export default function WorkoutsPage() {
           tss,
           source,
           intensity,
-          sports (name, name_fr)
+          sports (name, name_fr, color, icon)
         `,
           { count: "exact" }
         )
@@ -182,6 +185,8 @@ export default function WorkoutsPage() {
             sport: {
               name: a.sports?.name || "other",
               name_fr: a.sports?.name_fr || "Autre",
+              color: a.sports?.color,
+              icon: a.sports?.icon,
             },
           }))
         );
@@ -397,7 +402,9 @@ export default function WorkoutsPage() {
           <div className="space-y-4 lg:hidden">
             {activities.map((activity) => {
               const dateInfo = formatDate(activity.scheduled_date);
-              const sportColor = getSportColor(activity.sport.name);
+              const sportColor =
+                activity.sport.color ?? getSportColor(activity.sport.name);
+              const SportIcon = getSportIconComponent(activity.sport.icon ?? undefined);
 
               return (
                 <Link
@@ -413,9 +420,12 @@ export default function WorkoutsPage() {
                             {dateInfo.month} {dateInfo.day} • {dateInfo.time}
                           </p>
                           <h3 className="font-semibold">{activity.title}</h3>
-                          <p className="text-xs text-muted">
-                            {activity.sport.name_fr}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <SportIcon className="h-4 w-4 text-accent" />
+                            <p className="text-xs text-muted">
+                              {activity.sport.name_fr}
+                            </p>
+                          </div>
                         </div>
                         <Badge
                           variant="outline"
@@ -498,7 +508,9 @@ export default function WorkoutsPage() {
             <div className="divide-y divide-dark-200">
               {activities.map((activity) => {
                 const dateInfo = formatDate(activity.scheduled_date);
-                const sportColor = getSportColor(activity.sport.name);
+                const sportColor =
+                  activity.sport.color ?? getSportColor(activity.sport.name);
+                const SportIcon = getSportIconComponent(activity.sport.icon ?? undefined);
 
                 return (
                   <Link
@@ -520,10 +532,7 @@ export default function WorkoutsPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span
-                            className="h-4 w-4 rounded-full"
-                            style={{ backgroundColor: sportColor }}
-                          />
+                          <SportIcon className="h-4 w-4 text-accent" />
                           <h3 className="font-medium">{activity.title}</h3>
                         </div>
                         <p className="text-sm text-muted">
