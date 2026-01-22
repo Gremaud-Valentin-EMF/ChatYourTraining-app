@@ -11,11 +11,12 @@ export interface SelectProps
   hint?: string;
   options: { value: string; label: string }[];
   placeholder?: string;
+  hideChevron?: boolean;
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
-    { className, label, error, hint, options, placeholder, id, ...props },
+    { className, label, error, hint, options, placeholder, id, hideChevron, ...props },
     ref
   ) => {
     const selectId = id || label?.toLowerCase().replace(/\s/g, "-");
@@ -56,7 +57,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
               </option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+          {!hideChevron && (
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+          )}
         </div>
         {error && <p className="mt-1.5 text-sm text-error">{error}</p>}
         {hint && !error && <p className="mt-1.5 text-sm text-muted">{hint}</p>}

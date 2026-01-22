@@ -17,5 +17,6 @@ export { Slider, type SliderProps } from "./slider";
 export { Progress, type ProgressProps } from "./progress";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
 export { Modal, type ModalProps } from "./modal";
+export { DeleteConfirmationModal, type DeleteConfirmationModalProps } from "./delete-confirmation-modal";
 export { ChartContainer, type ChartConfig } from "./chart";
 export { Spinner } from "./spinner";

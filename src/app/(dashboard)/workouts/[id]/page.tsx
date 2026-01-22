@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Card, Badge, Button, Spinner, Slider } from "@/components/ui";
-import { ArrowLeft, Activity } from "lucide-react";
+import {
+  Card,
+  Badge,
+  Button,
+  Spinner,
+  Slider,
+  DeleteConfirmationModal,
+} from "@/components/ui";
+import { ArrowLeft, Activity, Check, Trash } from "lucide-react";
 import {
   formatDuration,
   formatDistance,
@@ -47,6 +54,11 @@ interface ActivityDetail {
   raw_data: Json | null;
 }
 
+const parseLocalDate = (dateStr: string) => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export default function WorkoutDetailPage({
   params,
 }: {
@@ -60,6 +72,14 @@ export default function WorkoutDetailPage({
   const [lthrValue, setLthrValue] = useState<number | null>(null);
   const [rpeInput, setRpeInput] = useState<number>(0);
   const [isSavingRpe, setIsSavingRpe] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isMarkingDone, setIsMarkingDone] = useState(false);
+  const today = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }, []);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     loadActivity();
@@ -196,6 +216,77 @@ export default function WorkoutDetailPage({
     }
   };
 
+  const handleMarkAsDone = async () => {
+    if (!activity) return;
+    const scheduledDate = parseLocalDate(activity.scheduled_date);
+    scheduledDate.setHours(0, 0, 0, 0);
+    if (activity.status !== "planned" || scheduledDate.getTime() > today.getTime())
+      return;
+
+    setIsMarkingDone(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase
+        .from("activities")
+        .update({
+          status: "completed",
+          actual_duration_minutes:
+            activity.actual_duration_minutes ?? activity.planned_duration_minutes,
+          actual_distance_km:
+            activity.actual_distance_km ?? activity.planned_distance_km,
+        })
+        .eq("id", activity.id)
+        .eq("user_id", user.id);
+
+      setActivity((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "completed",
+              actual_duration_minutes:
+                prev.actual_duration_minutes ?? prev.planned_duration_minutes ?? null,
+              actual_distance_km:
+                prev.actual_distance_km ?? prev.planned_distance_km ?? null,
+            }
+          : prev
+      );
+    } catch (error) {
+      console.error("Error marking activity as done:", error);
+    } finally {
+      setIsMarkingDone(false);
+    }
+  };
+
+  const openDeleteModal = () => setIsDeleteModalOpen(true);
+
+  const handleDeleteActivity = async () => {
+    if (!activity) return;
+    setIsDeleting(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase
+        .from("activities")
+        .delete()
+        .eq("id", activity.id)
+        .eq("user_id", user.id);
+
+      setIsDeleteModalOpen(false);
+      router.push("/workouts");
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -220,11 +311,16 @@ export default function WorkoutDetailPage({
 
   const sportColor = getSportColor(activity.sport_name);
   const SportIcon = getSportIconComponent(activity.sport_icon ?? undefined);
-  const date = new Date(activity.scheduled_date).toLocaleDateString("fr-FR", {
+  const scheduledDateLocal = parseLocalDate(activity.scheduled_date);
+  const date = scheduledDateLocal.toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
   });
+  const normalizedScheduled = new Date(scheduledDateLocal);
+  normalizedScheduled.setHours(0, 0, 0, 0);
+  const canMarkAsDone =
+    activity.status === "planned" && normalizedScheduled <= today;
   type BadgeVariant =
     | "default"
     | "success"
@@ -624,6 +720,19 @@ export default function WorkoutDetailPage({
                 </div>
               </section>
             )}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {canMarkAsDone && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleMarkAsDone}
+                  isLoading={isMarkingDone}
+                  leftIcon={<Check className="h-4 w-4" />}
+                >
+                  Marquer comme fait
+                </Button>
+              )}
+            </div>
           </header>
 
           <section className="space-y-3">
@@ -782,8 +891,36 @@ export default function WorkoutDetailPage({
               </p>
             )}
           </section>
+          <section className="space-y-3 border-t border-dark-200 pt-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs uppercase text-muted">
+                  Suppression définitive
+                </p>
+                <p className="text-sm text-muted">
+                  L&apos;entraînement sera supprimé de votre historique.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openDeleteModal}
+                leftIcon={<Trash className="h-4 w-4" />}
+                className="border-error text-error hover:bg-error/10 focus:ring-error"
+              >
+                Supprimer la séance
+              </Button>
+            </div>
+          </section>
         </div>
       </Card>
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteActivity}
+        isLoading={isDeleting}
+        description={`Supprimer la séance "${activity.title}" et toutes ses données est définitif.`}
+      />
     </div>
   );
 }

@@ -1,23 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { ChangeEvent, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Card, Button, Badge, Input, Select, Spinner } from "@/components/ui";
+import {
+  Card,
+  Button,
+  Badge,
+  Input,
+  Select,
+  Spinner,
+  Modal,
+  DeleteConfirmationModal,
+} from "@/components/ui";
 import {
   Plus,
   Download,
   Search,
   Clock,
   MapPin,
-  Mountain,
   Heart,
   Zap,
   ChevronRight,
   ChevronLeft,
   Filter,
+  Trash,
 } from "lucide-react";
-import { cn, formatDuration, getSportColor } from "@/lib/utils";
+import {
+  cn,
+  formatDuration,
+  getSportColor,
+  toLocalDateString,
+} from "@/lib/utils";
 import { getSportIconComponent } from "@/lib/sport-icons";
 import type { IntegrationProvider } from "@/types/database";
 
@@ -34,12 +48,19 @@ interface Activity {
   tss: number | null;
   source: IntegrationProvider;
   intensity: string | null;
+  description?: string | null;
   sport: {
     name: string;
     name_fr: string;
     color?: string;
     icon?: string | null;
   };
+}
+
+interface SportOption {
+  id: string;
+  name: string;
+  name_fr: string;
 }
 
 const sourceColors: Record<IntegrationProvider, string> = {
@@ -55,6 +76,39 @@ const sourceLabels: Record<IntegrationProvider, string> = {
   garmin: "GARMIN",
   manual: "MANUEL",
 };
+
+const intensityLabels: Record<string, string> = {
+  recovery: "Récupération",
+  endurance: "Endurance",
+  tempo: "Tempo",
+  threshold: "Seuil",
+  vo2max: "VO2Max",
+  anaerobic: "Anaérobie",
+};
+
+const intensityOrder = [
+  "recovery",
+  "endurance",
+  "tempo",
+  "threshold",
+  "vo2max",
+  "anaerobic",
+];
+
+const formatIntensityLabel = (value: string) => {
+  const normalized = value.replace(/_/g, " ");
+  const label = intensityLabels[value];
+  if (label) {
+    return label;
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const manualIntensityOptions = intensityOrder.map((value) => ({
+  value,
+  label: formatIntensityLabel(value),
+}));
 
 type PeriodFilter = "all" | "week" | "month" | "3months";
 type ActivityFilters = {
@@ -73,6 +127,27 @@ export default function WorkoutsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
 
+  const getDefaultSessionState = () => ({
+    title: "",
+    sportId: "",
+    date: toLocalDateString(new Date()),
+    duration: "",
+    distance: "",
+    intensity: "endurance",
+  });
+
+  const [sports, setSports] = useState<SportOption[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [newSession, setNewSession] = useState(getDefaultSessionState);
+  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(
+    null
+  );
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+
   // Filters
   const [filters, setFilters] = useState<ActivityFilters>({
     period: "all",
@@ -84,10 +159,92 @@ export default function WorkoutsPage() {
   const pageSize = 10;
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  const applyFilterChanges = (changes: Partial<ActivityFilters>) => {
+    setFilters((prev) => ({ ...prev, ...changes }));
+    setCurrentPage(1);
+  };
+
+  const sportOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    activities.forEach((activity) => {
+      const name = activity.sport?.name;
+      if (!name) return;
+      if (!map.has(name)) {
+        map.set(name, activity.sport.name_fr || name);
+      }
+    });
+
+    const sorted = Array.from(map.entries()).sort((a, b) =>
+      a[1].localeCompare(b[1], "fr")
+    );
+
+    return [
+      { value: "all", label: "Tous sports" },
+      ...sorted.map(([value, label]) => ({ value, label })),
+    ];
+  }, [activities]);
+
+  const sourceOptions = useMemo(() => {
+    const uniqueSources = new Set<IntegrationProvider>();
+    activities.forEach((activity) => {
+      uniqueSources.add(activity.source);
+    });
+
+    const sortedSources = Array.from(uniqueSources).sort((a, b) =>
+      sourceLabels[a].localeCompare(sourceLabels[b], "fr")
+    );
+
+    return [
+      { value: "all", label: "Toutes sources" },
+      ...sortedSources.map((source) => ({
+        value: source,
+        label: sourceLabels[source],
+      })),
+    ];
+  }, [activities]);
+
+  const intensityOptions = useMemo(() => {
+    const intensities = Array.from(
+      new Set(
+        activities
+          .map((activity) => activity.intensity)
+          .filter(Boolean) as string[]
+      )
+    );
+
+    const sortedIntensities = intensities.sort((a, b) => {
+      const aIndex = intensityOrder.indexOf(a);
+      const bIndex = intensityOrder.indexOf(b);
+      if (aIndex === bIndex) {
+        return a.localeCompare(b, "fr");
+      }
+      if (aIndex === -1) {
+        return 1;
+      }
+      if (bIndex === -1) {
+        return -1;
+      }
+      return aIndex - bIndex;
+    });
+
+    return [
+      { value: "all", label: "Toutes intensités" },
+      ...sortedIntensities.map((value) => ({
+        value,
+        label: formatIntensityLabel(value),
+      })),
+    ];
+  }, [activities]);
+
   useEffect(() => {
     loadActivities();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, filters]);
+  }, [currentPage, filters, searchQuery]);
+
+  useEffect(() => {
+    loadSports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadActivities = async () => {
     setIsLoading(true);
@@ -103,6 +260,7 @@ export default function WorkoutsPage() {
           `
           id,
           title,
+          description,
           scheduled_date,
           status,
           actual_duration_minutes,
@@ -146,12 +304,24 @@ export default function WorkoutsPage() {
         );
       }
 
+      if (filters.sport !== "all") {
+        query = query.eq("sports.name", filters.sport);
+      }
+
       if (filters.source !== "all") {
         query = query.eq("source", filters.source);
       }
 
       if (filters.intensity !== "all") {
         query = query.eq("intensity", filters.intensity);
+      }
+
+      const trimmedSearch = searchQuery.trim();
+      if (trimmedSearch) {
+        const searchValue = `%${trimmedSearch}%`;
+        query = query.or(
+          `title.ilike.${searchValue},description.ilike.${searchValue},intensity.ilike.${searchValue}`
+        );
       }
 
       // Pagination
@@ -167,6 +337,7 @@ export default function WorkoutsPage() {
           data.map((a: any) => ({
             id: a.id,
             title: a.title,
+            description: a.description,
             sport_id: a.sport_id,
             scheduled_date: a.scheduled_date,
             completed_date: a.completed_date,
@@ -197,6 +368,101 @@ export default function WorkoutsPage() {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSports = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("sports")
+        .select("id, name, name_fr")
+        .order("name_fr");
+
+      if (error) {
+        throw error;
+      }
+
+      setSports(data ?? []);
+    } catch (error) {
+      console.error("Error loading sports:", error);
+    }
+  };
+
+  const refreshActivitiesFromFirstPage = async () => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+      return;
+    }
+
+    await loadActivities();
+  };
+
+  const handleOpenModal = () => {
+    setNewSession(getDefaultSessionState());
+    setIsModalOpen(true);
+  };
+
+  const handleCreateSession = async () => {
+    if (!newSession.title || !newSession.sportId || !newSession.date) return;
+    setIsSavingSession(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.from("activities").insert({
+        user_id: user.id,
+        title: newSession.title,
+        sport_id: newSession.sportId,
+        scheduled_date: newSession.date,
+        planned_duration_minutes: newSession.duration
+          ? parseInt(newSession.duration, 10)
+          : null,
+        planned_distance_km: newSession.distance
+          ? parseFloat(newSession.distance)
+          : null,
+        intensity: newSession.intensity,
+        status: "planned",
+      });
+
+      setIsModalOpen(false);
+      setNewSession(getDefaultSessionState());
+      await refreshActivitiesFromFirstPage();
+    } catch (error) {
+      console.error("Error creating session:", error);
+    } finally {
+      setIsSavingSession(false);
+    }
+  };
+
+  const openDeleteModal = (activity: Activity) =>
+    setDeleteTarget({ id: activity.id, title: activity.title });
+
+  const closeDeleteModal = () => setDeleteTarget(null);
+
+  const handleDeleteActivity = async () => {
+    const activityId = deleteTarget?.id;
+    if (!activityId) return;
+    setDeletingActivityId(activityId);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase
+        .from("activities")
+        .delete()
+        .eq("id", activityId)
+        .eq("user_id", user.id);
+
+      await refreshActivitiesFromFirstPage();
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+    } finally {
+      setDeletingActivityId(null);
     }
   };
 
@@ -271,6 +537,23 @@ export default function WorkoutsPage() {
     (v) => v !== "all"
   ).length;
 
+  const visiblePageCount = Math.min(3, totalPages);
+  const paginationStart =
+    totalPages <= visiblePageCount
+      ? 1
+      : Math.max(
+          1,
+          Math.min(currentPage - 1, totalPages - visiblePageCount + 1)
+        );
+  const paginationPages = Array.from(
+    { length: visiblePageCount },
+    (_, index) => paginationStart + index
+  );
+  const paginationEnd =
+    paginationPages[paginationPages.length - 1] || paginationStart;
+  const showStartEllipsis = paginationStart > 1;
+  const showEndEllipsis = paginationEnd < totalPages;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -288,6 +571,7 @@ export default function WorkoutsPage() {
             variant="primary"
             leftIcon={<Plus className="h-4 w-4" />}
             className="w-full sm:w-auto"
+            onClick={handleOpenModal}
           >
             Ajouter manuel
           </Button>
@@ -303,85 +587,93 @@ export default function WorkoutsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
-          <Input
-            placeholder="Rechercher une session, un sport..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+            <Input
+              placeholder="Rechercher un titre, une description ou un objectif"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(activeFiltersCount > 0 && "text-accent")}
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              Filtres
+              {activeFiltersCount > 0 && (
+                <Badge variant="success" size="sm" className="ml-2">
+                  {activeFiltersCount}
+                </Badge>
+              )}
+            </Button>
+
+            {activeFiltersCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Réinitialiser
+              </Button>
+            )}
+          </div>
         </div>
-
-        <Select
-          options={[
-            { value: "all", label: "Toutes périodes" },
-            { value: "week", label: "7 derniers jours" },
-            { value: "month", label: "Ce mois" },
-            { value: "3months", label: "3 derniers mois" },
-          ]}
-          value={filters.period}
-          onChange={(e) =>
-            setFilters({
-              ...filters,
-              period: e.target.value as PeriodFilter,
-            })
-          }
-          className="w-full sm:w-40"
-        />
-
-        <Select
-          options={[
-            { value: "all", label: "Tous sports" },
-            { value: "running", label: "Course" },
-            { value: "cycling", label: "Vélo" },
-            { value: "swimming", label: "Natation" },
-            { value: "strength", label: "Renforcement" },
-          ]}
-          value={filters.sport}
-          onChange={(e) => setFilters({ ...filters, sport: e.target.value })}
-          className="w-full sm:w-36"
-        />
-
-        <Select
-          options={[
-            { value: "all", label: "Toutes sources" },
-            { value: "strava", label: "Strava" },
-            { value: "garmin", label: "Garmin" },
-            { value: "whoop", label: "WHOOP" },
-            { value: "manual", label: "Manuel" },
-          ]}
-          value={filters.source}
-          onChange={(e) =>
-            setFilters({
-              ...filters,
-              source: e.target.value as "all" | IntegrationProvider,
-            })
-          }
-          className="w-full sm:w-40"
-        />
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-          className={cn(activeFiltersCount > 0 && "text-accent")}
-        >
-          <Filter className="h-4 w-4 mr-1" />
-          Filtres
-          {activeFiltersCount > 0 && (
-            <Badge variant="success" size="sm" className="ml-2">
-              {activeFiltersCount}
-            </Badge>
-          )}
-        </Button>
-
-        {activeFiltersCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            Réinitialiser
-          </Button>
-        )}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              key: "period",
+              options: [
+                { value: "all", label: "Toutes périodes" },
+                { value: "week", label: "7 derniers jours" },
+                { value: "month", label: "Ce mois" },
+                { value: "3months", label: "3 derniers mois" },
+              ],
+              value: filters.period,
+              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
+                applyFilterChanges({
+                  period: e.target.value as PeriodFilter,
+                }),
+            },
+            {
+              key: "sport",
+              options: sportOptions,
+              value: filters.sport,
+              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
+                applyFilterChanges({ sport: e.target.value }),
+            },
+            {
+              key: "source",
+              options: sourceOptions,
+              value: filters.source,
+              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
+                applyFilterChanges({
+                  source: e.target.value as "all" | IntegrationProvider,
+                }),
+            },
+            {
+              key: "intensity",
+              options: intensityOptions,
+              value: filters.intensity,
+              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
+                applyFilterChanges({ intensity: e.target.value }),
+            },
+          ].map((config) => (
+            <Select
+              key={config.key}
+              options={config.options}
+              value={config.value}
+              onChange={config.onChange}
+              className="w-full"
+              hideChevron
+            />
+          ))}
+        </div>
       </div>
 
       {/* Activities List */}
@@ -393,7 +685,7 @@ export default function WorkoutsPage() {
         <div className="text-center py-12">
           <p className="text-muted mb-4">Aucune activité trouvée</p>
           <Button variant="secondary" leftIcon={<Plus className="h-4 w-4" />}>
-            Ajouter votre première séance
+            Ajouter une nouvelle séance
           </Button>
         </div>
       ) : (
@@ -404,7 +696,9 @@ export default function WorkoutsPage() {
               const dateInfo = formatDate(activity.scheduled_date);
               const sportColor =
                 activity.sport.color ?? getSportColor(activity.sport.name);
-              const SportIcon = getSportIconComponent(activity.sport.icon ?? undefined);
+              const SportIcon = getSportIconComponent(
+                activity.sport.icon ?? undefined
+              );
 
               return (
                 <Link
@@ -462,10 +756,6 @@ export default function WorkoutsPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Mountain className="h-4 w-4 text-muted" />
-                        <span>{activity.elevation_gain_m || "--"}m</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
                         <Heart className="h-4 w-4 text-error" />
                         <span>
                           {activity.avg_hr || "--"}
@@ -474,19 +764,29 @@ export default function WorkoutsPage() {
                           </span>
                         </span>
                       </div>
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="h-4 w-4 text-muted" />
+                        <span>
+                          {activity.tss ?? "--"}
+                          <span className="text-muted"> TSS</span>
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <Badge
-                        variant={
-                          activity.tss && activity.tss > 100
-                            ? "error"
-                            : "warning"
-                        }
-                      >
-                        <Zap className="h-3 w-3 mr-1" />
-                        {activity.tss || "--"} TSS
-                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        aria-label="Supprimer la séance"
+                        isLoading={deletingActivityId === activity.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openDeleteModal(activity);
+                        }}
+                        leftIcon={<Trash className="h-4 w-4 text-muted" />}
+                      />
                       <ChevronRight className="h-4 w-4 text-muted" />
                     </div>
                   </Card>
@@ -510,7 +810,9 @@ export default function WorkoutsPage() {
                 const dateInfo = formatDate(activity.scheduled_date);
                 const sportColor =
                   activity.sport.color ?? getSportColor(activity.sport.name);
-                const SportIcon = getSportIconComponent(activity.sport.icon ?? undefined);
+                const SportIcon = getSportIconComponent(
+                  activity.sport.icon ?? undefined
+                );
 
                 return (
                   <Link
@@ -557,10 +859,6 @@ export default function WorkoutsPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Mountain className="h-4 w-4 text-muted" />
-                        <span>{activity.elevation_gain_m || "--"}m</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
                         <Heart className="h-4 w-4 text-error" />
                         <span>
                           {activity.avg_hr || "--"}
@@ -569,16 +867,13 @@ export default function WorkoutsPage() {
                           </span>
                         </span>
                       </div>
-                      <Badge
-                        variant={
-                          activity.tss && activity.tss > 100
-                            ? "error"
-                            : "warning"
-                        }
-                      >
-                        <Zap className="h-3 w-3 mr-1" />
-                        {activity.tss || "--"} TSS
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="h-4 w-4 text-muted" />
+                        <span>
+                          {activity.tss ?? "--"}
+                          <span className="text-muted"> TSS</span>
+                        </span>
+                      </div>
                     </div>
 
                     <div className="col-span-2">
@@ -594,6 +889,19 @@ export default function WorkoutsPage() {
                     </div>
 
                     <div className="col-span-2 flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        aria-label="Supprimer la séance"
+                        isLoading={deletingActivityId === activity.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openDeleteModal(activity);
+                        }}
+                        leftIcon={<Trash className="h-4 w-4 text-muted" />}
+                      />
                       <ChevronRight className="h-4 w-4 text-muted" />
                     </div>
                   </Link>
@@ -610,58 +918,143 @@ export default function WorkoutsPage() {
             variant="ghost"
             size="icon"
             disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            leftIcon={<ChevronLeft className="h-4 w-4" />}
+          />
 
-          {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-            let pageNum: number;
-            if (totalPages <= 5) {
-              pageNum = i + 1;
-            } else if (currentPage <= 3) {
-              pageNum = i + 1;
-            } else if (currentPage >= totalPages - 2) {
-              pageNum = totalPages - 4 + i;
-            } else {
-              pageNum = currentPage - 2 + i;
-            }
-
-            return (
+          <>
+            {showStartEllipsis && <span className="text-muted">...</span>}
+            {paginationPages.map((pageNum) => (
               <Button
                 key={pageNum}
                 variant={currentPage === pageNum ? "primary" : "ghost"}
-                size="icon"
+                size="sm"
                 onClick={() => setCurrentPage(pageNum)}
               >
                 {pageNum}
               </Button>
-            );
-          })}
-
-          {totalPages > 5 && currentPage < totalPages - 2 && (
-            <>
-              <span className="text-muted">...</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCurrentPage(totalPages)}
-              >
-                {totalPages}
-              </Button>
-            </>
-          )}
+            ))}
+            {showEndEllipsis && (
+              <>
+                <span className="text-muted">...</span>
+                <Button
+                  key={`page-end-${totalPages}`}
+                  variant={currentPage === totalPages ? "primary" : "ghost"}
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                >
+                  {totalPages}
+                </Button>
+              </>
+            )}
+          </>
 
           <Button
             variant="ghost"
             size="icon"
             disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            leftIcon={<ChevronRight className="h-4 w-4" />}
+          />
         </div>
       )}
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Ajouter une séance"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Titre"
+            placeholder="Séance tempo, renouvellement, sortie longue..."
+            value={newSession.title}
+            onChange={(e) =>
+              setNewSession((prev) => ({ ...prev, title: e.target.value }))
+            }
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Date"
+              type="date"
+              className="w-full"
+              value={newSession.date}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, date: e.target.value }))
+              }
+            />
+            <Select
+              label="Sport"
+              value={newSession.sportId}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, sportId: e.target.value }))
+              }
+              placeholder="Choisissez un sport"
+              options={sports.map((sport) => ({
+                value: sport.id,
+                label: sport.name_fr || sport.name,
+              }))}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Durée (minutes)"
+              type="number"
+              min={0}
+              value={newSession.duration}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, duration: e.target.value }))
+              }
+            />
+            <Input
+              label="Distance (km)"
+              type="number"
+              min={0}
+              step="0.1"
+              value={newSession.distance}
+              onChange={(e) =>
+                setNewSession((prev) => ({ ...prev, distance: e.target.value }))
+              }
+            />
+          </div>
+          <Select
+            label="Intensité"
+            value={newSession.intensity}
+            onChange={(e) =>
+              setNewSession((prev) => ({ ...prev, intensity: e.target.value }))
+            }
+            options={manualIntensityOptions}
+          />
+
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateSession}
+              isLoading={isSavingSession}
+              disabled={
+                !newSession.title || !newSession.date || !newSession.sportId
+              }
+            >
+              Ajouter
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <DeleteConfirmationModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={closeDeleteModal}
+        onConfirm={handleDeleteActivity}
+        isLoading={Boolean(deletingActivityId)}
+        description={
+          deleteTarget
+            ? `Supprimer la séance "${deleteTarget.title}" est irrémédiable.`
+            : undefined
+        }
+      />
     </div>
   );
 }
