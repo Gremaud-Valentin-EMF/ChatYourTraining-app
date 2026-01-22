@@ -183,7 +183,10 @@ export default function DashboardLayout({
       </div>
 
       {/* Bottom navigation for mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-dark-50 border-t border-dark-200 px-4 py-2 z-40">
+      <nav
+        className="lg:hidden fixed inset-x-0 bottom-0 bg-dark-50 border-t border-dark-200 px-4 py-2 z-40"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0)" }}
+      >
         <div className="flex items-center justify-around">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
