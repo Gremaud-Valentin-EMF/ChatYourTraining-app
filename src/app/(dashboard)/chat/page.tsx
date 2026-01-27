@@ -655,15 +655,7 @@ export default function ChatPage() {
         {/* Input area */}
         <div className="border-t border-dark-200 p-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              variant={forcePlanMode ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setForcePlanMode((prev) => !prev)}
-              disabled={isStreaming}
-            >
-              {forcePlanMode ? "Mode plan activé" : "Demander un plan"}
-            </Button>
-            <div className="flex-1 relative">
+            <div className="flex-1 min-w-0">
               <Input
                 ref={inputRef}
                 value={inputValue}
@@ -679,15 +671,24 @@ export default function ChatPage() {
                 disabled={isStreaming}
               />
             </div>
-            <Button
-              variant="primary"
-              size="icon"
-              onClick={() => handleSend()}
-              disabled={!inputValue.trim() || isStreaming}
-              aria-label="Envoyer"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={forcePlanMode ? "primary" : "ghost"}
+                size="icon"
+                onClick={() => setForcePlanMode((prev) => !prev)}
+                disabled={isStreaming}
+                aria-label="Demander un plan IA"
+                leftIcon={<Calendar className="h-4 w-4" />}
+              />
+              <Button
+                variant="primary"
+                size="icon"
+                onClick={() => handleSend()}
+                disabled={!inputValue.trim() || isStreaming}
+                aria-label="Envoyer"
+                leftIcon={<Send className="h-4 w-4 text-dark" />}
+              />
+            </div>
           </div>
           {forcePlanMode && (
             <p className="text-xs text-accent mt-2">

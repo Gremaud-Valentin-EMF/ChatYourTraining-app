@@ -34,6 +34,8 @@ interface DailyMetrics {
   sleep_rem_minutes: number | null;
   sleep_light_minutes: number | null;
   sleep_awake_minutes: number | null;
+  sleep_start_at: string | null;
+  sleep_end_at: string | null;
   strain: number | null;
   stress_level: number | null;
 }
@@ -204,17 +206,19 @@ export default function HealthPage() {
   };
 
   const averageBedtimeMinutes = useMemo(() => {
-    if (!displayMetrics.length) return null;
-    const WAKE_MINUTES = 7 * 60;
     const samples = displayMetrics
-      .map((m) => m.sleep_duration_minutes)
-      .filter((value): value is number => typeof value === "number");
+      .map((m) => (m.sleep_start_at ? new Date(m.sleep_start_at) : null))
+      .filter((value): value is Date => value !== null);
+
     if (!samples.length) return null;
-    const total = samples.reduce((sum, duration) => {
-      const bedtime = (WAKE_MINUTES - duration + 1440) % 1440;
-      return sum + bedtime;
+
+    const totalMinutes = samples.reduce((sum, date) => {
+      return sum + date.getHours() * 60 + date.getMinutes();
     }, 0);
-    return Math.round(total / samples.length);
+
+    if (!Number.isFinite(totalMinutes)) return null;
+
+    return Math.round(totalMinutes / samples.length);
   }, [displayMetrics]);
 
   const averageBedtime =
@@ -283,7 +287,7 @@ export default function HealthPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold mb-2">Aperçu Santé</h1>
           <p className="text-muted">
@@ -291,7 +295,7 @@ export default function HealthPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <Tabs
             defaultValue="7"
             onValueChange={(v) => setPeriod(v as "7" | "30")}

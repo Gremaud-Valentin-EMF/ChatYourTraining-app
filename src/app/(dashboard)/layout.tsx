@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -55,13 +55,48 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileInfo, setProfileInfo] = useState<{
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null>(null);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfileInfo = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data } = await supabase
+          .from("users")
+          .select("full_name, avatar_url")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (isMounted) {
+          setProfileInfo(data ?? null);
+        }
+      } catch (error) {
+        console.error("Failed to load profile info:", error);
+      }
+    };
+
+    loadProfileInfo();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabase]);
 
   return (
     <div className="min-h-screen bg-dark">
@@ -140,12 +175,16 @@ export default function DashboardLayout({
                   onClick={() => setProfileMenuOpen((prev) => !prev)}
                   className="flex items-center gap-3 px-3 py-2 rounded-xl border border-transparent hover:border-accent transition-colors"
                 >
-                  <Avatar size="sm" fallback="JD" />
+                  <Avatar
+                    size="sm"
+                    src={profileInfo?.avatar_url ?? undefined}
+                    fallback={profileInfo?.full_name || "U"}
+                  />
                   <div className="hidden sm:flex flex-col items-start">
-                    <span className="text-sm font-medium">Jean Dupont</span>
-                    <span className="text-xs text-muted">
-                      Profil & Objectifs
+                    <span className="text-sm font-medium">
+                      {profileInfo?.full_name || "Athlète"}
                     </span>
+                    <span className="text-xs text-muted">Profil</span>
                   </div>
                   <ChevronDown
                     className={cn(
@@ -184,10 +223,10 @@ export default function DashboardLayout({
 
       {/* Bottom navigation for mobile */}
       <nav
-        className="lg:hidden fixed inset-x-0 bottom-0 bg-dark-50 border-t border-dark-200 px-4 py-2 z-40"
+        className="lg:hidden fixed inset-x-0 bottom-0 bg-dark-50 border-t border-dark-200 px-2 py-3 z-40"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0)" }}
       >
-        <div className="flex items-center justify-around">
+        <div className="flex items-center justify-between">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -195,8 +234,8 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-1 text-xs font-medium transition-colors",
-                  isActive ? "text-accent" : "text-muted"
+                  "flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs font-semibold transition-colors min-w-[60px]",
+                  isActive ? "text-accent bg-dark-100" : "text-muted hover:text-foreground hover:bg-dark-100"
                 )}
               >
                 <item.icon className="h-5 w-5" />

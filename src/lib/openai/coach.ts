@@ -244,8 +244,9 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
       .from("training_load")
       .select("*")
       .eq("user_id", userId)
-      .eq("date", today)
-      .single(),
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     (supabase as any)
       .from("activities")
       .select("*, sports(name, name_fr)")
@@ -274,6 +275,26 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   const load = loadResult.data;
   const todayWorkout = todayWorkoutResult.data;
   const upcoming = upcomingResult.data || [];
+  const atlValue =
+    typeof load?.atl === "number" ? load.atl : 0;
+  const ctlValue =
+    typeof load?.ctl === "number" ? load.ctl : 0;
+  const hasTsb = typeof load?.tsb === "number";
+  const tsbValue = hasTsb ? load.tsb : 0;
+  const loadContext = hasTsb
+    ? tsbValue < -20
+      ? "Bloc de charge - fatigue accumulée"
+      : tsbValue > 15
+      ? "Phase de repos - bonne fraîcheur"
+      : "Entraînement normal"
+    : "Données de charge indisponibles";
+  const tsbStatus = hasTsb
+    ? tsbValue > 5
+      ? "Frais"
+      : tsbValue < -10
+      ? "Fatigué"
+      : "Optimal"
+    : "Données manquantes";
 
   // Calculate age from birth date
   let age: number | null = null;
@@ -357,22 +378,12 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
       strain: metrics?.strain || null,
     },
     training_load_analysis: {
-      context:
-        load?.tsb && load.tsb < -20
-          ? "Bloc de charge - fatigue accumulée"
-          : load?.tsb && load.tsb > 15
-          ? "Phase de repos - bonne fraîcheur"
-          : "Entraînement normal",
+      context: loadContext,
       metrics: {
-        atl: load?.atl || 50,
-        ctl: load?.ctl || 55,
-        tsb: load?.tsb || 5,
-        tsb_status:
-          load?.tsb && load.tsb > 5
-            ? "Frais"
-            : load?.tsb && load.tsb < -10
-            ? "Fatigué"
-            : "Optimal",
+        atl: atlValue,
+        ctl: ctlValue,
+        tsb: tsbValue,
+        tsb_status: tsbStatus,
       },
       /* eslint-disable @typescript-eslint/no-explicit-any */
       weekly_summary: {

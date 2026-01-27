@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Card,
@@ -11,16 +11,7 @@ import {
   Avatar,
   Spinner,
 } from "@/components/ui";
-import {
-  Flag,
-  Settings,
-  Bell,
-  Calendar,
-  Edit2,
-  Save,
-  X,
-} from "lucide-react";
-import { daysUntil } from "@/lib/utils";
+import { Settings, Bell, Edit2, Save, X } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -45,15 +36,6 @@ interface UserSport {
   vma_kmh: number | null;
   ftp_watts: number | null;
   target_hours_per_week: number | null;
-}
-
-interface Objective {
-  id: string;
-  name: string;
-  event_date: string;
-  event_type: string;
-  priority: string;
-  target_time: string | null;
 }
 
 type SportRow = {
@@ -81,9 +63,9 @@ export default function ProfilePage() {
     birth_date: null,
   });
   const [sports, setSports] = useState<UserSport[]>([]);
-  const [objective, setObjective] = useState<Objective | null>(null);
   const [targetHours, setTargetHours] = useState(12);
-  const [latestRestingHr, setLatestRestingHr] = useState<number | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   // Notifications settings
   const [notifications, setNotifications] = useState({
@@ -107,27 +89,18 @@ export default function ProfilePage() {
 
       /* eslint-disable @typescript-eslint/no-explicit-any */
       // Load all profile data
-      const [profileRes, physioRes, sportsRes, objectiveRes]: any[] =
-        await Promise.all([
-          supabase.from("users").select("*").eq("id", user.id).single(),
-          supabase
-            .from("physiological_data")
-            .select("*")
-            .eq("user_id", user.id)
-            .single(),
-          supabase
-            .from("user_sports")
-            .select("*, sports(name, name_fr)")
-            .eq("user_id", user.id),
-          supabase
-            .from("objectives")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("priority", "A")
-            .order("event_date")
-            .limit(1)
-            .single(),
-        ]);
+      const [profileRes, physioRes, sportsRes]: any[] = await Promise.all([
+        supabase.from("users").select("*").eq("id", user.id).single(),
+        supabase
+          .from("physiological_data")
+          .select("*")
+          .eq("user_id", user.id)
+          .single(),
+        supabase
+          .from("user_sports")
+          .select("*, sports(name, name_fr)")
+          .eq("user_id", user.id),
+      ]);
       /* eslint-enable @typescript-eslint/no-explicit-any */
 
       if (profileRes.data) {
@@ -137,6 +110,7 @@ export default function ProfilePage() {
           email: profileRes.data.email,
           avatar_url: profileRes.data.avatar_url,
         });
+        setAvatarPreview(profileRes.data.avatar_url || null);
       }
 
       if (physioRes.data) {
@@ -168,26 +142,6 @@ export default function ProfilePage() {
         }
       }
 
-      if (objectiveRes.data) {
-        setObjective({
-          id: objectiveRes.data.id,
-          name: objectiveRes.data.name,
-          event_date: objectiveRes.data.event_date,
-          event_type: objectiveRes.data.event_type,
-          priority: objectiveRes.data.priority,
-          target_time: objectiveRes.data.target_time,
-        });
-      }
-
-      const { data: latestMetrics } = await supabase
-        .from("daily_metrics")
-        .select("resting_hr")
-        .eq("user_id", user.id)
-        .order("date", { ascending: false })
-        .limit(1);
-      if (latestMetrics?.[0]?.resting_hr) {
-        setLatestRestingHr(latestMetrics[0].resting_hr);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -204,28 +158,23 @@ export default function ProfilePage() {
       // Update profile
       await supabase
         .from("users")
-        .update({ full_name: profile?.full_name })
+        .update({
+          full_name: profile?.full_name,
+          avatar_url: profile?.avatar_url,
+        })
         .eq("id", user.id);
 
       // Update physio data
-      await supabase.from("physiological_data").upsert({
-        user_id: user.id,
-        weight_kg: physio.weight_kg,
-        height_cm: physio.height_cm,
-        hr_max: physio.hr_max,
-        hr_rest: physio.hr_rest,
-      });
-
-      // Update objective
-      if (objective) {
-        await supabase
-          .from("objectives")
-          .update({
-            name: objective.name,
-            event_date: objective.event_date,
-          })
-          .eq("id", objective.id);
-      }
+      await supabase.from("physiological_data").upsert(
+        {
+         user_id: user.id,
+         weight_kg: physio.weight_kg,
+         height_cm: physio.height_cm,
+         hr_max: physio.hr_max,
+         hr_rest: physio.hr_rest,
+        },
+        { onConflict: "user_id" }
+      );
 
       // Update target hours for sports
       for (const sport of sports) {
@@ -249,6 +198,24 @@ export default function ProfilePage() {
     );
   };
 
+  const openAvatarDialog = () => {
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setAvatarPreview(result);
+      setProfile((p) => (p ? { ...p, avatar_url: result } : p));
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -257,7 +224,6 @@ export default function ProfilePage() {
     );
   }
 
-  const daysToObjective = objective ? daysUntil(objective.event_date) : 0;
   const age =
     physio.birth_date && !Number.isNaN(Date.parse(physio.birth_date))
       ? Math.floor(
@@ -268,32 +234,47 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Profil et Objectifs</h1>
+        <h1 className="text-2xl font-bold">Profil</h1>
         <p className="text-muted">
-          Gérez votre identité et vos ambitions sportives.
+          Gérez votre identité et vos préférences d&apos;entraînement.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Profile card */}
         <div className="space-y-6">
-          {/* Profile Card */}
           <Card className="text-center">
             <div className="relative inline-block mb-4">
               <Avatar
-                src={profile?.avatar_url}
+                src={avatarPreview ?? profile?.avatar_url ?? undefined}
                 fallback={profile?.full_name || "U"}
                 size="xl"
                 className="h-24 w-24"
               />
-              {isEditing && (
-                <button className="absolute bottom-0 right-0 h-8 w-8 bg-accent rounded-full flex items-center justify-center text-dark">
-                  <Edit2 className="h-4 w-4" />
-                </button>
-              )}
             </div>
+
+            {isEditing && (
+              <div className="flex flex-col items-center gap-2 mb-4">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarInputChange}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openAvatarDialog}
+                  type="button"
+                >
+                  Changer la photo
+                </Button>
+                <p className="text-xs text-muted">
+                  Formats JPG/PNG, max 5 Mo.
+                </p>
+              </div>
+            )}
 
             {isEditing ? (
               <Input
@@ -313,8 +294,7 @@ export default function ProfilePage() {
               Discipline principale: {sports[0]?.sport_name || "Athlète"}
             </p>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               <div className="p-3 bg-dark-100 rounded-xl">
                 <p className="text-xs text-muted uppercase">Âge</p>
                 <p className="text-xl font-bold">
@@ -365,111 +345,17 @@ export default function ProfilePage() {
                 )}
               </div>
               <div className="p-3 bg-dark-100 rounded-xl">
-                <p className="text-xs text-muted uppercase">FC Repos (WHOOP)</p>
+                <p className="text-xs text-muted uppercase">FC max</p>
                 <p className="text-xl font-bold">
-                  {latestRestingHr ?? physio.hr_rest ?? "--"}{" "}
+                  {physio.hr_max ?? "--"}{" "}
                   <span className="text-sm text-muted">bpm</span>
                 </p>
               </div>
             </div>
           </Card>
-
-          {/* Next Event */}
-          {objective && (
-            <Card className="bg-gradient-to-br from-error/20 to-warning/10 border-error/30">
-              <div className="flex items-center gap-2 mb-2 text-xs text-error uppercase">
-                <Flag className="h-4 w-4" />
-                Prochain événement
-              </div>
-              <h3 className="font-bold text-lg">{objective.name}</h3>
-              <p className="text-sm text-muted mb-3">
-                Dans {daysToObjective} jours
-              </p>
-            </Card>
-          )}
         </div>
 
-        {/* Right column - Settings */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Objective */}
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <Flag className="h-5 w-5 text-accent" />
-              <h3 className="font-semibold">Objectif Principal</h3>
-            </div>
-            <p className="text-sm text-muted mb-4">
-              Votre cible majeure pour la saison
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="text-xs text-muted uppercase block mb-2">
-                  Nom de l&apos;événement
-                </label>
-                {isEditing ? (
-                  <Input
-                    value={objective?.name || ""}
-                    onChange={(e) =>
-                      setObjective((o) =>
-                        o ? { ...o, name: e.target.value } : null
-                      )
-                    }
-                  />
-                ) : (
-                  <div className="p-3 bg-dark-100 rounded-xl">
-                    <p className="font-medium">
-                      {objective?.name || "Non défini"}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="text-xs text-muted uppercase block mb-2">
-                  Date de l&apos;événement
-                </label>
-                {isEditing ? (
-                  <Input
-                    type="date"
-                    value={objective?.event_date || ""}
-                    onChange={(e) =>
-                      setObjective((o) =>
-                        o ? { ...o, event_date: e.target.value } : null
-                      )
-                    }
-                  />
-                ) : (
-                  <div className="p-3 bg-dark-100 rounded-xl flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted" />
-                    <p className="font-medium">
-                      {objective?.event_date
-                        ? new Date(objective.event_date).toLocaleDateString(
-                            "fr-FR"
-                          )
-                        : "Non défini"}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-dark-100 rounded-xl">
-              <div>
-                <p className="text-xs text-muted">Temps Restant</p>
-                <p className="text-2xl font-bold">
-                  {daysToObjective}{" "}
-                  <span className="text-sm text-muted">jours</span>
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted">Objectif Temps</p>
-                <p className="text-2xl font-bold">
-                  {objective?.target_time || "5h 15m"}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Training Parameters */}
           <Card>
             <div className="flex items-center gap-2 mb-4">
               <Settings className="h-5 w-5 text-accent" />
@@ -508,16 +394,14 @@ export default function ProfilePage() {
             </div>
           </Card>
 
-      {/* Notifications */}
-      <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="h-5 w-5 text-accent" />
-          <h3 className="font-semibold">Notifications</h3>
+          <Card>
+            <div className="flex items-center gap-2 mb-4">
+              <Bell className="h-5 w-5 text-accent" />
+              <h3 className="font-semibold">Notifications</h3>
             </div>
             <p className="text-sm text-muted mb-4">
               Restez informé de votre progression
             </p>
-
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-dark-100 rounded-xl">
                 <div>
@@ -571,11 +455,11 @@ export default function ProfilePage() {
                     }))
                   }
                 />
-          </div>
+              </div>
+            </div>
+          </Card>
         </div>
-      </Card>
-    </div>
-  </div>
+      </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -607,7 +491,11 @@ export default function ProfilePage() {
             </Button>
           )}
         </div>
-        <Button variant="ghost" className="text-error" onClick={handleDeleteProfile}>
+        <Button
+          variant="ghost"
+          className="text-error"
+          onClick={handleDeleteProfile}
+        >
           Supprimer le profil
         </Button>
       </div>

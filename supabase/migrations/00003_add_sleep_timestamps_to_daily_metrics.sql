@@ -1,0 +1,3 @@
+ALTER TABLE public.daily_metrics
+  ADD COLUMN IF NOT EXISTS sleep_start_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS sleep_end_at TIMESTAMPTZ;
