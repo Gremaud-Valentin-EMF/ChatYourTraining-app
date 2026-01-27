@@ -4,11 +4,13 @@ import {
   getRecovery,
   getSleep,
   getWorkouts,
+  getCycles,
   refreshTokens,
   mapWhoopSportType,
   WhoopSleep,
   WhoopRecovery,
   WhoopWorkout,
+  WhoopCycle,
 } from "@/lib/integrations/whoop";
 import {
   acquireSyncLock,
@@ -223,6 +225,14 @@ export async function POST() {
         })
       : { records: [] };
 
+    const cycleData: { records: WhoopCycle[] } = syncStrain
+      ? await getCycles(accessToken, {
+          start: startDate,
+          end: endDate,
+          limit: 25,
+        })
+      : { records: [] };
+
     console.log(
       "WHOOP sleep records:",
       sleepData.records.length,
@@ -238,6 +248,11 @@ export async function POST() {
       workoutData.records.length,
       syncWorkouts ? "(enabled)" : "(disabled)"
     );
+    console.log(
+      "WHOOP cycle records:",
+      cycleData.records.length,
+      syncStrain ? "(enabled)" : "(disabled)"
+    );
 
     let synced = 0;
     let updated = 0;
@@ -245,9 +260,6 @@ export async function POST() {
     // Process sleep data (if enabled)
     if (syncSleep || syncRecovery || syncHrv) {
       for (const sleep of sleepData.records) {
-        // Skip naps
-        if (sleep.nap) continue;
-
         // Use the END date (wake-up date) - this is what users expect
         // e.g., sleep from Jan 9 23:00 to Jan 10 07:00 → date = Jan 10
         const date = sleep.end.split("T")[0];
@@ -268,14 +280,77 @@ export async function POST() {
               )
           : null;
 
+        const sleepDurationMinutes = sleepStages
+          ? Math.round(sleepStages.total_in_bed_time_milli / 60000)
+          : null;
+
+        if (sleep.nap) {
+          if (!sleepDurationMinutes) continue;
+          const { data: existingNap } = await (supabase as any)
+            .from("daily_metrics")
+            .select(
+              "id, sleep_duration_minutes, sleep_deep_minutes, sleep_rem_minutes, sleep_light_minutes, sleep_awake_minutes"
+            )
+            .eq("user_id", user.id)
+            .eq("date", date)
+            .limit(1);
+
+          const napUpdates = {
+            sleep_duration_minutes:
+              (existingNap?.[0]?.sleep_duration_minutes ?? 0) +
+              sleepDurationMinutes,
+            sleep_deep_minutes:
+              (existingNap?.[0]?.sleep_deep_minutes ?? 0) +
+              (sleepStages
+                ? Math.round(
+                    sleepStages.total_slow_wave_sleep_time_milli / 60000
+                  )
+                : 0),
+            sleep_rem_minutes:
+              (existingNap?.[0]?.sleep_rem_minutes ?? 0) +
+              (sleepStages
+                ? Math.round(sleepStages.total_rem_sleep_time_milli / 60000)
+                : 0),
+            sleep_light_minutes:
+              (existingNap?.[0]?.sleep_light_minutes ?? 0) +
+              (sleepStages
+                ? Math.round(sleepStages.total_light_sleep_time_milli / 60000)
+                : 0),
+            sleep_awake_minutes:
+              (existingNap?.[0]?.sleep_awake_minutes ?? 0) +
+              (sleepStages
+                ? Math.round(sleepStages.total_awake_time_milli / 60000)
+                : 0),
+            source: "whoop",
+          };
+
+          if (existingNap && existingNap.length > 0) {
+            const { error: updateError } = await (supabase as any)
+              .from("daily_metrics")
+              .update(napUpdates)
+              .eq("id", existingNap[0].id);
+            if (!updateError) updated++;
+            else console.error("Nap update error:", updateError);
+          } else {
+            const { error: insertError } = await (supabase as any)
+              .from("daily_metrics")
+              .insert({
+                user_id: user.id,
+                date,
+                ...napUpdates,
+              });
+            if (!insertError) synced++;
+            else console.error("Nap insert error:", insertError);
+          }
+          continue;
+        }
+
         const metricsData: any = {
           date,
           sleep_score: sleepScore
             ? Math.round(sleepScore.sleep_performance_percentage)
             : null,
-          sleep_duration_minutes: sleepStages
-            ? Math.round(sleepStages.total_in_bed_time_milli / 60000)
-            : null,
+          sleep_duration_minutes: sleepDurationMinutes,
           sleep_deep_minutes: sleepStages
             ? Math.round(sleepStages.total_slow_wave_sleep_time_milli / 60000)
             : null,
@@ -312,6 +387,19 @@ export async function POST() {
           );
         }
 
+        // Match cycle data for day strain (if enabled)
+        if (syncStrain) {
+          const cycle = cycleData.records.find(
+            (c: any) =>
+              c.id === sleep.cycle_id ||
+              // Try matching by end date
+              c.end?.split("T")[0] === date
+          );
+          if (cycle?.score?.strain) {
+            metricsData.strain = cycle.score.strain;
+          }
+        }
+
         // Upsert daily metrics
         const { data: existing } = await (supabase as any)
           .from("daily_metrics")
@@ -341,6 +429,43 @@ export async function POST() {
         }
       }
     } // End sleep processing
+
+    // Ensure strain is recorded even when no sleep data exists
+    if (syncStrain) {
+      for (const cycle of cycleData.records) {
+        if (!cycle?.score?.strain || !cycle.end) continue;
+        const date = cycle.end.split("T")[0];
+        const { data: existingCycle } = await (supabase as any)
+          .from("daily_metrics")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("date", date)
+          .limit(1);
+
+        if (existingCycle && existingCycle.length > 0) {
+          const { error: updateError } = await (supabase as any)
+            .from("daily_metrics")
+            .update({
+              strain: cycle.score.strain,
+              source: "whoop",
+            })
+            .eq("id", existingCycle[0].id);
+          if (!updateError) updated++;
+          else console.error("Cycle update error:", updateError);
+        } else {
+          const { error: insertError } = await (supabase as any)
+            .from("daily_metrics")
+            .insert({
+              user_id: user.id,
+              date,
+              strain: cycle.score.strain,
+              source: "whoop",
+            });
+          if (!insertError) synced++;
+          else console.error("Cycle insert error:", insertError);
+        }
+      }
+    }
 
     // Get sports mapping for workouts
     const { data: sports } = await (supabase as any)
@@ -489,38 +614,6 @@ export async function POST() {
         if (!insertError) workoutsSynced++;
       }
     } // End workout processing
-
-    // Also add strain to daily_metrics for each day (if strain enabled)
-    if (syncStrain && workoutData.records.length > 0) {
-      for (const workout of workoutData.records) {
-        const date = workout.start.split("T")[0];
-        const strain = workout.score?.strain || 0;
-
-        // Update daily_metrics with strain data
-        const { data: existing } = await (supabase as any)
-          .from("daily_metrics")
-          .select("id, strain")
-          .eq("user_id", user.id)
-          .eq("date", date)
-          .limit(1);
-
-        if (existing && existing.length > 0) {
-          // Add strain to existing record (accumulate if multiple workouts)
-          const currentStrain = existing[0].strain || 0;
-          await (supabase as any)
-            .from("daily_metrics")
-            .update({ strain: Math.max(currentStrain, strain) })
-            .eq("id", existing[0].id);
-        } else {
-          await (supabase as any).from("daily_metrics").insert({
-            user_id: user.id,
-            date,
-            strain,
-            source: "whoop",
-          });
-        }
-      }
-    } // End strain processing
 
     // Update last sync timestamp
     await (supabase as any)

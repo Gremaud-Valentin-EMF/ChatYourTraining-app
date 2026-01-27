@@ -28,10 +28,12 @@ import {
   Zap,
   RefreshCw,
   Check,
-  AlertTriangle,
-  CheckCircle2,
+  TrendingUp,
   TrendingDown,
-  XCircle,
+  Minus,
+  AlertTriangle,
+  CheckCircle,
+  Info,
 } from "lucide-react";
 
 interface DailyMetrics {
@@ -69,7 +71,6 @@ export default function HealthPage() {
   const [metrics, setMetrics] = useState<DailyMetrics[]>([]);
   const [trainingLoad, setTrainingLoad] = useState<TrainingLoad[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [physio, setPhysio] = useState<{
     weight_kg: number | null;
@@ -93,27 +94,6 @@ export default function HealthPage() {
     loadMetrics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
-
-  const syncWhoop = async () => {
-    if (isSyncing) return;
-    setIsSyncing(true);
-    try {
-      const response = await fetch("/api/sync/whoop", {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Sync failed");
-      }
-
-      await loadMetrics();
-    } catch (error) {
-      console.error("Error syncing WHOOP:", error);
-      alert("Erreur lors de la synchronisation WHOOP");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const saveSubjectiveMetrics = async () => {
     try {
@@ -177,6 +157,23 @@ export default function HealthPage() {
     }
   };
 
+  const syncWhoop = async () => {
+    try {
+      const response = await fetch("/api/sync/whoop", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Sync failed");
+      }
+
+      await loadMetrics();
+    } catch (error) {
+      console.error("Error syncing WHOOP:", error);
+      alert("Erreur lors de la synchronisation WHOOP");
+    }
+  };
+
   const loadMetrics = async () => {
     setIsLoading(true);
     try {
@@ -185,7 +182,7 @@ export default function HealthPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const daysAgo = Math.max(parseInt(period), 14);
+      const daysAgo = parseInt(period);
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - daysAgo);
 
@@ -249,12 +246,10 @@ export default function HealthPage() {
     }
   };
 
-  const displayMetrics = useMemo(() => {
-    const days = parseInt(period);
-    if (!metrics.length) return [];
-    if (metrics.length <= days) return metrics;
-    return metrics.slice(-days);
-  }, [metrics, period]);
+  const displayMetrics = useMemo(
+    () => (metrics.length > 0 ? metrics : []),
+    [metrics]
+  );
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -263,28 +258,10 @@ export default function HealthPage() {
 
   const getRecoveryStatus = (score: number) => {
     if (score >= 67)
-      return {
-        label: "Optimal",
-        color: "text-success",
-        bg: "bg-success/20",
-        variant: "success" as const,
-        Icon: CheckCircle2,
-      };
+      return { label: "Optimal", color: "text-success", bg: "bg-success/20", variant: "success" as const };
     if (score >= 34)
-      return {
-        label: "Modéré",
-        color: "text-warning",
-        bg: "bg-warning/20",
-        variant: "warning" as const,
-        Icon: AlertTriangle,
-      };
-    return {
-      label: "Faible",
-      color: "text-error",
-      bg: "bg-error/20",
-      variant: "error" as const,
-      Icon: XCircle,
-    };
+      return { label: "Modéré", color: "text-warning", bg: "bg-warning/20", variant: "warning" as const };
+    return { label: "Faible", color: "text-error", bg: "bg-error/20", variant: "error" as const };
   };
 
   const getHRVStatus = (hrv: number, avg: number) => {
@@ -322,24 +299,12 @@ export default function HealthPage() {
     .map((m) => m.hrv_ms)
     .filter((v): v is number => v !== null && v > 0);
 
-  const recoveryValues = displayMetrics
-    .map((m) => m.recovery_score)
-    .filter((v): v is number => v !== null && v > 0);
-
   const avgHRV =
     hrvValues.length > 0
       ? Math.round(
           hrvValues.reduce((sum, v) => sum + v, 0) / hrvValues.length
         )
       : 0;
-
-  const avgRecovery =
-    recoveryValues.length > 0
-      ? Math.round(
-          recoveryValues.reduce((sum, v) => sum + v, 0) /
-            recoveryValues.length
-        )
-      : null;
 
   // HRV Baseline (zone normale)
   const hrvStdDev =
@@ -361,30 +326,31 @@ export default function HealthPage() {
         )
       : 0;
 
-  // Sleep debt (last 14 days, weighted toward recent days)
-  const sleepDebtWindow = useMemo(() => {
-    if (!metrics.length) return [];
-    return metrics.slice(-14);
-  }, [metrics]);
+  // Sleep debt (last 14 days, weighted towards recent days - WHOOP logic)
+  const sleepDebt = useMemo(() => {
+    // Get last 14 days of data
+    const last14Days = displayMetrics.slice(-14);
+    if (last14Days.length === 0) return 0;
 
-  const sleepDebt = sleepDebtWindow.reduce(
-    (result, entry, index) => {
-      const needed = entry.sleep_needed_minutes || 480; // Default 8h
-      const actual = entry.sleep_duration_minutes || 0;
-      const dailyDelta = actual - needed;
+    // Calculate weighted sleep debt (more weight on recent days)
+    let totalDebt = 0;
+    let totalWeight = 0;
+
+    last14Days.forEach((m, index) => {
+      const needed = m.sleep_needed_minutes || 480; // Default 8h
+      const actual = m.sleep_duration_minutes || 0;
+      const dailyDebt = actual - needed;
+
+      // Weight increases linearly from day 0 (oldest) to day 13 (most recent)
+      // Day 0 gets weight 1, day 13 gets weight 14
       const weight = index + 1;
-      return {
-        weightedSum: result.weightedSum + dailyDelta * weight,
-        weightTotal: result.weightTotal + weight,
-      };
-    },
-    { weightedSum: 0, weightTotal: 0 }
-  );
 
-  const weightedSleepDebtMinutes =
-    sleepDebt.weightTotal > 0
-      ? Math.round(sleepDebt.weightedSum / sleepDebt.weightTotal)
-      : 0;
+      totalDebt += dailyDebt * weight;
+      totalWeight += weight;
+    });
+
+    return totalWeight > 0 ? Math.round(totalDebt / totalWeight) : 0;
+  }, [displayMetrics]);
 
   const formatSleepDebt = (minutes: number) => {
     const absMinutes = Math.abs(minutes);
@@ -392,6 +358,21 @@ export default function HealthPage() {
     const m = absMinutes % 60;
     const sign = minutes < 0 ? "-" : "+";
     return `${sign}${h}h${m.toString().padStart(2, "0")}`;
+  };
+
+  // Format time since last sync
+  const formatTimeSince = (date: Date | null) => {
+    if (!date) return null;
+
+    const now = Date.now();
+    const diff = now - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (days > 0) return `il y a ${days}j`;
+    if (hours > 0) return `il y a ${hours}h`;
+    return `il y a ${minutes}m`;
   };
 
   const todayData =
@@ -459,7 +440,7 @@ export default function HealthPage() {
       avgRestingHR > 0 &&
       todayData.resting_hr > avgRestingHR + 5;
 
-    const sleepDeficit = weightedSleepDebtMinutes < -120; // Plus de 2h de dette
+    const sleepDeficit = sleepDebt < -120; // Plus de 2h de dette
 
     if (score >= 85) {
       if (hrvBelowBaseline || restingHRHigh) {
@@ -509,22 +490,6 @@ export default function HealthPage() {
     return `${h.toString().padStart(2, "0")}h${m.toString().padStart(2, "0")}`;
   };
 
-  const formatTimeSince = (date: Date) => {
-    const diffMs = Date.now() - date.getTime();
-    const minutes = Math.floor(diffMs / 60000);
-    if (minutes < 1) return "à l’instant";
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} h`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `${days} j`;
-    return date.toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
   // Generate Coach AI insights
   const generateCoachInsights = () => {
     const insights: { type: "warning" | "info" | "success"; text: string }[] =
@@ -561,12 +526,10 @@ export default function HealthPage() {
     }
 
     // Sleep debt warning
-    if (weightedSleepDebtMinutes < -120) {
+    if (sleepDebt < -120) {
       insights.push({
         type: "warning",
-        text: `Tu accumules une dette de sommeil de ${formatSleepDebt(
-          weightedSleepDebtMinutes
-        )}. Cela peut impacter ta récupération et tes performances. Essaie de te coucher plus tôt ces prochains jours.`,
+        text: `Tu accumules une dette de sommeil de ${formatSleepDebt(sleepDebt)}. Cela peut impacter ta récupération et tes performances. Essaie de te coucher plus tôt ces prochains jours.`,
       });
     }
 
@@ -646,122 +609,25 @@ export default function HealthPage() {
   const coachInsights = generateCoachInsights();
 
   const averageBedtimeMinutes = useMemo(() => {
-    const samples = metrics
+    const samples = displayMetrics
       .map((m) => (m.sleep_start_at ? new Date(m.sleep_start_at) : null))
       .filter((value): value is Date => value !== null);
 
     if (!samples.length) return null;
 
-    // Circular mean to handle bedtimes around midnight
-    const minutesPerDay = 24 * 60;
-    const { sinSum, cosSum } = samples.reduce(
-      (acc, date) => {
-        const minutes = date.getHours() * 60 + date.getMinutes();
-        const angle = (2 * Math.PI * minutes) / minutesPerDay;
-        return {
-          sinSum: acc.sinSum + Math.sin(angle),
-          cosSum: acc.cosSum + Math.cos(angle),
-        };
-      },
-      { sinSum: 0, cosSum: 0 }
-    );
+    const totalMinutes = samples.reduce((sum, date) => {
+      return sum + date.getHours() * 60 + date.getMinutes();
+    }, 0);
 
-    if (!Number.isFinite(sinSum) || !Number.isFinite(cosSum)) return null;
+    if (!Number.isFinite(totalMinutes)) return null;
 
-    const meanAngle = Math.atan2(sinSum / samples.length, cosSum / samples.length);
-    const normalizedAngle = meanAngle < 0 ? meanAngle + 2 * Math.PI : meanAngle;
-    return Math.round((normalizedAngle * minutesPerDay) / (2 * Math.PI));
-  }, [metrics]);
+    return Math.round(totalMinutes / samples.length);
+  }, [displayMetrics]);
 
   const averageBedtime =
     averageBedtimeMinutes !== null
       ? formatClockTime(averageBedtimeMinutes)
       : null;
-
-  const HrvTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    payload?: any[];
-    label?: string;
-  }) => {
-    if (!active || !payload || payload.length === 0 || !label) return null;
-    const hrvEntry = payload.find((item) => item.dataKey === "hrv_ms");
-    if (!hrvEntry || typeof hrvEntry.value !== "number") return null;
-    const formattedDate = new Date(label).toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "short",
-    });
-    const isInBaseline = hrvEntry.value >= hrvBaselineMin;
-    return (
-      <div className="rounded-xl bg-dark-100/95 backdrop-blur px-3 py-2 border border-dark-200 shadow-lg">
-        <p className="text-[11px] uppercase tracking-wide text-muted mb-2">
-          {formattedDate}
-        </p>
-        <div className="flex items-center gap-3 text-xs">
-          <div className="text-secondary">
-            <p className="text-muted uppercase">HRV</p>
-            <p className="font-semibold">{Math.round(hrvEntry.value)} ms</p>
-          </div>
-          <div className={isInBaseline ? "text-success" : "text-error"}>
-            <p className="text-muted uppercase">Statut</p>
-            <p className="font-semibold">
-              {isInBaseline ? "Normal" : "Bas"}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const TrendsTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    payload?: any[];
-    label?: string;
-  }) => {
-    if (!active || !payload || payload.length === 0 || !label) return null;
-    const recoveryEntry = payload.find(
-      (item) => item.dataKey === "recovery_score"
-    );
-    const hrEntry = payload.find((item) => item.dataKey === "resting_hr");
-    const formattedDate = new Date(label).toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "short",
-    });
-    return (
-      <div className="rounded-xl bg-dark-100/95 backdrop-blur px-3 py-2 border border-dark-200 shadow-lg">
-        <p className="text-[11px] uppercase tracking-wide text-muted mb-2">
-          {formattedDate}
-        </p>
-        <div className="flex gap-4 text-xs">
-          <div className="text-accent">
-            <p className="text-muted uppercase">Récup</p>
-            <p className="font-semibold">
-              {typeof recoveryEntry?.value === "number"
-                ? `${Math.round(recoveryEntry.value)}%`
-                : "--"}
-            </p>
-          </div>
-          <div className="text-warning">
-            <p className="text-muted uppercase">FC repos</p>
-            <p className="font-semibold">
-              {typeof hrEntry?.value === "number"
-                ? `${Math.round(hrEntry.value)} bpm`
-                : "--"}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const handleTrendHover = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -822,14 +688,6 @@ export default function HealthPage() {
     );
   }
 
-  // Debug: log les données chargées
-  console.log("Health page render:", {
-    metricsCount: metrics.length,
-    trainingLoadCount: trainingLoad.length,
-    todayData: todayData ? "present" : "null",
-    todayLoad: todayLoad ? "present" : "null",
-  });
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -844,7 +702,6 @@ export default function HealthPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <Tabs
             value={period}
-            defaultValue="7"
             onValueChange={(v) => setPeriod(v as "7" | "30")}
           >
             <TabsList>
@@ -857,12 +714,11 @@ export default function HealthPage() {
             variant="secondary"
             leftIcon={<RefreshCw className="h-4 w-4" />}
             onClick={syncWhoop}
-            disabled={isSyncing}
           >
-            {isSyncing ? "Synchronisation..." : "Synchro WHOOP"}
+            Synchro WHOOP
             {lastSync && (
               <span className="text-xs text-muted ml-2">
-                il y a {formatTimeSince(lastSync)}
+                {formatTimeSince(lastSync)}
               </span>
             )}
           </Button>
@@ -937,9 +793,7 @@ export default function HealthPage() {
         <Card>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted">Score de récupération</span>
-            <Heart
-              className={`h-5 w-5 ${recoveryStatus?.color || "text-muted"}`}
-            />
+            <Heart className="h-5 w-5 text-success" />
           </div>
           {todayData?.recovery_score ? (
             <>
@@ -947,19 +801,9 @@ export default function HealthPage() {
                 {todayData.recovery_score}%
               </p>
               {recoveryStatus && (
-                <Badge
-                  variant={recoveryStatus.variant}
-                  size="sm"
-                  className={recoveryStatus.bg}
-                >
-                  <recoveryStatus.Icon className="h-3 w-3 mr-1" />
+                <Badge variant={recoveryStatus.variant} size="sm">
                   {recoveryStatus.label}
                 </Badge>
-              )}
-              {avgRecovery !== null && (
-                <p className="text-xs text-muted mt-2">
-                  Moyenne ({period} jours) : {avgRecovery}%
-                </p>
               )}
             </>
           ) : (
@@ -983,13 +827,13 @@ export default function HealthPage() {
               {hrvValues.length > 1 && (
                 <>
                   {todayData.hrv_ms >= hrvBaselineMin ? (
-                    <Badge variant="success" size="sm">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                    <Badge variant="success" size="sm" className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
                       Dans ta zone habituelle
                     </Badge>
                   ) : (
-                    <Badge variant="error" size="sm">
-                      <TrendingDown className="h-3 w-3 mr-1" />
+                    <Badge variant="error" size="sm" className="flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
                       En dessous de ta baseline
                     </Badge>
                   )}
@@ -1024,13 +868,13 @@ export default function HealthPage() {
               </p>
               {displayMetrics.length > 0 && (
                 <>
-                  {weightedSleepDebtMinutes < -60 ? (
+                  {sleepDebt < -60 ? (
                     <Badge variant="error" size="sm">
-                      Dette : {formatSleepDebt(weightedSleepDebtMinutes)}
+                      Dette : {formatSleepDebt(sleepDebt)}
                     </Badge>
-                  ) : weightedSleepDebtMinutes > 60 ? (
+                  ) : sleepDebt > 60 ? (
                     <Badge variant="success" size="sm">
-                      Surplus : {formatSleepDebt(weightedSleepDebtMinutes)}
+                      Surplus : {formatSleepDebt(sleepDebt)}
                     </Badge>
                   ) : (
                     <Badge variant="success" size="sm">
@@ -1038,8 +882,8 @@ export default function HealthPage() {
                     </Badge>
                   )}
                   <p className="text-xs text-muted mt-2">
-                    Dette cumulée (14 jours) :{" "}
-                    {formatSleepDebt(weightedSleepDebtMinutes)}
+                    Dette cumulée (14 derniers jours, pondérée) :{" "}
+                    {formatSleepDebt(sleepDebt)}
                   </p>
                 </>
               )}
@@ -1067,8 +911,8 @@ export default function HealthPage() {
               </p>
               {todayData.resting_hr > avgRestingHR + 5 ? (
                 <>
-                  <Badge variant="error" size="sm">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
+                  <Badge variant="error" size="sm" className="flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
                     Élevée
                   </Badge>
                   <p className="text-xs text-error mt-2">
@@ -1293,10 +1137,8 @@ export default function HealthPage() {
           )}
       </Card>
 
-      {/* Charts and details */}
-      <div className="space-y-6">
-        {/* HRV Chart with baseline */}
-        <Card>
+      {/* HRV Chart with baseline */}
+      <Card>
           <div className="mb-2">
             <h3 className="font-semibold">Variabilité Cardiaque (HRV)</h3>
             <p className="text-xs text-muted mt-1">
@@ -1330,7 +1172,7 @@ export default function HealthPage() {
                       {activeTrendPoint.hrv_ms &&
                       activeTrendPoint.hrv_ms >= hrvBaselineMin ? (
                         <>
-                          <CheckCircle2 className="h-3 w-3 text-success" />
+                          <CheckCircle className="h-3 w-3 text-success" />
                           Normal
                         </>
                       ) : (
@@ -1351,7 +1193,6 @@ export default function HealthPage() {
                     onMouseMove={(state) => handleTrendHover(state)}
                     onMouseLeave={() => clearTrendHover()}
                     onClick={(state) => handleTrendHover(state, true)}
-                    onTouchEnd={(state) => handleTrendHover(state, true)}
                     className="focus:outline-none"
                   >
                     <CartesianGrid
@@ -1365,10 +1206,7 @@ export default function HealthPage() {
                       fontSize={12}
                     />
                     <YAxis stroke="var(--muted)" fontSize={12} />
-                    <Tooltip
-                      content={<HrvTooltip />}
-                      cursor={{ stroke: "var(--dark-300)" }}
-                    />
+                    <Tooltip wrapperStyle={{ display: "none" }} />
                     {/* Baseline zone */}
                     {hrvStdDev > 0 && (
                       <>
@@ -1434,8 +1272,8 @@ export default function HealthPage() {
           )}
         </Card>
 
-        {/* Trends chart - Recovery & Resting HR */}
-        <Card>
+      {/* Trends chart - Recovery & Resting HR */}
+      <Card>
           <div className="mb-2">
             <h3 className="font-semibold">Tendances physiologiques</h3>
             <div className="flex flex-wrap gap-4 text-xs text-muted mt-2">
@@ -1488,7 +1326,6 @@ export default function HealthPage() {
                     onMouseMove={(state) => handleTrendHover(state)}
                     onMouseLeave={() => clearTrendHover()}
                     onClick={(state) => handleTrendHover(state, true)}
-                    onTouchEnd={(state) => handleTrendHover(state, true)}
                     className="focus:outline-none"
                   >
                     <CartesianGrid
@@ -1514,10 +1351,7 @@ export default function HealthPage() {
                       fontSize={12}
                       domain={[40, 80]}
                     />
-                    <Tooltip
-                      content={<TrendsTooltip />}
-                      cursor={{ stroke: "var(--dark-300)" }}
-                    />
+                    <Tooltip wrapperStyle={{ display: "none" }} />
                     <Line
                       yAxisId="left"
                       type="monotone"
@@ -1544,9 +1378,9 @@ export default function HealthPage() {
           )}
         </Card>
 
-        {/* Coach AI Insights */}
-        {coachInsights.length > 0 && (
-          <Card>
+      {/* Coach AI Insights */}
+      {coachInsights.length > 0 && (
+        <Card>
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-accent/20 rounded-lg">
                 <Zap className="h-5 w-5 text-accent" />
@@ -1577,8 +1411,8 @@ export default function HealthPage() {
           </Card>
         )}
 
-        {/* Biometry and sleep */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Biometry and sleep */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Biométrie</h3>

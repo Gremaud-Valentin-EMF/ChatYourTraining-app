@@ -339,6 +339,55 @@ export async function getSleep(
 }
 
 /**
+ * Get cycle data (daily physiological cycles that include day strain)
+ */
+export async function getCycles(
+  accessToken: string,
+  params: {
+    start?: string;
+    end?: string;
+    limit?: number;
+    nextToken?: string;
+  } = {}
+): Promise<{ records: WhoopCycle[]; next_token?: string }> {
+  const searchParams = new URLSearchParams();
+  if (params.start) searchParams.set("start", params.start);
+  if (params.end) searchParams.set("end", params.end);
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  if (params.nextToken) searchParams.set("nextToken", params.nextToken);
+
+  const url = `${WHOOP_API_V1}/cycle?${searchParams}`;
+  console.log("Fetching WHOOP cycles from:", url);
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  const responseText = await response.text();
+  console.log(
+    "WHOOP cycles response:",
+    response.status,
+    responseText.substring(0, 200)
+  );
+
+  if (response.status === 404) {
+    return { records: [] };
+  }
+
+  if (response.ok) {
+    try {
+      const data = JSON.parse(responseText);
+      return data;
+    } catch {
+      return { records: [] };
+    }
+  }
+
+  console.error("WHOOP cycles error:", response.status, responseText);
+  return { records: [] };
+}
+
+/**
  * Get workout data
  */
 export async function getWorkouts(
