@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Button, Input, Spinner, Badge } from "@/components/ui";
+import {
+  Card,
+  Button,
+  Input,
+  Spinner,
+  Badge,
+  DeleteConfirmationModal,
+} from "@/components/ui";
 import {
   Send,
   Plus,
@@ -12,6 +19,10 @@ import {
   ChevronRight,
   Bot,
   User,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +37,7 @@ interface ChatSession {
   id: string;
   title: string;
   updated_at: string;
+  is_archived?: boolean;
 }
 
 interface PlanSession {
@@ -65,18 +77,21 @@ const quickActions = [
     label: "Analyser ma forme",
     prompt:
       "Peux-tu analyser ma forme actuelle et me dire si je suis prêt pour une séance intense ?",
+    forcePlan: false,
   },
   {
     icon: Zap,
     label: "Séance du jour",
     prompt:
       "Que penses-tu de ma séance prévue aujourd'hui par rapport à ma récupération ?",
+    forcePlan: false,
   },
   {
     icon: Calendar,
     label: "Adapter le planning",
     prompt:
       "Je me sens fatigué, peux-tu me proposer une adaptation de mon planning pour les prochains jours ?",
+    forcePlan: true,
   },
 ];
 
@@ -91,11 +106,21 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [planSuggestions, setPlanSuggestions] = useState<PlanSuggestion[]>([]);
   const [forcePlanMode, setForcePlanMode] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [contextMenu, setContextMenu] = useState<string | null>(null);
+  const [renamingSession, setRenamingSession] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [adaptationDetected, setAdaptationDetected] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -117,9 +142,11 @@ export default function ChatPage() {
     return () => media.removeEventListener("change", listener);
   }, []);
 
-  const loadSessions = async () => {
+  const loadSessions = async (archived?: boolean) => {
     try {
-      const response = await fetch("/api/chat");
+      const show = archived !== undefined ? archived : showArchived;
+      const url = show ? "/api/chat?showArchived=true" : "/api/chat";
+      const response = await fetch(url);
       const data = await response.json();
       if (data.sessions) {
         setSessions(data.sessions);
@@ -164,6 +191,7 @@ export default function ChatPage() {
 
     setInputValue("");
     setIsStreaming(true);
+    setAdaptationDetected(null);
 
     // Add user message optimistically
     const userMessage: Message = {
@@ -242,6 +270,10 @@ export default function ChatPage() {
                 ]);
               }
 
+              if (data.adaptationDetected) {
+                setAdaptationDetected(fullContent);
+              }
+
               if (data.done && data.sessionId) {
                 if (!currentSession) {
                   setCurrentSession(data.sessionId);
@@ -269,7 +301,70 @@ export default function ChatPage() {
     setMessages([]);
     setPlanSuggestions([]);
     setForcePlanMode(false);
+    setAdaptationDetected(null);
   };
+
+  const handleRenameStart = (session: ChatSession) => {
+    setRenamingSession(session.id);
+    setRenameValue(session.title || "");
+    setContextMenu(null);
+  };
+
+  const handleRenameSave = async () => {
+    if (!renamingSession || !renameValue.trim()) return;
+    try {
+      await fetch("/api/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: renamingSession, title: renameValue.trim() }),
+      });
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === renamingSession ? { ...s, title: renameValue.trim() } : s
+        )
+      );
+    } catch (error) {
+      console.error("Error renaming session:", error);
+    }
+    setRenamingSession(null);
+    setRenameValue("");
+  };
+
+  const handleDeleteSession = async () => {
+    if (!deleteTarget) return;
+    try {
+      await fetch(`/api/chat?sessionId=${deleteTarget.id}`, { method: "DELETE" });
+      if (currentSession === deleteTarget.id) {
+        setCurrentSession(null);
+        setMessages([]);
+        setPlanSuggestions([]);
+      }
+      setSessions((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+    } catch (error) {
+      console.error("Error deleting session:", error);
+    }
+    setDeleteTarget(null);
+  };
+
+  const handleArchiveSession = async (sessionId: string) => {
+    try {
+      await fetch("/api/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, is_archived: true }),
+      });
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch (error) {
+      console.error("Error archiving session:", error);
+    }
+    setContextMenu(null);
+  };
+
+  // Reload sessions when showArchived changes
+  useEffect(() => {
+    loadSessions(showArchived);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchived]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -541,32 +636,114 @@ export default function ChatPage() {
             ) : (
               <div className="space-y-1">
                 {sessions.map((session) => (
-                  <button
+                  <div
                     key={session.id}
-                    onClick={() => {
-                      loadMessages(session.id);
-                      if (!isDesktop) {
-                        setSidebarOpen(false);
-                      }
-                    }}
                     className={cn(
-                      "w-full text-left px-3 py-2 rounded-xl transition-colors",
+                      "relative group flex items-start rounded-xl transition-colors",
                       currentSession === session.id
                         ? "bg-accent/20 text-accent"
                         : "hover:bg-dark-100 text-foreground"
                     )}
                   >
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm truncate">{session.title}</span>
-                    </div>
-                    <p className="text-xs text-muted mt-1 ml-6">
-                      {formatDate(session.updated_at)}
-                    </p>
-                  </button>
+                    {renamingSession === session.id ? (
+                      <div className="w-full px-2 py-1">
+                        <input
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRenameSave();
+                            if (e.key === "Escape") {
+                              setRenamingSession(null);
+                              setRenameValue("");
+                            }
+                          }}
+                          onBlur={() => {
+                            setRenamingSession(null);
+                            setRenameValue("");
+                          }}
+                          className="w-full bg-dark-100 border border-dark-200 rounded-lg px-2 py-1 text-sm text-foreground focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            loadMessages(session.id);
+                            if (!isDesktop) {
+                              setSidebarOpen(false);
+                            }
+                          }}
+                          className="flex-1 text-left px-3 py-2 min-w-0"
+                        >
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                            <span className="text-sm truncate">{session.title}</span>
+                          </div>
+                          <p className="text-xs text-muted mt-1 ml-6">
+                            {formatDate(session.updated_at)}
+                          </p>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setContextMenu(contextMenu === session.id ? null : session.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 mt-1 mr-1 rounded-lg hover:bg-dark-200 transition-opacity"
+                          aria-label="Options"
+                        >
+                          <MoreHorizontal className="h-4 w-4 text-muted" />
+                        </button>
+
+                        {contextMenu === session.id && (
+                          <div className="absolute right-0 top-8 z-50 w-44 bg-dark-50 border border-dark-200 rounded-xl shadow-lg p-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRenameStart(session);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted hover:text-foreground hover:bg-dark-100"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Renommer
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleArchiveSession(session.id);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted hover:text-foreground hover:bg-dark-100"
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                              Archiver
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget({ id: session.id, title: session.title || "cette conversation" });
+                                setContextMenu(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-error hover:bg-error/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Supprimer
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
+
+            <button
+              onClick={() => setShowArchived((prev) => !prev)}
+              className="w-full mt-3 text-xs text-muted hover:text-foreground text-center py-2 transition-colors"
+            >
+              {showArchived ? "Masquer archivées" : "Montrer archivées"}
+            </button>
           </div>
         </div>
       </div>
@@ -622,7 +799,7 @@ export default function ChatPage() {
                     variant="interactive"
                     padding="sm"
                     className="cursor-pointer"
-                    onClick={() => handleSend(action.prompt)}
+                    onClick={() => handleSend(action.prompt, { forcePlan: action.forcePlan })}
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 bg-accent/20 rounded-xl flex items-center justify-center">
@@ -651,6 +828,31 @@ export default function ChatPage() {
             </>
           )}
         </div>
+
+        {/* Adaptation detected banner */}
+        {adaptationDetected && !isStreaming && (
+          <div className="mx-4 mt-2 mb-1 p-3 bg-secondary/10 border border-secondary/30 rounded-xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-secondary flex-shrink-0" />
+              <p className="text-sm text-secondary">
+                Le coach suggère une adaptation de planning
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setAdaptationDetected(null);
+                handleSend("Formule cette suggestion comme une modification de plan structurée avec les détails (séance, date, action)", {
+                  forcePlan: true,
+                });
+              }}
+              disabled={isStreaming}
+            >
+              Formuler comme modification
+            </Button>
+          </div>
+        )}
 
         {/* Input area */}
         <div className="border-t border-dark-200 p-4">
@@ -701,6 +903,18 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
+
+      <DeleteConfirmationModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteSession}
+        isLoading={false}
+        description={
+          deleteTarget
+            ? `Supprimer "${deleteTarget.title}" et tous ses messages est irrémédiable.`
+            : undefined
+        }
+      />
     </div>
   );
 }

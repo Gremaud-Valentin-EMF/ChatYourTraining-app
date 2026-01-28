@@ -18,6 +18,7 @@ import {
   LogOut,
   Bell,
   ChevronDown,
+  Target,
 } from "lucide-react";
 
 const navItems = [
@@ -35,6 +36,11 @@ const navItems = [
     href: "/workouts",
     label: "Entraînements",
     icon: List,
+  },
+  {
+    href: "/objectives",
+    label: "Objectifs",
+    icon: Target,
   },
   {
     href: "/health",

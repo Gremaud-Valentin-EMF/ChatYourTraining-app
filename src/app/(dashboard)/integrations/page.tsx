@@ -627,10 +627,10 @@ function IntegrationsPageContent() {
                         })),
                       ]}
                       value={preference?.preferred_provider || ""}
-                      onChange={(e) =>
+                      onChange={(value) =>
                         handlePreferenceChange(
                           dataType,
-                          e.target.value as IntegrationProvider
+                          value as IntegrationProvider
                         )
                       }
                       className="w-full sm:w-40"

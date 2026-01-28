@@ -28,6 +28,13 @@ export interface AthleteProfile {
     priority: string;
     days_remaining: number;
   } | null;
+  objectives: {
+    name: string;
+    date: string;
+    type: string;
+    priority: string;
+    days_remaining: number;
+  }[];
   limitations: string[];
 }
 
@@ -134,10 +141,15 @@ Les indicateurs de récupération (Whoop, HRV, etc.) sont des **signaux**, pas d
 - Séances manquées : ne culpabilise pas, mais alerte si récurrent (>2 séances/semaine)
 - TSB très négatif (<-20) : recommande allègement proactif
 
-## Règles de sécurité (NON NÉGOCIABLE)
-- **JAMAIS** de diagnostic médical
-- Si douleur aiguë mentionnée → Recommande consultation spécialiste
-- Si signes de surentraînement sévère → Insiste sur le repos et avis médical
+## Règles de santé et sécurité
+- **JAMAIS** de diagnostic médical — reste toujours dans le rôle coach
+- **Symptômes bénins** (toux légère, fatigue passagère, courbatures après séance, petit mal de tête) → conseils pratiques : repos, hydratation, sommeil. Pas de prise de panique, pas de "consultez un médecin" systématique
+- **Symptômes potentiellement sérieux** (douleur aiguë persistante, fièvre, douleur thoracique, essoufflement inhabituel, signes de surentraînement sévère comme resting HR qui monte depuis des jours + TSB très négatif + insomnie) → alors et seulement alors recommande une consultation
+- Si l'athlète mentionne un symptôme, évalue d'abord si ça semble grave avant de réagir. Le bon sens avant la prudence excessive
+
+## Suggestions d'adaptation du planning
+- Quand tu proposes une adaptation (repos, changement de séance, annulation), formule-la comme une **proposition explicite** : "Je te propose de..." ou "On pourrait adapter comme ça : ..."
+- Reste encourageant : une adaptation n'est pas un échec, c'est de la stratégie
 
 ## Format de réponse
 - Utilise des listes à puces pour les recommandations
@@ -196,6 +208,7 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
     physioResult,
     sportsResult,
     objectiveResult,
+    allObjectivesResult,
     metricsResult,
     activitiesResult,
     loadResult,
@@ -221,6 +234,12 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
       .order("event_date")
       .limit(1)
       .single(),
+    (supabase as any)
+      .from("objectives")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("event_date", today)
+      .order("event_date"),
     (supabase as any)
       .from("daily_metrics")
       .select("*")
@@ -270,6 +289,7 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   const physio = physioResult.data;
   const sports = sportsResult.data || [];
   const objective = objectiveResult.data;
+  const allObjectives = allObjectivesResult.data || [];
   const metrics = metricsResult.data;
   const activities = activitiesResult.data || [];
   const load = loadResult.data;
@@ -345,6 +365,21 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
             days_remaining: daysRemaining,
           }
         : null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      objectives: allObjectives.map((obj: any) => {
+        const eventDate = new Date(obj.event_date);
+        const todayDate = new Date(today);
+        const days = Math.ceil(
+          (eventDate.getTime() - todayDate.getTime()) / (24 * 60 * 60 * 1000)
+        );
+        return {
+          name: obj.name,
+          date: obj.event_date,
+          type: obj.event_type,
+          priority: obj.priority,
+          days_remaining: days,
+        };
+      }),
       limitations: [],
     },
     physiological_status_today: {

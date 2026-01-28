@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -635,33 +635,33 @@ export default function WorkoutsPage() {
                 { value: "3months", label: "3 derniers mois" },
               ],
               value: filters.period,
-              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
+              onChange: (value: string) =>
                 applyFilterChanges({
-                  period: e.target.value as PeriodFilter,
+                  period: value as PeriodFilter,
                 }),
             },
             {
               key: "sport",
               options: sportOptions,
               value: filters.sport,
-              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
-                applyFilterChanges({ sport: e.target.value }),
+              onChange: (value: string) =>
+                applyFilterChanges({ sport: value }),
             },
             {
               key: "source",
               options: sourceOptions,
               value: filters.source,
-              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
+              onChange: (value: string) =>
                 applyFilterChanges({
-                  source: e.target.value as "all" | IntegrationProvider,
+                  source: value as "all" | IntegrationProvider,
                 }),
             },
             {
               key: "intensity",
               options: intensityOptions,
               value: filters.intensity,
-              onChange: (e: ChangeEvent<HTMLSelectElement>) =>
-                applyFilterChanges({ intensity: e.target.value }),
+              onChange: (value: string) =>
+                applyFilterChanges({ intensity: value }),
             },
           ].map((config) => (
             <Select
@@ -987,8 +987,8 @@ export default function WorkoutsPage() {
             <Select
               label="Sport"
               value={newSession.sportId}
-              onChange={(e) =>
-                setNewSession((prev) => ({ ...prev, sportId: e.target.value }))
+              onChange={(value) =>
+                setNewSession((prev) => ({ ...prev, sportId: value }))
               }
               placeholder="Choisissez un sport"
               options={sports.map((sport) => ({
@@ -1021,8 +1021,8 @@ export default function WorkoutsPage() {
           <Select
             label="Intensité"
             value={newSession.intensity}
-            onChange={(e) =>
-              setNewSession((prev) => ({ ...prev, intensity: e.target.value }))
+            onChange={(value) =>
+              setNewSession((prev) => ({ ...prev, intensity: value }))
             }
             options={manualIntensityOptions}
           />

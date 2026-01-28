@@ -29,6 +29,7 @@ import {
   Edit2,
   NotebookPen,
   Check,
+  Target,
 } from "lucide-react";
 import {
   cn,
@@ -36,6 +37,13 @@ import {
   formatDuration,
   toLocalDateString,
 } from "@/lib/utils";
+
+interface Objective {
+  id: string;
+  name: string;
+  event_date: string;
+  priority: "A" | "B" | "C";
+}
 
 interface Activity {
   id: string;
@@ -78,6 +86,7 @@ export default function CalendarPage() {
   const [sports, setSports] = useState<
     { id: string; name: string; name_fr: string }[]
   >([]);
+  const [objectives, setObjectives] = useState<Objective[]>([]);
   const [isSavingSession, setIsSavingSession] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newSession, setNewSession] = useState({
@@ -252,6 +261,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     loadSports();
+    loadObjectives();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
@@ -329,6 +339,23 @@ export default function CalendarPage() {
       .order("name_fr");
     if (data) {
       setSports(data);
+    }
+  };
+
+  const loadObjectives = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("objectives")
+        .select("id, name, event_date, priority")
+        .eq("user_id", user.id)
+        .order("event_date");
+      if (data) {
+        setObjectives(data);
+      }
+    } catch (error) {
+      console.error("Error loading objectives:", error);
     }
   };
 
@@ -469,6 +496,13 @@ export default function CalendarPage() {
       day
     ).padStart(2, "0")}`;
     return activities.filter((a) => a.scheduled_date === dateStr);
+  };
+
+  const getObjectivesForDate = (day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
+    return objectives.filter((o) => o.event_date === dateStr);
   };
 
   const isCurrentDay = (day: number) => {
@@ -734,6 +768,7 @@ export default function CalendarPage() {
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                       const day = i + 1;
                       const dayActivities = getActivitiesForDate(day);
+                      const dayObjectives = getObjectivesForDate(day);
                       const isSelected =
                         selectedDate?.getDate() === day &&
                         selectedDate?.getMonth() === month &&
@@ -764,6 +799,28 @@ export default function CalendarPage() {
                             {isCurrentDay(day) && (
                               <span className="ml-1 h-1 w-1 md:h-1.5 md:w-1.5 bg-accent rounded-full inline-block" />
                             )}
+                          </div>
+
+                          {/* Objectifs badge (desktop) */}
+                          <div className="hidden md:block space-y-1">
+                            {dayObjectives.map((obj) => (
+                              <div
+                                key={`obj-${obj.id}`}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold truncate"
+                                style={{
+                                  backgroundColor: "rgba(234, 179, 8, 0.15)",
+                                  color: "#ca8a04",
+                                  border: "1px solid rgba(234, 179, 8, 0.3)",
+                                }}
+                              >
+                                <Target className="h-2.5 w-2.5 flex-shrink-0" />
+                                <span className="truncate">
+                                  {obj.name.length > 10
+                                    ? `${obj.name.substring(0, 10)}...`
+                                    : obj.name}
+                                </span>
+                              </div>
+                            ))}
                           </div>
 
                           {/* Desktop: Full List */}
@@ -815,6 +872,13 @@ export default function CalendarPage() {
 
                           {/* Mobile: Dots */}
                           <div className="flex md:hidden flex-wrap gap-1 mt-1">
+                            {dayObjectives.map((obj) => (
+                              <div
+                                key={`obj-${obj.id}`}
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: "#ca8a04" }}
+                              />
+                            ))}
                             {dayActivities.map((activity) => (
                               <div
                                 key={activity.id}
@@ -1241,8 +1305,8 @@ export default function CalendarPage() {
             <Select
               label="Sport"
               value={newSession.sportId}
-              onChange={(e) =>
-                setNewSession((prev) => ({ ...prev, sportId: e.target.value }))
+              onChange={(value) =>
+                setNewSession((prev) => ({ ...prev, sportId: value }))
               }
               placeholder="Choisissez un sport"
               options={sports.map((sport) => ({
@@ -1275,8 +1339,8 @@ export default function CalendarPage() {
           <Select
             label="Intensité"
             value={newSession.intensity}
-            onChange={(e) =>
-              setNewSession((prev) => ({ ...prev, intensity: e.target.value }))
+            onChange={(value) =>
+              setNewSession((prev) => ({ ...prev, intensity: value }))
             }
             options={[
               { value: "recovery", label: "Récupération" },

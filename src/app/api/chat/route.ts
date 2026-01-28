@@ -223,6 +223,17 @@ export async function POST(request: Request) {
             await supabase.from("chat_messages").insert(assistantMessagePayload);
           }
 
+          // Send adaptation signal if detected
+          if (isAdaptationDetected(fullResponse)) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  adaptationDetected: true,
+                })}\n\n`
+              )
+            );
+          }
+
           // Send done signal
           controller.enqueue(
             encoder.encode(
@@ -270,6 +281,24 @@ type StreamOptions = {
   messages: OpenAI.Chat.ChatCompletionMessageParam[];
   onChunk: (content: string) => void;
 };
+
+function isAdaptationDetected(content: string): boolean {
+  const normalized = content.toLowerCase();
+  const keywords = [
+    "je te propose de",
+    "on pourrait adapter",
+    "on pourrait remplacer",
+    "on pourrait annuler",
+    "jour de repos",
+    "adapter la séance",
+    "adapter le planning",
+    "remplacer la séance",
+    "annuler la séance",
+    "réduire l'intensité",
+    "passer à un jour de repos",
+  ];
+  return keywords.some((kw) => normalized.includes(kw));
+}
 
 function isPlanRequest(content: string): boolean {
   const normalized = content.toLowerCase();
@@ -658,11 +687,18 @@ export async function GET(request: Request) {
 
       return NextResponse.json({ messages });
     } else {
-      // Get all sessions
-      const { data: sessions, error } = await supabase
+      // Get all sessions (exclude archived by default)
+      const showArchived = searchParams.get("showArchived") === "true";
+      let query = supabase
         .from("chat_sessions")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", user.id);
+
+      if (!showArchived) {
+        query = query.or("is_archived.is.null,is_archived.eq.false");
+      }
+
+      const { data: sessions, error } = await query
         .order("updated_at", { ascending: false })
         .limit(20);
 
@@ -681,5 +717,92 @@ export async function GET(request: Request) {
       { error: "Internal server error" },
       { status: 500 }
     );
+  }
+}
+
+// Rename or archive a session
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { sessionId, title, is_archived } = body;
+
+    if (!sessionId) {
+      return NextResponse.json({ error: "sessionId required" }, { status: 400 });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (typeof title === "string") {
+      updates.title = title;
+    }
+    if (typeof is_archived === "boolean") {
+      updates.is_archived = is_archived;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from("chat_sessions")
+      .update(updates)
+      .eq("id", sessionId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Chat PATCH error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// Delete a session
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get("sessionId");
+
+    if (!sessionId) {
+      return NextResponse.json({ error: "sessionId required" }, { status: 400 });
+    }
+
+    // Delete messages first, then session
+    await supabase
+      .from("chat_messages")
+      .delete()
+      .eq("session_id", sessionId);
+
+    const { error } = await supabase
+      .from("chat_sessions")
+      .delete()
+      .eq("id", sessionId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      return NextResponse.json({ error: "Failed to delete session" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Chat DELETE error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

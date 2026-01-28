@@ -780,11 +780,9 @@ export default function OnboardingPage() {
                                   { value: "elite", label: "Élite" },
                                 ]}
                                 value={sport.level}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  updateSportLevel(sport.id, e.target.value);
+                                onChange={(value) => {
+                                  updateSportLevel(sport.id, value);
                                 }}
-                                onClick={(e) => e.stopPropagation()}
                                 className="h-11 text-sm"
                               />
                             </div>
@@ -958,8 +956,8 @@ export default function OnboardingPage() {
                   { value: "other", label: "Autre" },
                 ]}
                 value={objective.event_type}
-                onChange={(e) =>
-                  setObjective({ ...objective, event_type: e.target.value })
+                onChange={(value) =>
+                  setObjective({ ...objective, event_type: value })
                 }
               />
 
