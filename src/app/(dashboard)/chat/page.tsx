@@ -118,10 +118,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Removed - now handled by the showArchived useEffect below
 
   useEffect(() => {
     scrollToBottom();
@@ -142,10 +139,21 @@ export default function ChatPage() {
     return () => media.removeEventListener("change", listener);
   }, []);
 
-  const loadSessions = async (archived?: boolean) => {
+  // Close context menu when clicking outside
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [contextMenu]);
+
+  const loadSessions = async () => {
     try {
-      const show = archived !== undefined ? archived : showArchived;
-      const url = show ? "/api/chat?showArchived=true" : "/api/chat";
+      const url = showArchived ? "/api/chat?showArchived=true" : "/api/chat";
       const response = await fetch(url);
       const data = await response.json();
       if (data.sessions) {
@@ -360,9 +368,9 @@ export default function ChatPage() {
     setContextMenu(null);
   };
 
-  // Reload sessions when showArchived changes
+  // Load sessions on mount and when showArchived changes
   useEffect(() => {
-    loadSessions(showArchived);
+    loadSessions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived]);
 
@@ -474,10 +482,11 @@ export default function ChatPage() {
 
   const handleRefusePlan = (planId: string) => {
     setPlanSuggestions((prev) => prev.filter((p) => p.id !== planId));
-    handleSend(
-      "Ce plan ne me convient pas, peux-tu m'en proposer un autre plus adapté ?",
-      { forcePlan: true }
+    setForcePlanMode(true);
+    setInputValue(
+      "Ce plan ne me convient pas. Voici ce que je souhaiterais à la place : "
     );
+    inputRef.current?.focus();
   };
 
   const renderPlanSuggestion = (suggestion: PlanSuggestion) => {

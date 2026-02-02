@@ -11,8 +11,10 @@ import {
   Spinner,
   Slider,
   DeleteConfirmationModal,
+  Input,
+  Select,
 } from "@/components/ui";
-import { ArrowLeft, Activity, Check, Trash } from "lucide-react";
+import { ArrowLeft, Activity, Check, Trash, Edit, X, Save } from "lucide-react";
 import {
   formatDuration,
   formatDistance,
@@ -74,6 +76,13 @@ export default function WorkoutDetailPage({
   const [isSavingRpe, setIsSavingRpe] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMarkingDone, setIsMarkingDone] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    intensity: "",
+  });
   const today = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -89,6 +98,11 @@ export default function WorkoutDetailPage({
   useEffect(() => {
     if (activity) {
       setRpeInput(activity.rpe ?? 0);
+      setEditForm({
+        title: activity.title,
+        description: activity.description ?? "",
+        intensity: activity.intensity ?? "endurance",
+      });
     }
   }, [activity]);
 
@@ -284,6 +298,54 @@ export default function WorkoutDetailPage({
       console.error("Error deleting activity:", error);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleStartEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (activity) {
+      setEditForm({
+        title: activity.title,
+        description: activity.description ?? "",
+        intensity: activity.intensity ?? "endurance",
+      });
+    }
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!activity) return;
+    setIsSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from("activities")
+        .update({
+          title: editForm.title,
+          description: editForm.description || null,
+          intensity: editForm.intensity,
+        })
+        .eq("id", activity.id);
+
+      if (!error) {
+        setActivity((prev) =>
+          prev
+            ? {
+                ...prev,
+                title: editForm.title,
+                description: editForm.description || null,
+                intensity: editForm.intensity,
+              }
+            : prev
+        );
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error("Error updating activity:", error);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -675,9 +737,20 @@ export default function WorkoutDetailPage({
                   <p className="text-xs uppercase text-foreground/60">{date}</p>
                 </div>
                 <div className="flex flex-row items-center gap-3">
-                  <h1 className="text-2xl font-bold text-foreground">
-                    {activity.title}
-                  </h1>
+                  {isEditing ? (
+                    <Input
+                      value={editForm.title}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      className="text-2xl font-bold max-w-md"
+                      placeholder="Titre de la séance"
+                    />
+                  ) : (
+                    <h1 className="text-2xl font-bold text-foreground">
+                      {activity.title}
+                    </h1>
+                  )}
                   <Badge
                     variant={statusVariant}
                     className="uppercase text-xs tracking-wide"
@@ -698,13 +771,33 @@ export default function WorkoutDetailPage({
                   <span className="text-xs uppercase text-foreground/60">
                     Objectif de la séance
                   </span>
-                  <span className="font-medium text-foreground">
-                    {focusLabel}
-                  </span>
+                  {isEditing ? (
+                    <Select
+                      value={editForm.intensity}
+                      onChange={(value) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          intensity: value,
+                        }))
+                      }
+                      options={[
+                        { value: "recovery", label: "Récupération active" },
+                        { value: "endurance", label: "Endurance fondamentale" },
+                        { value: "tempo", label: "Développement VMA" },
+                        { value: "threshold", label: "Seuil / tenue de puissance" },
+                        { value: "vo2max", label: "Augmentation de VO2max" },
+                      ]}
+                      className="max-w-xs"
+                    />
+                  ) : (
+                    <span className="font-medium text-foreground">
+                      {focusLabel}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-            {activity.description && (
+            {(activity.description || isEditing) && (
               <section className="space-y-3 border-t border-dark-200 pt-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -715,22 +808,70 @@ export default function WorkoutDetailPage({
                     Notes de contexte
                   </span>
                 </div>
-                <div className="rounded-2xl border border-dark-200 bg-dark-100/50 px-4 py-3 text-sm text-foreground/70">
-                  {activity.description}
-                </div>
+                {isEditing ? (
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-2xl border border-dark-200 bg-dark-100/50 px-4 py-3 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+                    rows={3}
+                    placeholder="Description de la séance (optionnel)"
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-dark-200 bg-dark-100/50 px-4 py-3 text-sm text-foreground/70">
+                    {activity.description}
+                  </div>
+                )}
               </section>
             )}
             <div className="flex flex-wrap gap-2 pt-2">
-              {canMarkAsDone && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleMarkAsDone}
-                  isLoading={isMarkingDone}
-                  leftIcon={<Check className="h-4 w-4" />}
-                >
-                  Marquer comme fait
-                </Button>
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveEdit}
+                    isLoading={isSavingEdit}
+                    leftIcon={<Save className="h-4 w-4" />}
+                  >
+                    Enregistrer
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelEdit}
+                    disabled={isSavingEdit}
+                    leftIcon={<X className="h-4 w-4" />}
+                  >
+                    Annuler
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {canMarkAsDone && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleMarkAsDone}
+                      isLoading={isMarkingDone}
+                      leftIcon={<Check className="h-4 w-4" />}
+                    >
+                      Marquer comme fait
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleStartEdit}
+                    leftIcon={<Edit className="h-4 w-4" />}
+                  >
+                    Modifier
+                  </Button>
+                </>
               )}
             </div>
           </header>

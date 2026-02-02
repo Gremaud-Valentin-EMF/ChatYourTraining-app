@@ -302,15 +302,58 @@ function isAdaptationDetected(content: string): boolean {
 
 function isPlanRequest(content: string): boolean {
   const normalized = content.toLowerCase();
-  return (
-    normalized.includes("plan d'entrainement") ||
-    normalized.includes("plan d'entraînement") ||
-    normalized.includes("plan d entrainement") ||
-    normalized.includes("plan d'entrainement") ||
-    normalized.includes("programme") ||
-    normalized.includes("planning") ||
-    /plan\s+pour\s+les\s+\d+/.test(normalized)
-  );
+
+  // Explicit plan requests
+  const explicitPlanKeywords = [
+    "plan d'entrainement",
+    "plan d'entraînement",
+    "plan d entrainement",
+    "programme d'entrainement",
+    "programme d'entraînement",
+    "planning d'entrainement",
+    "calendrier d'entrainement",
+    /plan\s+pour\s+les\s+\d+/,
+  ];
+
+  // Implicit plan requests (adaptation, scheduling)
+  const implicitPlanKeywords = [
+    "adapter le planning",
+    "adapter mon planning",
+    "modifier le planning",
+    "modifier mon planning",
+    "changer le planning",
+    "réorganiser le planning",
+    "ajuster le planning",
+    "revoir le planning",
+    "me faire un planning",
+    "faire un planning",
+    "organiser mes séances",
+    "planifier mes séances",
+    "comment organiser",
+    "que faire cette semaine",
+    "que faire la semaine prochaine",
+    "que dois-je faire",
+    "quoi faire",
+  ];
+
+  // Check explicit keywords
+  for (const keyword of explicitPlanKeywords) {
+    if (typeof keyword === "string" && normalized.includes(keyword)) {
+      return true;
+    }
+    if (keyword instanceof RegExp && keyword.test(normalized)) {
+      return true;
+    }
+  }
+
+  // Check implicit keywords
+  for (const keyword of implicitPlanKeywords) {
+    if (normalized.includes(keyword)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function generatePlanSuggestion({
@@ -689,16 +732,11 @@ export async function GET(request: Request) {
     } else {
       // Get all sessions (exclude archived by default)
       const showArchived = searchParams.get("showArchived") === "true";
-      let query = supabase
+      const { data: sessions, error } = await supabase
         .from("chat_sessions")
         .select("*")
-        .eq("user_id", user.id);
-
-      if (!showArchived) {
-        query = query.or("is_archived.is.null,is_archived.eq.false");
-      }
-
-      const { data: sessions, error } = await query
+        .eq("user_id", user.id)
+        .eq("is_archived", showArchived)
         .order("updated_at", { ascending: false })
         .limit(20);
 

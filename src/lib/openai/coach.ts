@@ -100,6 +100,11 @@ export interface ScheduleContext {
 }
 
 export interface CoachContext {
+  current_datetime: {
+    date: string;
+    time: string;
+    timezone: string;
+  };
   athlete_profile: AthleteProfile;
   physiological_status_today: PhysiologicalStatus;
   training_load_analysis: TrainingLoadAnalysis;
@@ -339,8 +344,22 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   const recoveryStatus: "green" | "yellow" | "red" =
     recoveryScore >= 67 ? "green" : recoveryScore >= 34 ? "yellow" : "red";
 
+  // Get current datetime with timezone
+  const now = new Date();
+  const timeString = now.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
   // Build context
   const context: CoachContext = {
+    current_datetime: {
+      date: today,
+      time: timeString,
+      timezone,
+    },
     athlete_profile: {
       name: profile?.full_name || "Athlète",
       age,
