@@ -1,0 +1,17 @@
+{
+  "name": "ChatYourTraining",
+  "short_name": "ChatYourTraining",
+  "description": "Coach IA pour Athlètes d'Endurance",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#2B9EB3",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#000000"/>
+
+  <!-- Brain (left side) -->
+  <g transform="translate(80, 180)">
+    <path d="M 50 20 Q 30 20 20 35 Q 10 50 15 70 Q 10 85 20 95 Q 15 110 25 120 Q 35 128 50 125 Q 50 135 60 140 Q 75 145 85 135 Q 95 140 105 135 Q 115 130 115 115 Q 125 105 120 90 Q 130 75 125 60 Q 130 45 120 35 Q 105 20 85 22 Q 70 18 50 20 Z"
+          stroke="#2B9EB3"
+          stroke-width="8"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+    <path d="M 55 40 Q 65 38 70 45 M 75 55 Q 82 58 85 65 M 90 80 Q 95 88 92 95 M 50 70 Q 45 78 48 88"
+          stroke="#2B9EB3"
+          stroke-width="6"
+          fill="none"
+          stroke-linecap="round"/>
+  </g>
+
+  <!-- Heartbeat line (center) -->
+  <g transform="translate(200, 256)">
+    <path d="M 0 0 L 20 0 L 30 -40 L 40 60 L 50 -30 L 60 10 L 70 0 L 110 0"
+          stroke="#2B9EB3"
+          stroke-width="8"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+    <circle cx="110" cy="0" r="10" fill="#2B9EB3"/>
+  </g>
+
+  <!-- Muscle arm (right side) -->
+  <g transform="translate(340, 170)">
+    <!-- Upper arm -->
+    <path d="M 20 80 Q 15 70 15 55 Q 15 40 25 30 Q 35 22 45 25 L 50 28 Q 58 32 60 42 Q 62 50 60 60 L 55 75 Q 52 82 45 85 L 35 87 Q 27 85 20 80 Z"
+          fill="#2B9EB3"/>
+
+    <!-- Forearm -->
+    <path d="M 35 87 Q 40 95 45 105 Q 48 115 50 128 Q 51 140 48 150 Q 45 158 38 162 L 30 163 Q 22 160 18 152 Q 15 142 17 130 Q 19 115 23 100 Q 27 92 35 87 Z"
+          fill="#2B9EB3"/>
+
+    <!-- Bicep peak -->
+    <ellipse cx="42" cy="60" rx="22" ry="28" fill="#2B9EB3" transform="rotate(-15 42 60)"/>
+
+    <!-- Hand/fist -->
+    <ellipse cx="35" cy="170" rx="18" ry="14" fill="#2B9EB3"/>
+    <path d="M 32 165 L 35 155 M 38 165 L 40 155 M 42 167 L 43 157"
+          stroke="#000000"
+          stroke-width="3"
+          stroke-linecap="round"/>
+  </g>
+
+  <!-- Vertical divider line -->
+  <line x1="256" y1="200" x2="256" y2="310" stroke="#2B9EB3" stroke-width="4" opacity="0.5"/>
+</svg>

@@ -27,6 +27,15 @@ export const metadata: Metadata = {
     "coach IA",
     "training",
   ],
+  applicationName: "ChatYourTraining",
+  appleWebApp: {
+    capable: true,
+    title: "ChatYourTraining",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
@@ -36,6 +45,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="dark">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#000000" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-dark text-foreground min-h-screen`}
       >
