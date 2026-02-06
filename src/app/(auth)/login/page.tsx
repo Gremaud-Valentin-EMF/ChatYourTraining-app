@@ -129,7 +129,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-end">
           <Link
             href="/forgot-password"
-            className="text-sm text-accent hover:text-accent-400 transition-colors"
+            className="text-sm text-accent hover:text-accent-400 transition-[color]"
           >
             Mot de passe oublié ?
           </Link>
@@ -151,7 +151,7 @@ export default function LoginPage() {
         Pas encore de compte ?{" "}
         <Link
           href="/register"
-          className="text-accent hover:text-accent-400 font-medium transition-colors"
+          className="text-accent hover:text-accent-400 font-medium transition-[color]"
         >
           Créer un compte
         </Link>

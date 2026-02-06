@@ -98,6 +98,7 @@ export function Modal({
                 size="icon"
                 onClick={onClose}
                 className="shrink-0 -mr-2 -mt-2"
+                aria-label="Fermer"
               >
                 <X className="h-5 w-5" />
               </Button>

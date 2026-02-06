@@ -216,11 +216,11 @@ export default function RegisterPage() {
       {/* Terms */}
       <p className="mt-6 text-center text-sm text-muted">
         En créant un compte, vous acceptez nos{" "}
-        <Link href="/terms" className="text-accent hover:text-accent-400">
+        <Link href="/terms" className="text-accent hover:text-accent-400 transition-[color]">
           conditions d&apos;utilisation
         </Link>{" "}
         et notre{" "}
-        <Link href="/privacy" className="text-accent hover:text-accent-400">
+        <Link href="/privacy" className="text-accent hover:text-accent-400 transition-[color]">
           politique de confidentialité
         </Link>
         .
@@ -231,7 +231,7 @@ export default function RegisterPage() {
         Déjà un compte ?{" "}
         <Link
           href="/login"
-          className="text-accent hover:text-accent-400 font-medium transition-colors"
+          className="text-accent hover:text-accent-400 font-medium transition-[color]"
         >
           Se connecter
         </Link>

@@ -15,6 +15,7 @@ export interface SelectProps {
   onChange?: (value: string) => void;
   className?: string;
   id?: string;
+  name?: string;
   disabled?: boolean;
 }
 
@@ -26,6 +27,7 @@ function Select({
   options,
   placeholder,
   id,
+  name,
   hideChevron,
   value = "",
   onChange,
@@ -37,6 +39,7 @@ function Select({
   const listRef = useRef<HTMLUListElement>(null);
 
   const selectId = id || label?.toLowerCase().replace(/\s/g, "-");
+  const selectName = name || selectId;
 
   const selectedOption = options.find((o) => o.value === value);
   const displayValue = selectedOption?.label || "";
@@ -114,6 +117,8 @@ function Select({
         </label>
       )}
       <div className="relative">
+        {/* Hidden input for form submission */}
+        <input type="hidden" name={selectName} value={value} />
         <button
           type="button"
           id={selectId}

@@ -14,10 +14,11 @@ export interface InputProps
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   (
-    { className, label, error, hint, leftIcon, rightIcon, id, ...props },
+    { className, label, error, hint, leftIcon, rightIcon, id, name, ...props },
     ref
   ) => {
     const inputId = id || label?.toLowerCase().replace(/\s/g, "-");
+    const inputName = name || inputId;
 
     return (
       <div className="w-full">
@@ -38,6 +39,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
+            name={inputName}
             className={cn(
               "w-full px-4 py-3 bg-dark-100 border border-dark-200 rounded-xl",
               "text-foreground placeholder:text-muted",

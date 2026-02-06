@@ -658,6 +658,8 @@ export default function ChatPage() {
                       <div className="w-full px-2 py-1">
                         <input
                           autoFocus
+                          name="session-title"
+                          aria-label="Renommer la conversation"
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
                           onKeyDown={(e) => {

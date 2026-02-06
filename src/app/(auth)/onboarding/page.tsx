@@ -694,6 +694,7 @@ export default function OnboardingPage() {
                       <button
                         key={category.id}
                         onClick={() => setSelectedCategory(category.id)}
+                        aria-label={`Catégorie ${category.label}`}
                         className={`shrink-0 w-auto md:w-full text-left px-3 py-2 rounded-lg transition-all flex items-center justify-between group snap-start whitespace-nowrap md:whitespace-normal ${
                           isSelected
                             ? "bg-accent text-dark font-medium shadow-lg shadow-accent/20"
@@ -717,10 +718,12 @@ export default function OnboardingPage() {
                     {filteredSports.map((sport) => {
                       const IconComponent = getSportIconComponent(sport.icon);
                       return (
-                        <div
+                        <button
                           key={sport.id}
+                          type="button"
                           onClick={() => toggleSport(sport.id)}
-                          className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          aria-label={`${sport.selected ? 'Désélectionner' : 'Sélectionner'} ${sport.name_fr}`}
+                          className={`w-full p-4 rounded-xl border-2 cursor-pointer transition-all text-left ${
                             sport.selected
                               ? "border-accent bg-accent/10"
                               : "border-dark-200 hover:border-dark-300 bg-card"
@@ -787,7 +790,7 @@ export default function OnboardingPage() {
                               />
                             </div>
                           )}
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1013,8 +1016,10 @@ export default function OnboardingPage() {
         {/* Skip option */}
         <div className="mt-6 text-center">
           <button
+            type="button"
             onClick={handleComplete}
-            className="text-sm text-muted hover:text-foreground transition-colors"
+            aria-label="Passer l'onboarding et configurer plus tard"
+            className="text-sm text-muted hover:text-foreground transition-[color]"
           >
             Passer et configurer plus tard
           </button>
