@@ -25,6 +25,7 @@ interface PhysioData {
   height_cm: number | null;
   hr_max: number | null;
   hr_rest: number | null;
+  lthr: number | null;
   birth_date: string | null;
 }
 
@@ -60,6 +61,7 @@ export default function ProfilePage() {
     height_cm: null,
     hr_max: null,
     hr_rest: null,
+    lthr: null,
     birth_date: null,
   });
   const [sports, setSports] = useState<UserSport[]>([]);
@@ -119,6 +121,7 @@ export default function ProfilePage() {
           height_cm: physioRes.data.height_cm,
           hr_max: physioRes.data.hr_max,
           hr_rest: physioRes.data.hr_rest,
+          lthr: physioRes.data.lthr ?? null,
           birth_date: physioRes.data.birth_date,
         });
       }
@@ -172,6 +175,7 @@ export default function ProfilePage() {
          height_cm: physio.height_cm,
          hr_max: physio.hr_max,
          hr_rest: physio.hr_rest,
+         lthr: physio.lthr,
         },
         { onConflict: "user_id" }
       );
@@ -346,10 +350,45 @@ export default function ProfilePage() {
               </div>
               <div className="p-3 bg-dark-100 rounded-xl">
                 <p className="text-xs text-muted uppercase">FC max</p>
-                <p className="text-xl font-bold">
-                  {physio.hr_max ?? "--"}{" "}
-                  <span className="text-sm text-muted">bpm</span>
-                </p>
+                {isEditing ? (
+                  <Input
+                    type="number"
+                    value={physio.hr_max ?? ""}
+                    onChange={(e) =>
+                      setPhysio((p) => ({
+                        ...p,
+                        hr_max: parseInt(e.target.value) || null,
+                      }))
+                    }
+                    className="text-center text-xl font-bold h-8 p-1"
+                  />
+                ) : (
+                  <p className="text-xl font-bold">
+                    {physio.hr_max ?? "--"}{" "}
+                    <span className="text-sm text-muted">bpm</span>
+                  </p>
+                )}
+              </div>
+              <div className="p-3 bg-dark-100 rounded-xl">
+                <p className="text-xs text-muted uppercase">LTHR</p>
+                {isEditing ? (
+                  <Input
+                    type="number"
+                    value={physio.lthr ?? ""}
+                    onChange={(e) =>
+                      setPhysio((p) => ({
+                        ...p,
+                        lthr: parseInt(e.target.value) || null,
+                      }))
+                    }
+                    className="text-center text-xl font-bold h-8 p-1"
+                  />
+                ) : (
+                  <p className="text-xl font-bold">
+                    {physio.lthr ?? "--"}{" "}
+                    <span className="text-sm text-muted">bpm</span>
+                  </p>
+                )}
               </div>
             </div>
           </Card>

@@ -20,6 +20,14 @@ export type ActivityStatus =
   | "in_progress";
 export type IntegrationProvider = "strava" | "whoop" | "garmin" | "manual";
 export type ObjectivePriority = "A" | "B" | "C";
+export type ActivityStreamType =
+  | "time"
+  | "heartrate"
+  | "power"
+  | "cadence"
+  | "speed"
+  | "distance"
+  | "altitude";
 
 export interface Database {
   public: {
@@ -69,6 +77,7 @@ export interface Database {
           birth_date: string | null;
           hr_max: number | null;
           hr_rest: number | null;
+          lthr: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -80,6 +89,7 @@ export interface Database {
           birth_date?: string | null;
           hr_max?: number | null;
           hr_rest?: number | null;
+          lthr?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -91,6 +101,7 @@ export interface Database {
           birth_date?: string | null;
           hr_max?: number | null;
           hr_rest?: number | null;
+          lthr?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -282,6 +293,33 @@ export interface Database {
           raw_data?: Json | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      activity_streams: {
+        Row: {
+          id: string;
+          activity_id: string;
+          provider: IntegrationProvider;
+          data_type: ActivityStreamType;
+          values: number[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          activity_id: string;
+          provider: IntegrationProvider;
+          data_type: ActivityStreamType;
+          values: number[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          activity_id?: string;
+          provider?: IntegrationProvider;
+          data_type?: ActivityStreamType;
+          values?: number[];
+          created_at?: string;
         };
         Relationships: [];
       };

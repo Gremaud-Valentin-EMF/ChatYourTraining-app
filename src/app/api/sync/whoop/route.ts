@@ -590,14 +590,14 @@ export async function POST() {
           raw_data: workout as unknown as ImportedActivityData["raw_data"],
         };
 
-        const matchedPlan = await matchPlannedWorkout(supabase as any, {
+        const matchedPlanId = await matchPlannedWorkout(supabase as any, {
           userId: user.id,
           sportId,
           scheduledDate: workoutDate,
           data: workoutPayload,
         });
 
-        if (matchedPlan) {
+        if (matchedPlanId) {
           workoutsSynced++;
           workoutsMatched++;
           continue;

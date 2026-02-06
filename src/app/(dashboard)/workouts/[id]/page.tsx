@@ -22,6 +22,7 @@ import {
 } from "@/lib/utils";
 import { getSportIconComponent } from "@/lib/sport-icons";
 import type { Json } from "@/types/database";
+import { ActivityStreamChart } from "@/components/workouts/activity-stream-chart";
 
 const focusByIntensity: Record<string, string> = {
   endurance: "Endurance fondamentale",
@@ -78,6 +79,11 @@ export default function WorkoutDetailPage({
   const [isMarkingDone, setIsMarkingDone] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [streamData, setStreamData] = useState<{
+    time?: number[] | null;
+    heartrate?: number[] | null;
+    power?: number[] | null;
+  } | null>(null);
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
@@ -89,6 +95,14 @@ export default function WorkoutDetailPage({
     return now;
   }, []);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const parseStreamArray = (value: unknown): number[] | null => {
+    if (!Array.isArray(value)) return null;
+    const numeric = value
+      .map((item) => (typeof item === "number" ? item : Number(item)))
+      .filter((item) => Number.isFinite(item));
+    return numeric.length > 0 ? numeric : null;
+  };
 
   useEffect(() => {
     loadActivity();
@@ -204,8 +218,37 @@ export default function WorkoutDetailPage({
         rpe: data.rpe ?? null,
         raw_data: data.raw_data ?? null,
       });
+
+      const { data: streamRows } = await supabase
+        .from("activity_streams")
+        .select("data_type, values")
+        .eq("activity_id", data.id);
+
+      const streamMap = new Map<string, number[]>();
+      if (streamRows) {
+        for (const row of streamRows) {
+          const parsed = parseStreamArray(row.values);
+          if (parsed) {
+            streamMap.set(row.data_type, parsed);
+          }
+        }
+      }
+
+      const rawStreams =
+        (data.raw_data as Record<string, unknown> | null)?._streams as
+          | Record<string, unknown>
+          | undefined;
+
+      setStreamData({
+        time: streamMap.get("time") ?? parseStreamArray(rawStreams?.time),
+        heartrate:
+          streamMap.get("heartrate") ??
+          parseStreamArray(rawStreams?.heartrate),
+        power: streamMap.get("power") ?? parseStreamArray(rawStreams?.power),
+      });
     } else {
       setActivity(null);
+      setStreamData(null);
     }
     setIsLoading(false);
   };
@@ -712,6 +755,15 @@ export default function WorkoutDetailPage({
       prefersPace ? formatPaceValue(3600 / value) : `${value.toFixed(1)} km/h`,
   });
 
+  const hasStreamData =
+    Boolean(streamData?.heartrate && streamData.heartrate.length > 0) ||
+    Boolean(streamData?.power && streamData.power.length > 0);
+  const resolvedStreamData = streamData ?? {
+    time: null,
+    heartrate: null,
+    power: null,
+  };
+
   return (
     <div className="space-y-6">
       <Link
@@ -922,6 +974,30 @@ export default function WorkoutDetailPage({
             ) : (
               <p className="text-sm text-muted">
                 Aucune donnée spécifique n&apos;est disponible pour cette
+                séance.
+              </p>
+            )}
+          </section>
+
+          <section className="space-y-3 border-t border-dark-200 pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Courbes de performance
+              </h3>
+              <span className="text-xs uppercase text-foreground/60">
+                Zoom & sélection
+              </span>
+            </div>
+            {hasStreamData ? (
+              <ActivityStreamChart
+                timeStream={resolvedStreamData.time ?? null}
+                heartRateStream={resolvedStreamData.heartrate ?? null}
+                powerStream={resolvedStreamData.power ?? null}
+              />
+            ) : (
+              <p className="text-sm text-muted">
+                Aucune donnée détaillée n&apos;est disponible pour cette
                 séance.
               </p>
             )}

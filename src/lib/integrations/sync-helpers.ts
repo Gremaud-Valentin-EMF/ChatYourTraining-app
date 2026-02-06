@@ -108,7 +108,7 @@ export async function matchPlannedWorkout(
     scheduledDate: string;
     data: ImportedActivityData;
   }
-) {
+): Promise<string | null> {
   const { userId, sportId, scheduledDate, data } = params;
   const targetDuration =
     data.actual_duration_minutes ?? 0;
@@ -124,7 +124,7 @@ export async function matchPlannedWorkout(
     .order("planned_duration_minutes", { ascending: true });
 
   if (!candidates || candidates.length === 0) {
-    return false;
+    return null;
   }
 
   let bestCandidate: { id: string; planned_duration_minutes: number | null } | null =
@@ -148,7 +148,7 @@ export async function matchPlannedWorkout(
   }
 
   if (!bestCandidate) {
-    return false;
+    return null;
   }
 
   const updatePayload: Partial<ImportedActivityData> = {
@@ -177,8 +177,8 @@ export async function matchPlannedWorkout(
 
   if (error) {
     console.error("Failed to update planned workout:", error);
-    return false;
+    return null;
   }
 
-  return true;
+  return bestCandidate.id;
 }

@@ -8,6 +8,7 @@ import {
   mapStravaSportType,
   calculateNormalizedHeartRate,
   calculateNormalizedPower,
+  calculateNormalizedGradedPace,
   TSSCalculationOptions,
 } from "@/lib/integrations/strava";
 import {
@@ -230,6 +231,65 @@ export async function POST() {
     let streamsFetched = 0;
     const MAX_STREAMS_PER_SYNC = 80; // More streams for accurate NHR/TSS
 
+    const buildStreamRows = (
+      activityId: string,
+      provider: "strava",
+      options: TSSCalculationOptions
+    ) => {
+      const rows: {
+        activity_id: string;
+        provider: "strava";
+        data_type:
+          | "time"
+          | "heartrate"
+          | "power"
+          | "distance"
+          | "altitude";
+        values: number[];
+      }[] = [];
+      if (options.timeStream && options.timeStream.length > 0) {
+        rows.push({
+          activity_id: activityId,
+          provider,
+          data_type: "time",
+          values: options.timeStream,
+        });
+      }
+      if (options.heartrateStream && options.heartrateStream.length > 0) {
+        rows.push({
+          activity_id: activityId,
+          provider,
+          data_type: "heartrate",
+          values: options.heartrateStream,
+        });
+      }
+      if (options.powerStream && options.powerStream.length > 0) {
+        rows.push({
+          activity_id: activityId,
+          provider,
+          data_type: "power",
+          values: options.powerStream,
+        });
+      }
+      if (options.distanceStream && options.distanceStream.length > 0) {
+        rows.push({
+          activity_id: activityId,
+          provider,
+          data_type: "distance",
+          values: options.distanceStream,
+        });
+      }
+      if (options.altitudeStream && options.altitudeStream.length > 0) {
+        rows.push({
+          activity_id: activityId,
+          provider,
+          data_type: "altitude",
+          values: options.altitudeStream,
+        });
+      }
+      return rows;
+    };
+
     for (const stravaActivity of activities) {
       // Check if activity already exists
       const externalId = String(stravaActivity.id);
@@ -276,7 +336,7 @@ export async function POST() {
         if (shouldFetchStreams) {
           try {
             // Always include time stream for charting
-            const streamKeys = ["time"];
+            const streamKeys = ["time", "distance", "altitude"];
             if (stravaActivity.average_heartrate) streamKeys.push("heartrate");
             if (stravaActivity.weighted_average_watts) streamKeys.push("watts");
 
@@ -290,6 +350,12 @@ export async function POST() {
             // Store time stream for charting
             if (streams.time?.data) {
               tssOptions.timeStream = streams.time.data;
+            }
+            if (streams.distance?.data) {
+              tssOptions.distanceStream = streams.distance.data;
+            }
+            if (streams.altitude?.data) {
+              tssOptions.altitudeStream = streams.altitude.data;
             }
 
             // Calculate and store Heart Rate data
@@ -315,6 +381,22 @@ export async function POST() {
                 );
               }
             }
+
+            if (streams.time?.data && streams.distance?.data) {
+              const ngp = calculateNormalizedGradedPace(
+                streams.time.data,
+                streams.distance.data,
+                streams.altitude?.data
+              );
+              if (ngp > 0) {
+                tssOptions.normalizedPaceSeconds = ngp;
+                console.log(
+                  `Streams: ${stravaActivity.name} - NGP=${ngp.toFixed(
+                    1
+                  )}s/km`
+                );
+              }
+            }
           } catch (streamError) {
             // Non-blocking: if streams fail, use average values
             console.log(
@@ -337,30 +419,57 @@ export async function POST() {
           }${tssOptions.normalizedHeartRate ? " (NHR)" : ""}`
       );
 
-      const matchedPlan = await matchPlannedWorkout(supabase as any, {
+      const matchedPlanId = await matchPlannedWorkout(supabase as any, {
         userId: user.id,
         sportId,
         scheduledDate: activityData.scheduled_date,
         data: activityData,
       });
 
-      if (matchedPlan) {
+      if (matchedPlanId) {
+        const streamRows = buildStreamRows(
+          matchedPlanId,
+          "strava",
+          tssOptions
+        );
+        if (streamRows.length > 0) {
+          await (supabase as any)
+            .from("activity_streams")
+            .upsert(streamRows, { onConflict: "activity_id,data_type" });
+        }
         synced++;
         matchedToPlan++;
         continue;
       }
 
-      const { error: insertError } = await (supabase as any)
+      const { data: inserted, error: insertError } = await (supabase as any)
         .from("activities")
         .insert({
           user_id: user.id,
           sport_id: sportId,
           ...activityData,
-        });
+        })
+        .select("id");
 
       if (insertError) {
         console.error("Error inserting activity:", insertError);
       } else {
+        const insertedActivityId =
+          Array.isArray(inserted) && inserted.length > 0
+            ? inserted[0]?.id
+            : null;
+        if (insertedActivityId) {
+          const streamRows = buildStreamRows(
+            insertedActivityId,
+            "strava",
+            tssOptions
+          );
+          if (streamRows.length > 0) {
+            await (supabase as any)
+              .from("activity_streams")
+              .upsert(streamRows, { onConflict: "activity_id,data_type" });
+          }
+        }
         synced++;
       }
     }

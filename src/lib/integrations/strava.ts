@@ -192,6 +192,8 @@ export interface StravaStreamsResponse {
   time?: StravaStream;
   watts?: StravaStream;
   cadence?: StravaStream;
+  distance?: StravaStream;
+  altitude?: StravaStream;
 }
 
 /**
@@ -296,6 +298,81 @@ export function calculateNormalizedPower(powerData: number[]): number {
   return Math.round(Math.pow(meanFourthPower, 0.25));
 }
 
+const MINETTI_COEFFICIENTS = {
+  a: 155.4,
+  b: -30.4,
+  c: -43.3,
+  d: 46.3,
+  e: 19.5,
+  f: 3.6,
+};
+
+function calculateEnergyCost(grade: number): number {
+  const g = Math.max(-0.3, Math.min(0.3, grade));
+  const { a, b, c, d, e, f } = MINETTI_COEFFICIENTS;
+  return (
+    a * Math.pow(g, 5) +
+    b * Math.pow(g, 4) +
+    c * Math.pow(g, 3) +
+    d * Math.pow(g, 2) +
+    e * g +
+    f
+  );
+}
+
+export function calculateNormalizedGradedPace(
+  timeStream: number[],
+  distanceStream: number[],
+  altitudeStream?: number[]
+): number {
+  if (!timeStream.length || !distanceStream.length) return 0;
+  const length = Math.min(timeStream.length, distanceStream.length);
+  const hasAltitude =
+    altitudeStream && altitudeStream.length >= length;
+  const gapSpeeds: number[] = [];
+
+  for (let i = 1; i < length; i++) {
+    const dt = timeStream[i] - timeStream[i - 1];
+    const dd = distanceStream[i] - distanceStream[i - 1];
+    if (dt <= 0 || dd <= 0) continue;
+    const speed = dd / dt; // m/s
+    let grade = 0;
+    if (hasAltitude) {
+      const de = altitudeStream![i] - altitudeStream![i - 1];
+      grade = dd > 0 ? de / dd : 0;
+    }
+    const cost = calculateEnergyCost(grade);
+    const equivalentSpeed = speed * (cost / 3.6);
+    if (Number.isFinite(equivalentSpeed) && equivalentSpeed > 0) {
+      gapSpeeds.push(equivalentSpeed);
+    }
+  }
+
+  if (gapSpeeds.length < 30) {
+    if (gapSpeeds.length === 0) return 0;
+    const avgSpeed =
+      gapSpeeds.reduce((a, b) => a + b, 0) / gapSpeeds.length;
+    return Math.round((1000 / avgSpeed) * 10) / 10;
+  }
+
+  const rollingAverages: number[] = [];
+  for (let i = 29; i < gapSpeeds.length; i++) {
+    let sum = 0;
+    for (let j = i - 29; j <= i; j++) {
+      sum += gapSpeeds[j];
+    }
+    rollingAverages.push(sum / 30);
+  }
+
+  const fourthPowers = rollingAverages.map((s) => Math.pow(s, 4));
+  const meanFourthPower =
+    fourthPowers.reduce((a, b) => a + b, 0) / fourthPowers.length;
+  const normalizedSpeed = Math.pow(meanFourthPower, 0.25);
+  if (!Number.isFinite(normalizedSpeed) || normalizedSpeed <= 0) return 0;
+
+  return Math.round((1000 / normalizedSpeed) * 10) / 10;
+}
+
 /**
  * Map Strava sport type to our sport types
  */
@@ -393,10 +470,13 @@ export interface TSSCalculationOptions {
   userThresholdPace?: number; // min/km at threshold
   normalizedHeartRate?: number; // From stream data (more accurate)
   normalizedPower?: number; // From stream data (more accurate)
+  normalizedPaceSeconds?: number; // From stream data (NGP/NTP)
   // Raw stream data for storage and charting
   heartrateStream?: number[];
   powerStream?: number[];
   timeStream?: number[]; // Seconds from start
+  distanceStream?: number[]; // Meters from start
+  altitudeStream?: number[]; // Meters
 }
 
 const DEFAULT_LTHR = 170;
@@ -431,10 +511,15 @@ export function calculateActivityTSS(
     userThresholdPace,
     normalizedHeartRate,
     normalizedPower,
+    normalizedPaceSeconds,
   } = options;
 
   const durationHours = activity.moving_time / 3600;
   const durationMinutes = activity.moving_time / 60;
+  const hrDurationSeconds =
+    typeof activity.elapsed_time === "number" && activity.elapsed_time > 0
+      ? activity.elapsed_time
+      : activity.moving_time;
   const sportType = activity.sport_type || activity.type;
 
   // Method 1: Cycling with power data (most accurate for cycling)
@@ -462,15 +547,21 @@ export function calculateActivityTSS(
     const distanceKm = activity.distance / 1000;
     if (distanceKm > 0.3 && durationMinutes > 0) {
       const actualPace = durationMinutes / distanceKm; // min/km
+      const normalizedPace =
+        normalizedPaceSeconds && normalizedPaceSeconds > 0
+          ? normalizedPaceSeconds / 60
+          : actualPace;
       // Default threshold: 5:30/km (moderately fit runner)
       const thresholdPace = userThresholdPace || 5.5;
       const intensityFactor = Math.min(
         1.5,
-        Math.max(0.5, thresholdPace / actualPace)
+        Math.max(0.5, thresholdPace / normalizedPace)
       );
       const rtss = durationHours * Math.pow(intensityFactor, 2) * 100;
       console.log(
         `TSS calc (running pace): pace=${actualPace.toFixed(
+          1
+        )}/km, NGP=${normalizedPace.toFixed(
           1
         )}/km, threshold=${thresholdPace}/km, IF=${intensityFactor.toFixed(
           2
@@ -482,7 +573,7 @@ export function calculateActivityTSS(
     const hrValue = normalizedHeartRate || activity.average_heartrate;
     if (hrValue) {
       const referenceLthr = resolveLthr(userLthr, userHrMax);
-      const rtss = calculateHrTSS(activity.moving_time, hrValue, referenceLthr);
+      const rtss = calculateHrTSS(hrDurationSeconds, hrValue, referenceLthr);
       const intensityFactor = hrValue / referenceLthr;
       console.log(
         `TSS calc (running HR fallback): HR=${hrValue}${
@@ -524,7 +615,7 @@ export function calculateActivityTSS(
   if (hrValueGeneric) {
     const referenceLthr = resolveLthr(userLthr, userHrMax);
     const hrtss = calculateHrTSS(
-      activity.moving_time,
+      hrDurationSeconds,
       hrValueGeneric,
       referenceLthr
     );
@@ -594,11 +685,7 @@ export function convertStravaActivity(
     _calculated: {
       normalized_hr: options.normalizedHeartRate || null,
       normalized_power: options.normalizedPower || null,
-    },
-    _streams: {
-      heartrate: options.heartrateStream || null,
-      power: options.powerStream || null,
-      time: options.timeStream || null,
+      normalized_pace: options.normalizedPaceSeconds || null,
     },
   } as Json;
 
