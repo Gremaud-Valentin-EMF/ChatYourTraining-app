@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -11,8 +11,6 @@ import {
   Spinner,
   Slider,
   DeleteConfirmationModal,
-  Input,
-  Select,
 } from "@/components/ui";
 import { ArrowLeft, Activity, Check, Trash, Edit, X, Save } from "lucide-react";
 import {
@@ -31,6 +29,14 @@ const focusByIntensity: Record<string, string> = {
   vo2max: "Augmentation de VO2max",
   recovery: "Récupération active",
 };
+
+const intensityOptions = [
+  { value: "recovery", label: "Récupération active" },
+  { value: "endurance", label: "Endurance fondamentale" },
+  { value: "tempo", label: "Développement VMA" },
+  { value: "threshold", label: "Seuil / tenue de puissance" },
+  { value: "vo2max", label: "Augmentation de VO2max" },
+];
 
 interface ActivityDetail {
   id: string;
@@ -78,6 +84,26 @@ export default function WorkoutDetailPage({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMarkingDone, setIsMarkingDone] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isTssInlineEditing, setIsTssInlineEditing] = useState(false);
+  const [isPlannedDurationInlineEditing, setIsPlannedDurationInlineEditing] =
+    useState(false);
+  const [isPlannedDistanceInlineEditing, setIsPlannedDistanceInlineEditing] =
+    useState(false);
+  const [isPlannedPaceInlineEditing, setIsPlannedPaceInlineEditing] =
+    useState(false);
+  const [isPlannedMovingTimeInlineEditing, setIsPlannedMovingTimeInlineEditing] =
+    useState(false);
+  const [isPlannedElevationInlineEditing, setIsPlannedElevationInlineEditing] =
+    useState(false);
+  const [isPlannedTssInlineEditing, setIsPlannedTssInlineEditing] =
+    useState(false);
+  const [isPlannedIfInlineEditing, setIsPlannedIfInlineEditing] =
+    useState(false);
+  const [isIfInlineEditing, setIsIfInlineEditing] = useState(false);
+  const [isTitleInlineEditing, setIsTitleInlineEditing] = useState(false);
+  const [isIntensityInlineEditing, setIsIntensityInlineEditing] =
+    useState(false);
+  const intensityMenuRef = useRef<HTMLDivElement>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [streamData, setStreamData] = useState<{
     time?: number[] | null;
@@ -88,6 +114,15 @@ export default function WorkoutDetailPage({
     title: "",
     description: "",
     intensity: "",
+    tss: "",
+    planned_duration_minutes: "",
+    planned_distance_km: "",
+    planned_pace_min_km: "",
+    planned_moving_time_minutes: "",
+    planned_elevation_m: "",
+    planned_tss: "",
+    planned_if: "",
+    if_value: "",
   });
   const today = useMemo(() => {
     const now = new Date();
@@ -111,14 +146,99 @@ export default function WorkoutDetailPage({
 
   useEffect(() => {
     if (activity) {
-      setRpeInput(activity.rpe ?? 0);
+      const raw = (activity.raw_data as Record<string, unknown> | null) ?? null;
+      const manual =
+        raw && typeof raw._manual === "object"
+          ? (raw._manual as Record<string, unknown>)
+          : null;
+      const manualPlannedPaceSeconds =
+        typeof manual?.planned_pace_seconds === "number"
+          ? manual.planned_pace_seconds
+          : null;
+      const derivedPlannedPaceSeconds =
+        activity.planned_duration_minutes !== null &&
+        activity.planned_duration_minutes !== undefined &&
+        activity.planned_distance_km !== null &&
+        activity.planned_distance_km !== undefined &&
+        activity.planned_distance_km > 0
+          ? (activity.planned_duration_minutes * 60) / activity.planned_distance_km
+          : null;
+      const paceSecondsForEdit =
+        manualPlannedPaceSeconds ?? derivedPlannedPaceSeconds;
+      const manualIfValue =
+        typeof manual?.if_override === "number" ? manual.if_override : null;
+      const manualPlannedMovingTime =
+        typeof manual?.planned_moving_time_minutes === "number"
+          ? manual.planned_moving_time_minutes
+          : null;
+      const manualPlannedElevation =
+        typeof manual?.planned_elevation_m === "number"
+          ? manual.planned_elevation_m
+          : null;
+      const manualPlannedTss =
+        typeof manual?.planned_tss === "number" ? manual.planned_tss : null;
+      const manualPlannedIf =
+        typeof manual?.planned_if === "number" ? manual.planned_if : null;
       setEditForm({
         title: activity.title,
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
+        tss: activity.tss !== null && activity.tss !== undefined ? String(activity.tss) : "",
+        planned_duration_minutes:
+          activity.planned_duration_minutes !== null &&
+          activity.planned_duration_minutes !== undefined
+            ? String(activity.planned_duration_minutes)
+            : "",
+        planned_distance_km:
+          activity.planned_distance_km !== null &&
+          activity.planned_distance_km !== undefined
+            ? String(activity.planned_distance_km)
+            : "",
+        planned_pace_min_km:
+          paceSecondsForEdit !== null ? (paceSecondsForEdit / 60).toFixed(2) : "",
+        planned_moving_time_minutes:
+          manualPlannedMovingTime !== null
+            ? String(Math.round(manualPlannedMovingTime))
+            : "",
+        planned_elevation_m:
+          manualPlannedElevation !== null
+            ? String(Math.round(manualPlannedElevation))
+            : "",
+        planned_tss:
+          manualPlannedTss !== null ? String(Math.round(manualPlannedTss)) : "",
+        planned_if:
+          manualPlannedIf !== null ? manualPlannedIf.toFixed(2) : "",
+        if_value: manualIfValue !== null ? manualIfValue.toFixed(2) : "",
       });
+      setRpeInput(activity.rpe ?? 0);
     }
   }, [activity]);
+
+  useEffect(() => {
+    if (!isIntensityInlineEditing) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        intensityMenuRef.current &&
+        !intensityMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsIntensityInlineEditing(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsIntensityInlineEditing(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isIntensityInlineEditing]);
 
   const loadActivity = async () => {
     setIsLoading(true);
@@ -253,26 +373,6 @@ export default function WorkoutDetailPage({
     setIsLoading(false);
   };
 
-  const handleRpeSave = async () => {
-    if (!activity) return;
-    setIsSavingRpe(true);
-    const { error } = await supabase
-      .from("activities")
-      .update({ rpe: rpeInput })
-      .eq("id", activity.id);
-    setIsSavingRpe(false);
-    if (!error) {
-      setActivity((prev) =>
-        prev
-          ? {
-              ...prev,
-              rpe: rpeInput,
-            }
-          : prev
-      );
-    }
-  };
-
   const handleMarkAsDone = async () => {
     if (!activity) return;
     const scheduledDate = parseLocalDate(activity.scheduled_date);
@@ -320,6 +420,27 @@ export default function WorkoutDetailPage({
 
   const openDeleteModal = () => setIsDeleteModalOpen(true);
 
+  const handleRpeSave = async () => {
+    if (!activity) return;
+    setIsSavingRpe(true);
+    const nextRpe = Math.min(10, Math.max(0, Math.round(rpeInput)));
+    const { error } = await supabase
+      .from("activities")
+      .update({ rpe: nextRpe })
+      .eq("id", activity.id);
+    setIsSavingRpe(false);
+    if (!error) {
+      setActivity((prev) =>
+        prev
+          ? {
+              ...prev,
+              rpe: nextRpe,
+            }
+          : prev
+      );
+    }
+  };
+
   const handleDeleteActivity = async () => {
     if (!activity) return;
     setIsDeleting(true);
@@ -345,17 +466,170 @@ export default function WorkoutDetailPage({
   };
 
   const handleStartEdit = () => {
+    if (activity) {
+      const raw = (activity.raw_data as Record<string, unknown> | null) ?? null;
+      const manual =
+        raw && typeof raw._manual === "object"
+          ? (raw._manual as Record<string, unknown>)
+          : null;
+      const manualPlannedPaceSeconds =
+        typeof manual?.planned_pace_seconds === "number"
+          ? manual.planned_pace_seconds
+          : null;
+      const derivedPlannedPaceSeconds =
+        activity.planned_duration_minutes !== null &&
+        activity.planned_duration_minutes !== undefined &&
+        activity.planned_distance_km !== null &&
+        activity.planned_distance_km !== undefined &&
+        activity.planned_distance_km > 0
+          ? (activity.planned_duration_minutes * 60) / activity.planned_distance_km
+          : null;
+      const paceSecondsForEdit =
+        manualPlannedPaceSeconds ?? derivedPlannedPaceSeconds;
+      const manualIfValue =
+        typeof manual?.if_override === "number" ? manual.if_override : null;
+      const manualPlannedMovingTime =
+        typeof manual?.planned_moving_time_minutes === "number"
+          ? manual.planned_moving_time_minutes
+          : null;
+      const manualPlannedElevation =
+        typeof manual?.planned_elevation_m === "number"
+          ? manual.planned_elevation_m
+          : null;
+      const manualPlannedTss =
+        typeof manual?.planned_tss === "number" ? manual.planned_tss : null;
+      const manualPlannedIf =
+        typeof manual?.planned_if === "number" ? manual.planned_if : null;
+      setEditForm({
+        title: activity.title,
+        description: activity.description ?? "",
+        intensity: activity.intensity ?? "endurance",
+        tss:
+          activity.tss !== null && activity.tss !== undefined
+            ? String(activity.tss)
+            : "",
+        planned_duration_minutes:
+          activity.planned_duration_minutes !== null &&
+          activity.planned_duration_minutes !== undefined
+            ? String(activity.planned_duration_minutes)
+            : "",
+        planned_distance_km:
+          activity.planned_distance_km !== null &&
+          activity.planned_distance_km !== undefined
+            ? String(activity.planned_distance_km)
+            : "",
+        planned_pace_min_km:
+          paceSecondsForEdit !== null ? (paceSecondsForEdit / 60).toFixed(2) : "",
+        planned_moving_time_minutes:
+          manualPlannedMovingTime !== null
+            ? String(Math.round(manualPlannedMovingTime))
+            : "",
+        planned_elevation_m:
+          manualPlannedElevation !== null
+            ? String(Math.round(manualPlannedElevation))
+            : "",
+        planned_tss:
+          manualPlannedTss !== null ? String(Math.round(manualPlannedTss)) : "",
+        planned_if:
+          manualPlannedIf !== null ? manualPlannedIf.toFixed(2) : "",
+        if_value: manualIfValue !== null ? manualIfValue.toFixed(2) : "",
+      });
+    }
+    setIsTssInlineEditing(false);
+    setIsPlannedDurationInlineEditing(false);
+    setIsPlannedDistanceInlineEditing(false);
+    setIsPlannedPaceInlineEditing(false);
+    setIsPlannedMovingTimeInlineEditing(false);
+    setIsPlannedElevationInlineEditing(false);
+    setIsPlannedTssInlineEditing(false);
+    setIsPlannedIfInlineEditing(false);
+    setIsIfInlineEditing(false);
+    setIsTitleInlineEditing(false);
+    setIsIntensityInlineEditing(false);
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
     if (activity) {
+      const raw = (activity.raw_data as Record<string, unknown> | null) ?? null;
+      const manual =
+        raw && typeof raw._manual === "object"
+          ? (raw._manual as Record<string, unknown>)
+          : null;
+      const manualPlannedPaceSeconds =
+        typeof manual?.planned_pace_seconds === "number"
+          ? manual.planned_pace_seconds
+          : null;
+      const derivedPlannedPaceSeconds =
+        activity.planned_duration_minutes !== null &&
+        activity.planned_duration_minutes !== undefined &&
+        activity.planned_distance_km !== null &&
+        activity.planned_distance_km !== undefined &&
+        activity.planned_distance_km > 0
+          ? (activity.planned_duration_minutes * 60) / activity.planned_distance_km
+          : null;
+      const paceSecondsForEdit =
+        manualPlannedPaceSeconds ?? derivedPlannedPaceSeconds;
+      const manualIfValue =
+        typeof manual?.if_override === "number" ? manual.if_override : null;
+      const manualPlannedMovingTime =
+        typeof manual?.planned_moving_time_minutes === "number"
+          ? manual.planned_moving_time_minutes
+          : null;
+      const manualPlannedElevation =
+        typeof manual?.planned_elevation_m === "number"
+          ? manual.planned_elevation_m
+          : null;
+      const manualPlannedTss =
+        typeof manual?.planned_tss === "number" ? manual.planned_tss : null;
+      const manualPlannedIf =
+        typeof manual?.planned_if === "number" ? manual.planned_if : null;
       setEditForm({
         title: activity.title,
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
+        tss:
+          activity.tss !== null && activity.tss !== undefined
+            ? String(activity.tss)
+            : "",
+        planned_duration_minutes:
+          activity.planned_duration_minutes !== null &&
+          activity.planned_duration_minutes !== undefined
+            ? String(activity.planned_duration_minutes)
+            : "",
+        planned_distance_km:
+          activity.planned_distance_km !== null &&
+          activity.planned_distance_km !== undefined
+            ? String(activity.planned_distance_km)
+            : "",
+        planned_pace_min_km:
+          paceSecondsForEdit !== null ? (paceSecondsForEdit / 60).toFixed(2) : "",
+        planned_moving_time_minutes:
+          manualPlannedMovingTime !== null
+            ? String(Math.round(manualPlannedMovingTime))
+            : "",
+        planned_elevation_m:
+          manualPlannedElevation !== null
+            ? String(Math.round(manualPlannedElevation))
+            : "",
+        planned_tss:
+          manualPlannedTss !== null ? String(Math.round(manualPlannedTss)) : "",
+        planned_if:
+          manualPlannedIf !== null ? manualPlannedIf.toFixed(2) : "",
+        if_value: manualIfValue !== null ? manualIfValue.toFixed(2) : "",
       });
     }
+    setIsTssInlineEditing(false);
+    setIsPlannedDurationInlineEditing(false);
+    setIsPlannedDistanceInlineEditing(false);
+    setIsPlannedPaceInlineEditing(false);
+    setIsPlannedMovingTimeInlineEditing(false);
+    setIsPlannedElevationInlineEditing(false);
+    setIsPlannedTssInlineEditing(false);
+    setIsPlannedIfInlineEditing(false);
+    setIsIfInlineEditing(false);
+    setIsTitleInlineEditing(false);
+    setIsIntensityInlineEditing(false);
     setIsEditing(false);
   };
 
@@ -363,12 +637,97 @@ export default function WorkoutDetailPage({
     if (!activity) return;
     setIsSavingEdit(true);
     try {
+      const parsedTss =
+        editForm.tss.trim() === "" ? null : Math.max(0, Number(editForm.tss));
+      const parsedPlannedDuration =
+        editForm.planned_duration_minutes.trim() === ""
+          ? null
+          : Math.max(0, Math.round(Number(editForm.planned_duration_minutes)));
+      const parsedPlannedDistance =
+        editForm.planned_distance_km.trim() === ""
+          ? null
+          : Math.max(0, Number(editForm.planned_distance_km));
+      const parsedPlannedPaceMinKm =
+        editForm.planned_pace_min_km.trim() === ""
+          ? null
+          : Math.max(0, Number(editForm.planned_pace_min_km));
+      const parsedIfValue =
+        editForm.if_value.trim() === ""
+          ? null
+          : Math.max(0, Number(editForm.if_value));
+      const parsedPlannedMovingTime =
+        editForm.planned_moving_time_minutes.trim() === ""
+          ? null
+          : Math.max(0, Math.round(Number(editForm.planned_moving_time_minutes)));
+      const parsedPlannedElevation =
+        editForm.planned_elevation_m.trim() === ""
+          ? null
+          : Math.max(0, Math.round(Number(editForm.planned_elevation_m)));
+      const parsedPlannedTss =
+        editForm.planned_tss.trim() === ""
+          ? null
+          : Math.max(0, Math.round(Number(editForm.planned_tss)));
+      const parsedPlannedIf =
+        editForm.planned_if.trim() === ""
+          ? null
+          : Math.max(0, Number(editForm.planned_if));
+      const currentRawData =
+        (activity.raw_data as Record<string, unknown> | null) ?? null;
+      const currentManual =
+        currentRawData && typeof currentRawData._manual === "object"
+          ? (currentRawData._manual as Record<string, unknown>)
+          : {};
+      const nextManual = {
+        ...currentManual,
+        planned_pace_seconds:
+          parsedPlannedPaceMinKm !== null && Number.isFinite(parsedPlannedPaceMinKm)
+            ? Math.round(parsedPlannedPaceMinKm * 60)
+            : null,
+        planned_moving_time_minutes:
+          parsedPlannedMovingTime !== null &&
+          Number.isFinite(parsedPlannedMovingTime)
+            ? parsedPlannedMovingTime
+            : null,
+        planned_elevation_m:
+          parsedPlannedElevation !== null && Number.isFinite(parsedPlannedElevation)
+            ? parsedPlannedElevation
+            : null,
+        planned_tss:
+          parsedPlannedTss !== null && Number.isFinite(parsedPlannedTss)
+            ? parsedPlannedTss
+            : null,
+        planned_if:
+          parsedPlannedIf !== null && Number.isFinite(parsedPlannedIf)
+            ? Number(parsedPlannedIf.toFixed(2))
+            : null,
+        if_override:
+          parsedIfValue !== null && Number.isFinite(parsedIfValue)
+            ? Number(parsedIfValue.toFixed(2))
+            : null,
+      };
+      const nextRawData = {
+        ...(currentRawData ?? {}),
+        _manual: nextManual,
+      };
       const { error } = await supabase
         .from("activities")
         .update({
           title: editForm.title,
           description: editForm.description || null,
           intensity: editForm.intensity,
+          planned_duration_minutes:
+            parsedPlannedDuration !== null && Number.isFinite(parsedPlannedDuration)
+              ? parsedPlannedDuration
+              : null,
+          planned_distance_km:
+            parsedPlannedDistance !== null && Number.isFinite(parsedPlannedDistance)
+              ? parsedPlannedDistance
+              : null,
+          tss:
+            parsedTss !== null && Number.isFinite(parsedTss)
+              ? parsedTss
+              : null,
+          raw_data: nextRawData as Json,
         })
         .eq("id", activity.id);
 
@@ -380,9 +739,35 @@ export default function WorkoutDetailPage({
                 title: editForm.title,
                 description: editForm.description || null,
                 intensity: editForm.intensity,
+                planned_duration_minutes:
+                  parsedPlannedDuration !== null &&
+                  Number.isFinite(parsedPlannedDuration)
+                    ? parsedPlannedDuration
+                    : null,
+                planned_distance_km:
+                  parsedPlannedDistance !== null &&
+                  Number.isFinite(parsedPlannedDistance)
+                    ? parsedPlannedDistance
+                    : null,
+                tss:
+                  parsedTss !== null && Number.isFinite(parsedTss)
+                    ? parsedTss
+                    : null,
+                raw_data: nextRawData as Json,
               }
             : prev
         );
+        setIsTssInlineEditing(false);
+        setIsPlannedDurationInlineEditing(false);
+        setIsPlannedDistanceInlineEditing(false);
+        setIsPlannedPaceInlineEditing(false);
+        setIsPlannedMovingTimeInlineEditing(false);
+        setIsPlannedElevationInlineEditing(false);
+        setIsPlannedTssInlineEditing(false);
+        setIsPlannedIfInlineEditing(false);
+        setIsIfInlineEditing(false);
+        setIsTitleInlineEditing(false);
+        setIsIntensityInlineEditing(false);
         setIsEditing(false);
       }
     } catch (error) {
@@ -453,7 +838,14 @@ export default function WorkoutDetailPage({
   const intensityKey = (activity.intensity ?? "endurance").toLowerCase();
   const focusLabel =
     focusByIntensity[intensityKey] ?? "Approche guidée pour cette séance";
+  const editIntensityKey = (editForm.intensity ?? "endurance").toLowerCase();
+  const editFocusLabel =
+    focusByIntensity[editIntensityKey] ?? "Approche guidée pour cette séance";
   const rawData = (activity.raw_data as Record<string, unknown> | null) ?? null;
+  const manualData =
+    rawData && typeof rawData._manual === "object"
+      ? (rawData._manual as Record<string, unknown>)
+      : null;
   const calculated = rawData?._calculated as
     | Record<string, unknown>
     | undefined;
@@ -486,7 +878,6 @@ export default function WorkoutDetailPage({
       ? movingTimeSeconds / 60
       : activity.actual_duration_minutes ?? null;
   const isCycling = activity.sport_name === "cycling";
-  const isRunning = activity.sport_name === "running";
   const formatDurationValue = (minutes: number) =>
     formatDuration(Math.round(minutes));
   const formatPaceValue = (secondsPerKm: number) => {
@@ -502,7 +893,25 @@ export default function WorkoutDetailPage({
     normalizedPower && ftpWatts ? normalizedPower / ftpWatts : null;
   const intensityFactorHeart =
     normalizedHeartRate && lthrValue ? normalizedHeartRate / lthrValue : null;
-  const intensityFactor = intensityFactorPower ?? intensityFactorHeart ?? null;
+  const computedIntensityFactor =
+    intensityFactorPower ?? intensityFactorHeart ?? null;
+  const manualIfOverride =
+    typeof manualData?.if_override === "number"
+      ? manualData.if_override
+      : null;
+  const manualPlannedMovingTime =
+    typeof manualData?.planned_moving_time_minutes === "number"
+      ? manualData.planned_moving_time_minutes
+      : null;
+  const manualPlannedElevation =
+    typeof manualData?.planned_elevation_m === "number"
+      ? manualData.planned_elevation_m
+      : null;
+  const manualPlannedTss =
+    typeof manualData?.planned_tss === "number" ? manualData.planned_tss : null;
+  const manualPlannedIf =
+    typeof manualData?.planned_if === "number" ? manualData.planned_if : null;
+  const intensityFactor = manualIfOverride ?? computedIntensityFactor ?? null;
   const averagePower =
     typeof rawData?.avg_power_watts === "number"
       ? rawData.avg_power_watts
@@ -530,8 +939,16 @@ export default function WorkoutDetailPage({
     actualRaw?: number | null;
   };
 
-  const plannedDurationMinutes = activity.planned_duration_minutes;
-  const plannedDistanceKm = activity.planned_distance_km;
+  const plannedDurationMinutes = isEditing
+    ? editForm.planned_duration_minutes.trim() === ""
+      ? null
+      : Math.max(0, Math.round(Number(editForm.planned_duration_minutes)))
+    : activity.planned_duration_minutes;
+  const plannedDistanceKm = isEditing
+    ? editForm.planned_distance_km.trim() === ""
+      ? null
+      : Math.max(0, Number(editForm.planned_distance_km))
+    : activity.planned_distance_km;
   const plannedDurationString =
     typeof plannedDurationMinutes === "number"
       ? formatDurationValue(plannedDurationMinutes)
@@ -540,14 +957,49 @@ export default function WorkoutDetailPage({
     typeof plannedDistanceKm === "number"
       ? formatDistance(plannedDistanceKm)
       : null;
-  const plannedPaceSeconds =
+  const derivedPlannedPaceSeconds =
     typeof plannedDurationMinutes === "number" &&
     typeof plannedDistanceKm === "number" &&
     plannedDistanceKm > 0
       ? (plannedDurationMinutes * 60) / plannedDistanceKm
       : null;
+  const manualPlannedPaceSeconds =
+    typeof manualData?.planned_pace_seconds === "number"
+      ? manualData.planned_pace_seconds
+      : null;
+  const editedPlannedPaceSeconds =
+    editForm.planned_pace_min_km.trim() === ""
+      ? null
+      : Math.max(0, Number(editForm.planned_pace_min_km) * 60);
+  const plannedPaceSeconds = isEditing
+    ? editedPlannedPaceSeconds ?? derivedPlannedPaceSeconds
+    : manualPlannedPaceSeconds ?? derivedPlannedPaceSeconds;
   const plannedPaceString =
     plannedPaceSeconds !== null ? formatPaceValue(plannedPaceSeconds) : null;
+  const plannedMovingTimeMinutes = isEditing
+    ? editForm.planned_moving_time_minutes.trim() === ""
+      ? null
+      : Math.max(0, Math.round(Number(editForm.planned_moving_time_minutes)))
+    : manualPlannedMovingTime;
+  const plannedMovingTimeString =
+    plannedMovingTimeMinutes !== null
+      ? formatDurationValue(plannedMovingTimeMinutes)
+      : null;
+  const plannedElevation = isEditing
+    ? editForm.planned_elevation_m.trim() === ""
+      ? null
+      : Math.max(0, Math.round(Number(editForm.planned_elevation_m)))
+    : manualPlannedElevation;
+  const plannedTss = isEditing
+    ? editForm.planned_tss.trim() === ""
+      ? null
+      : Math.max(0, Math.round(Number(editForm.planned_tss)))
+    : manualPlannedTss;
+  const plannedIf = isEditing
+    ? editForm.planned_if.trim() === ""
+      ? null
+      : Math.max(0, Number(editForm.planned_if))
+    : manualPlannedIf;
   const actualDurationString =
     durationMinutesValue !== null
       ? formatDurationValue(durationMinutesValue)
@@ -560,6 +1012,17 @@ export default function WorkoutDetailPage({
     distanceKm !== null ? formatDistance(distanceKm) : null;
   const actualPaceString =
     averagePaceSeconds !== null ? formatPaceValue(averagePaceSeconds) : null;
+
+  const displayedTss = isEditing
+    ? editForm.tss.trim() === ""
+      ? null
+      : Math.max(0, Number(editForm.tss))
+    : activity.tss;
+  const displayedIf = isEditing
+    ? editForm.if_value.trim() === ""
+      ? intensityFactor
+      : Math.max(0, Number(editForm.if_value))
+    : intensityFactor;
 
   const comparisonRows: ComparisonRow[] = [
     {
@@ -574,7 +1037,9 @@ export default function WorkoutDetailPage({
     },
     {
       label: "Moving time",
+      planned: plannedMovingTimeString,
       actual: actualMovingString,
+      plannedRaw: plannedMovingTimeMinutes,
       actualRaw: movingMinutesValue,
     },
     {
@@ -621,24 +1086,30 @@ export default function WorkoutDetailPage({
     },
     {
       label: "Dénivelé",
+      planned: plannedElevation !== null ? `${Math.round(plannedElevation)} m` : null,
       actual: elevationGain !== null ? `${Math.round(elevationGain)} m` : null,
+      plannedRaw: plannedElevation,
       actualRaw: elevationGain,
     },
     {
       label: "TSS",
+      planned: plannedTss !== null ? `${Math.round(plannedTss)}` : null,
       actual:
-        activity.tss !== null && activity.tss !== undefined
-          ? `${activity.tss}`
+        displayedTss !== null && displayedTss !== undefined
+          ? `${displayedTss}`
           : null,
-      actualRaw: activity.tss,
+      plannedRaw: plannedTss,
+      actualRaw: displayedTss,
     },
     {
       label: "IF",
+      planned: plannedIf !== null ? plannedIf.toFixed(2) : null,
       actual:
-        intensityFactor && (isCycling || isRunning)
-          ? intensityFactor.toFixed(2)
+        displayedIf !== null && displayedIf !== undefined
+          ? displayedIf.toFixed(2)
           : null,
-      actualRaw: intensityFactor,
+      plannedRaw: plannedIf,
+      actualRaw: displayedIf,
     },
   ].filter((row) => row.planned || row.actual);
   const formatComparisonValue = (
@@ -790,14 +1261,29 @@ export default function WorkoutDetailPage({
                 </div>
                 <div className="flex flex-row items-center gap-3">
                   {isEditing ? (
-                    <Input
-                      value={editForm.title}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({ ...prev, title: e.target.value }))
-                      }
-                      className="text-2xl font-bold max-w-md"
-                      placeholder="Titre de la séance"
-                    />
+                    isTitleInlineEditing ? (
+                      <input
+                        value={editForm.title}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
+                        }
+                        onBlur={() => setIsTitleInlineEditing(false)}
+                        className="w-full max-w-md border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-2xl font-bold text-foreground focus:outline-none focus:border-accent"
+                        placeholder="Titre de la séance"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsTitleInlineEditing(true)}
+                        className="text-2xl font-bold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                      >
+                        {editForm.title || activity.title || "—"}
+                      </button>
+                    )
                   ) : (
                     <h1 className="text-2xl font-bold text-foreground">
                       {activity.title}
@@ -824,23 +1310,55 @@ export default function WorkoutDetailPage({
                     Objectif de la séance
                   </span>
                   {isEditing ? (
-                    <Select
-                      value={editForm.intensity}
-                      onChange={(value) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          intensity: value,
-                        }))
-                      }
-                      options={[
-                        { value: "recovery", label: "Récupération active" },
-                        { value: "endurance", label: "Endurance fondamentale" },
-                        { value: "tempo", label: "Développement VMA" },
-                        { value: "threshold", label: "Seuil / tenue de puissance" },
-                        { value: "vo2max", label: "Augmentation de VO2max" },
-                      ]}
-                      className="max-w-xs"
-                    />
+                    <div className="relative" ref={intensityMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setIsIntensityInlineEditing((prev) => !prev)
+                        }
+                        className="font-medium text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                      >
+                        {editFocusLabel}
+                      </button>
+                      {isIntensityInlineEditing && (
+                        <div className="absolute left-0 top-full z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-dark-200 bg-dark-100/95 backdrop-blur-sm shadow-2xl">
+                          {intensityOptions.map((option, index) => {
+                            const isSelected = editForm.intensity === option.value;
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => {
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    intensity: option.value,
+                                  }));
+                                  setIsIntensityInlineEditing(false);
+                                }}
+                                className={
+                                  "w-full px-4 py-3 text-left text-sm font-medium transition-all duration-200 " +
+                                  (index === 0 ? "rounded-t-2xl " : "") +
+                                  (index === intensityOptions.length - 1 ? "rounded-b-2xl " : "") +
+                                  (isSelected
+                                    ? "bg-accent/20 text-accent shadow-inner"
+                                    : "text-foreground hover:bg-dark-200 hover:text-accent")
+                                }
+                              >
+                                <span className="flex items-center gap-2">
+                                  {isSelected && (
+                                    <span className="flex h-4 w-4 items-center justify-center">
+                                      <span className="h-2 w-2 rounded-full bg-accent" />
+                                    </span>
+                                  )}
+                                  {!isSelected && <span className="w-4" />}
+                                  {option.label}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <span className="font-medium text-foreground">
                       {focusLabel}
@@ -955,17 +1473,286 @@ export default function WorkoutDetailPage({
                         <p className="text-xs uppercase text-foreground/60">
                           Prévu
                         </p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {formatComparisonValue(row.planned, row.plannedRaw)}
-                        </p>
+                        {isEditing && row.label === "Durée totale" ? (
+                          isPlannedDurationInlineEditing ? (
+                            <input
+                              id="planned-duration-input"
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={editForm.planned_duration_minutes}
+                              onChange={(e) =>
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  planned_duration_minutes: e.target.value,
+                                }))
+                              }
+                              onBlur={() =>
+                                setIsPlannedDurationInlineEditing(false)
+                              }
+                              autoFocus
+                              className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setIsPlannedDurationInlineEditing(true)
+                              }
+                              className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                            >
+                              {formatComparisonValue(row.planned, row.plannedRaw)}
+                            </button>
+                          )
+                        ) : isEditing && row.label === "Distance" ? (
+                          isPlannedDistanceInlineEditing ? (
+                            <input
+                              id="planned-distance-input"
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={editForm.planned_distance_km}
+                              onChange={(e) =>
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  planned_distance_km: e.target.value,
+                                }))
+                              }
+                              onBlur={() =>
+                                setIsPlannedDistanceInlineEditing(false)
+                              }
+                              autoFocus
+                              className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setIsPlannedDistanceInlineEditing(true)
+                              }
+                              className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                            >
+                              {formatComparisonValue(row.planned, row.plannedRaw)}
+                            </button>
+                          )
+                        ) : isEditing && row.label === "Moyenne / rythme moyen" ? (
+                          isPlannedPaceInlineEditing ? (
+                            <input
+                              id="planned-pace-input"
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={editForm.planned_pace_min_km}
+                              onChange={(e) =>
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  planned_pace_min_km: e.target.value,
+                                }))
+                              }
+                              onBlur={() => setIsPlannedPaceInlineEditing(false)}
+                              autoFocus
+                              className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsPlannedPaceInlineEditing(true)}
+                              className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                            >
+                              {formatComparisonValue(row.planned, row.plannedRaw)}
+                            </button>
+                          )
+                        ) : isEditing && row.label === "Moving time" ? (
+                          isPlannedMovingTimeInlineEditing ? (
+                            <input
+                              id="planned-moving-time-input"
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={editForm.planned_moving_time_minutes}
+                              onChange={(e) =>
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  planned_moving_time_minutes: e.target.value,
+                                }))
+                              }
+                              onBlur={() =>
+                                setIsPlannedMovingTimeInlineEditing(false)
+                              }
+                              autoFocus
+                              className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsPlannedMovingTimeInlineEditing(true)}
+                              className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                            >
+                              {formatComparisonValue(row.planned, row.plannedRaw)}
+                            </button>
+                          )
+                        ) : isEditing && row.label === "Dénivelé" ? (
+                          isPlannedElevationInlineEditing ? (
+                            <input
+                              id="planned-elevation-input"
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={editForm.planned_elevation_m}
+                              onChange={(e) =>
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  planned_elevation_m: e.target.value,
+                                }))
+                              }
+                              onBlur={() =>
+                                setIsPlannedElevationInlineEditing(false)
+                              }
+                              autoFocus
+                              className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsPlannedElevationInlineEditing(true)}
+                              className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                            >
+                              {formatComparisonValue(row.planned, row.plannedRaw)}
+                            </button>
+                          )
+                        ) : isEditing && row.label === "TSS" ? (
+                          isPlannedTssInlineEditing ? (
+                            <input
+                              id="planned-tss-input"
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={editForm.planned_tss}
+                              onChange={(e) =>
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  planned_tss: e.target.value,
+                                }))
+                              }
+                              onBlur={() => setIsPlannedTssInlineEditing(false)}
+                              autoFocus
+                              className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsPlannedTssInlineEditing(true)}
+                              className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                            >
+                              {formatComparisonValue(row.planned, row.plannedRaw)}
+                            </button>
+                          )
+                        ) : isEditing && row.label === "IF" ? (
+                          isPlannedIfInlineEditing ? (
+                            <input
+                              id="planned-if-input"
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={editForm.planned_if}
+                              onChange={(e) =>
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  planned_if: e.target.value,
+                                }))
+                              }
+                              onBlur={() => setIsPlannedIfInlineEditing(false)}
+                              autoFocus
+                              className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setIsPlannedIfInlineEditing(true)}
+                              className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                            >
+                              {formatComparisonValue(row.planned, row.plannedRaw)}
+                            </button>
+                          )
+                        ) : (
+                          <p className="text-lg font-semibold text-foreground">
+                            {formatComparisonValue(row.planned, row.plannedRaw)}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs uppercase text-foreground/60">
                           Réalisé
                         </p>
-                        <p className="text-lg font-semibold text-foreground">
-                          {formatComparisonValue(row.actual, row.actualRaw)}
-                        </p>
+                        {(row.label === "TSS" || row.label === "IF") && isEditing ? (
+                          <div>
+                            {(row.label === "TSS"
+                              ? isTssInlineEditing
+                              : isIfInlineEditing) ? (
+                              <input
+                                id={row.label === "TSS" ? "tss-inline-input" : "if-inline-input"}
+                                type="number"
+                                min={0}
+                                step={row.label === "TSS" ? 1 : 0.01}
+                                value={row.label === "TSS" ? editForm.tss : editForm.if_value}
+                                onChange={(e) =>
+                                  setEditForm((prev) => {
+                                    if (row.label === "TSS") {
+                                      return {
+                                        ...prev,
+                                        tss: e.target.value,
+                                      };
+                                    }
+                                    return {
+                                      ...prev,
+                                      if_value: e.target.value,
+                                    };
+                                  })
+                                }
+                                onBlur={() => {
+                                  if (row.label === "TSS") {
+                                    setIsTssInlineEditing(false);
+                                    return;
+                                  }
+                                  setIsIfInlineEditing(false);
+                                }}
+                                autoFocus
+                                className="no-spinner w-28 border-0 border-b border-accent/70 bg-transparent px-0 py-0 text-lg font-semibold text-foreground focus:outline-none focus:border-accent"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (row.label === "TSS") {
+                                    setIsTssInlineEditing(true);
+                                    return;
+                                  }
+                                  if (
+                                    !editForm.if_value &&
+                                    row.actualRaw !== null &&
+                                    row.actualRaw !== undefined
+                                  ) {
+                                    setEditForm((prev) => ({
+                                      ...prev,
+                                      if_value: Number(row.actualRaw).toFixed(2),
+                                    }));
+                                  }
+                                  setIsIfInlineEditing(true);
+                                }}
+                                className="text-lg font-semibold text-foreground underline underline-offset-4 decoration-dotted hover:text-accent transition-colors"
+                              >
+                                {row.label === "TSS"
+                                  ? editForm.tss || "—"
+                                  : editForm.if_value ||
+                                    formatComparisonValue(row.actual, row.actualRaw)}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-lg font-semibold text-foreground">
+                            {formatComparisonValue(row.actual, row.actualRaw)}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1048,8 +1835,7 @@ export default function WorkoutDetailPage({
               </Button>
             </div>
             <p className="text-xs text-foreground/60">
-              Renseigne le RPE une fois la séance terminée pour améliorer les
-              analyses futures.
+              Le RPE peut etre ajuste directement ici.
             </p>
           </section>
 
