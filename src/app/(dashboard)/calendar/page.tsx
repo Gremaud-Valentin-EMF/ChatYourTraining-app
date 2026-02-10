@@ -1185,7 +1185,7 @@ export default function CalendarPage() {
                 <Card className="text-center py-4">
                   <p className="text-sm text-muted">Météo non disponible</p>
                   <p className="text-xs text-muted mt-2">
-                    Assure-toi d'avoir accordé la permission de géolocalisation
+                    Assure-toi d&apos;avoir accordé la permission de géolocalisation
                   </p>
                 </Card>
               );
