@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { useGeolocation } from "@/lib/hooks/useGeolocation";
 import {
   Activity,
   LayoutDashboard,
@@ -67,6 +68,8 @@ export default function DashboardLayout({
     full_name: string | null;
     avatar_url: string | null;
   } | null>(null);
+
+  useGeolocation();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -229,7 +232,7 @@ export default function DashboardLayout({
 
       {/* Bottom navigation for mobile */}
       <nav
-        className="lg:hidden fixed inset-x-0 bottom-0 bg-dark-50 border-t border-dark-200 px-2 py-3 z-40"
+        className="lg:hidden fixed inset-x-0 bottom-0 bg-dark-50 border-t border-dark-200 px-1 py-2 z-40"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0)" }}
       >
         <div className="flex items-center justify-between">
@@ -240,12 +243,12 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs font-semibold transition-colors min-w-[60px]",
+                  "flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-xs font-semibold transition-colors min-w-0",
                   isActive ? "text-accent bg-dark-100" : "text-muted hover:text-foreground hover:bg-dark-100"
                 )}
               >
                 <item.icon className="h-5 w-5" />
-                <span>{item.label.split(" ")[0]}</span>
+                <span className="hidden sm:block">{item.label.split(" ")[0]}</span>
               </Link>
             );
           })}

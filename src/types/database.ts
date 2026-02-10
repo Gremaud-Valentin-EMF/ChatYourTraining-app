@@ -41,6 +41,9 @@ export interface Database {
           timezone: string;
           locale: string;
           onboarding_completed: boolean;
+          latitude: number | null;
+          longitude: number | null;
+          location_updated_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -52,6 +55,9 @@ export interface Database {
           timezone?: string;
           locale?: string;
           onboarding_completed?: boolean;
+          latitude?: number | null;
+          longitude?: number | null;
+          location_updated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -63,6 +69,9 @@ export interface Database {
           timezone?: string;
           locale?: string;
           onboarding_completed?: boolean;
+          latitude?: number | null;
+          longitude?: number | null;
+          location_updated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -569,6 +578,39 @@ export interface Database {
         };
         Relationships: [];
       };
+      weather_cache: {
+        Row: {
+          id: string;
+          latitude: number;
+          longitude: number;
+          cache_type: string;
+          data: Json;
+          fetched_at: string;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          latitude: number;
+          longitude: number;
+          cache_type: string;
+          data: Json;
+          fetched_at?: string;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          latitude?: number;
+          longitude?: number;
+          cache_type?: string;
+          data?: Json;
+          fetched_at?: string;
+          expires_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -606,3 +648,4 @@ export type IntegrationPreference = Tables<"integration_preferences">;
 export type ChatSession = Tables<"chat_sessions">;
 export type ChatMessage = Tables<"chat_messages">;
 export type TrainingLoad = Tables<"training_load">;
+export type WeatherCache = Tables<"weather_cache">;

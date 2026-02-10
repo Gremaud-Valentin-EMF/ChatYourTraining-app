@@ -46,6 +46,7 @@ interface PlanSession {
   duration_minutes?: number;
   description?: string;
   intensity?: string;
+  weather_note?: string;
 }
 
 interface PlanDay {
@@ -197,6 +198,15 @@ export default function ChatPage() {
       setForcePlanMode(false);
     }
 
+    // Get user timezone
+    const getUserTimezone = () => {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch {
+        return 'Europe/Paris';
+      }
+    };
+
     setInputValue("");
     setIsStreaming(true);
     setAdaptationDetected(null);
@@ -227,6 +237,7 @@ export default function ChatPage() {
           message: text,
           sessionId: currentSession,
           forcePlanMode: shouldForcePlan,
+          timezone: getUserTimezone(),
         }),
       });
 
@@ -560,6 +571,12 @@ export default function ChatPage() {
                               {session.description && (
                                 <p className="mt-2 text-sm">
                                   {session.description}
+                                </p>
+                              )}
+                              {session.weather_note && (
+                                <p className="mt-1 text-xs text-accent/80 flex items-center gap-1">
+                                  <span>🌤️</span>
+                                  {session.weather_note}
                                 </p>
                               )}
                             </div>

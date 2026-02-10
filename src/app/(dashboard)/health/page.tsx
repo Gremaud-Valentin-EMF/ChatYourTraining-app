@@ -88,6 +88,14 @@ export default function HealthPage() {
     mood: 3,
     notes: "",
   });
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     loadMetrics();
@@ -1255,7 +1263,7 @@ export default function HealthPage() {
             todayData.fatigue_level ||
             todayData.mood ||
             todayData.notes) && (
-            <div className="grid grid-cols-3 gap-4 mt-4 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 text-center">
               {todayData.stress_level && (
                 <div className="p-3 bg-dark-100 rounded-xl">
                   <p className="text-xs text-muted uppercase">Stress</p>
@@ -1344,7 +1352,7 @@ export default function HealthPage() {
                 </div>
               )}
 
-              <div className="h-80">
+              <div className="h-64 sm:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={displayMetrics}
@@ -1362,12 +1370,16 @@ export default function HealthPage() {
                       dataKey="date"
                       tickFormatter={formatDate}
                       stroke="var(--muted)"
-                      fontSize={12}
+                      fontSize={isMobile ? 10 : 12}
+                      angle={isMobile ? -45 : 0}
+                      textAnchor={isMobile ? "end" : "middle"}
+                      height={isMobile ? 60 : 30}
                     />
-                    <YAxis stroke="var(--muted)" fontSize={12} />
+                    <YAxis stroke="var(--muted)" fontSize={isMobile ? 10 : 12} width={isMobile ? 35 : 45} />
                     <Tooltip
                       content={<HrvTooltip />}
                       cursor={{ stroke: "var(--dark-300)" }}
+                      wrapperStyle={{ maxWidth: isMobile ? '200px' : '300px' }}
                     />
                     {/* Baseline zone */}
                     {hrvStdDev > 0 && (
@@ -1481,7 +1493,7 @@ export default function HealthPage() {
                 </div>
               )}
 
-              <div className="h-80">
+              <div className="h-64 sm:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={displayMetrics}
@@ -1499,24 +1511,30 @@ export default function HealthPage() {
                       dataKey="date"
                       tickFormatter={formatDate}
                       stroke="var(--muted)"
-                      fontSize={12}
+                      fontSize={isMobile ? 10 : 12}
+                      angle={isMobile ? -45 : 0}
+                      textAnchor={isMobile ? "end" : "middle"}
+                      height={isMobile ? 60 : 30}
                     />
                     <YAxis
                       yAxisId="left"
                       stroke="var(--muted)"
-                      fontSize={12}
+                      fontSize={isMobile ? 10 : 12}
+                      width={isMobile ? 35 : 45}
                       domain={[0, 100]}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
                       stroke="var(--muted)"
-                      fontSize={12}
+                      fontSize={isMobile ? 10 : 12}
+                      width={isMobile ? 35 : 45}
                       domain={[40, 80]}
                     />
                     <Tooltip
                       content={<TrendsTooltip />}
                       cursor={{ stroke: "var(--dark-300)" }}
+                      wrapperStyle={{ maxWidth: isMobile ? '200px' : '300px' }}
                     />
                     <Line
                       yAxisId="left"

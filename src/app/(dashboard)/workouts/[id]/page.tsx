@@ -183,32 +183,16 @@ export default function WorkoutDetailPage({
         title: activity.title,
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
-        tss: activity.tss !== null && activity.tss !== undefined ? String(activity.tss) : "",
-        planned_duration_minutes:
-          activity.planned_duration_minutes !== null &&
-          activity.planned_duration_minutes !== undefined
-            ? String(activity.planned_duration_minutes)
-            : "",
-        planned_distance_km:
-          activity.planned_distance_km !== null &&
-          activity.planned_distance_km !== undefined
-            ? String(activity.planned_distance_km)
-            : "",
+        tss: activity.tss?.toString() || "",
+        planned_duration_minutes: activity.planned_duration_minutes?.toString() || "",
+        planned_distance_km: activity.planned_distance_km?.toString() || "",
         planned_pace_min_km:
           paceSecondsForEdit !== null ? (paceSecondsForEdit / 60).toFixed(2) : "",
-        planned_moving_time_minutes:
-          manualPlannedMovingTime !== null
-            ? String(Math.round(manualPlannedMovingTime))
-            : "",
-        planned_elevation_m:
-          manualPlannedElevation !== null
-            ? String(Math.round(manualPlannedElevation))
-            : "",
-        planned_tss:
-          manualPlannedTss !== null ? String(Math.round(manualPlannedTss)) : "",
-        planned_if:
-          manualPlannedIf !== null ? manualPlannedIf.toFixed(2) : "",
-        if_value: manualIfValue !== null ? manualIfValue.toFixed(2) : "",
+        planned_moving_time_minutes: manualPlannedMovingTime?.toString() || "",
+        planned_elevation_m: manualPlannedElevation?.toString() || "",
+        planned_tss: manualPlannedTss?.toString() || "",
+        planned_if: manualPlannedIf?.toFixed(2) || "",
+        if_value: manualIfValue?.toFixed(2) || "",
       });
       setRpeInput(activity.rpe ?? 0);
     }
@@ -504,35 +488,16 @@ export default function WorkoutDetailPage({
         title: activity.title,
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
-        tss:
-          activity.tss !== null && activity.tss !== undefined
-            ? String(activity.tss)
-            : "",
-        planned_duration_minutes:
-          activity.planned_duration_minutes !== null &&
-          activity.planned_duration_minutes !== undefined
-            ? String(activity.planned_duration_minutes)
-            : "",
-        planned_distance_km:
-          activity.planned_distance_km !== null &&
-          activity.planned_distance_km !== undefined
-            ? String(activity.planned_distance_km)
-            : "",
+        tss: activity.tss?.toString() || "",
+        planned_duration_minutes: activity.planned_duration_minutes?.toString() || "",
+        planned_distance_km: activity.planned_distance_km?.toString() || "",
         planned_pace_min_km:
           paceSecondsForEdit !== null ? (paceSecondsForEdit / 60).toFixed(2) : "",
-        planned_moving_time_minutes:
-          manualPlannedMovingTime !== null
-            ? String(Math.round(manualPlannedMovingTime))
-            : "",
-        planned_elevation_m:
-          manualPlannedElevation !== null
-            ? String(Math.round(manualPlannedElevation))
-            : "",
-        planned_tss:
-          manualPlannedTss !== null ? String(Math.round(manualPlannedTss)) : "",
-        planned_if:
-          manualPlannedIf !== null ? manualPlannedIf.toFixed(2) : "",
-        if_value: manualIfValue !== null ? manualIfValue.toFixed(2) : "",
+        planned_moving_time_minutes: manualPlannedMovingTime?.toString() || "",
+        planned_elevation_m: manualPlannedElevation?.toString() || "",
+        planned_tss: manualPlannedTss?.toString() || "",
+        planned_if: manualPlannedIf?.toFixed(2) || "",
+        if_value: manualIfValue?.toFixed(2) || "",
       });
     }
     setIsTssInlineEditing(false);
@@ -588,35 +553,16 @@ export default function WorkoutDetailPage({
         title: activity.title,
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
-        tss:
-          activity.tss !== null && activity.tss !== undefined
-            ? String(activity.tss)
-            : "",
-        planned_duration_minutes:
-          activity.planned_duration_minutes !== null &&
-          activity.planned_duration_minutes !== undefined
-            ? String(activity.planned_duration_minutes)
-            : "",
-        planned_distance_km:
-          activity.planned_distance_km !== null &&
-          activity.planned_distance_km !== undefined
-            ? String(activity.planned_distance_km)
-            : "",
+        tss: activity.tss?.toString() || "",
+        planned_duration_minutes: activity.planned_duration_minutes?.toString() || "",
+        planned_distance_km: activity.planned_distance_km?.toString() || "",
         planned_pace_min_km:
           paceSecondsForEdit !== null ? (paceSecondsForEdit / 60).toFixed(2) : "",
-        planned_moving_time_minutes:
-          manualPlannedMovingTime !== null
-            ? String(Math.round(manualPlannedMovingTime))
-            : "",
-        planned_elevation_m:
-          manualPlannedElevation !== null
-            ? String(Math.round(manualPlannedElevation))
-            : "",
-        planned_tss:
-          manualPlannedTss !== null ? String(Math.round(manualPlannedTss)) : "",
-        planned_if:
-          manualPlannedIf !== null ? manualPlannedIf.toFixed(2) : "",
-        if_value: manualIfValue !== null ? manualIfValue.toFixed(2) : "",
+        planned_moving_time_minutes: manualPlannedMovingTime?.toString() || "",
+        planned_elevation_m: manualPlannedElevation?.toString() || "",
+        planned_tss: manualPlannedTss?.toString() || "",
+        planned_if: manualPlannedIf?.toFixed(2) || "",
+        if_value: manualIfValue?.toFixed(2) || "",
       });
     }
     setIsTssInlineEditing(false);
@@ -1285,7 +1231,7 @@ export default function WorkoutDetailPage({
                       </button>
                     )
                   ) : (
-                    <h1 className="text-2xl font-bold text-foreground">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                       {activity.title}
                     </h1>
                   )}
@@ -1398,7 +1344,7 @@ export default function WorkoutDetailPage({
                 )}
               </section>
             )}
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 pt-2">
               {isEditing ? (
                 <>
                   <Button
@@ -1407,6 +1353,7 @@ export default function WorkoutDetailPage({
                     onClick={handleSaveEdit}
                     isLoading={isSavingEdit}
                     leftIcon={<Save className="h-4 w-4" />}
+                    className="w-full sm:w-auto"
                   >
                     Enregistrer
                   </Button>
@@ -1416,6 +1363,7 @@ export default function WorkoutDetailPage({
                     onClick={handleCancelEdit}
                     disabled={isSavingEdit}
                     leftIcon={<X className="h-4 w-4" />}
+                    className="w-full sm:w-auto"
                   >
                     Annuler
                   </Button>
@@ -1429,6 +1377,7 @@ export default function WorkoutDetailPage({
                       onClick={handleMarkAsDone}
                       isLoading={isMarkingDone}
                       leftIcon={<Check className="h-4 w-4" />}
+                      className="w-full sm:w-auto"
                     >
                       Marquer comme fait
                     </Button>
@@ -1438,6 +1387,7 @@ export default function WorkoutDetailPage({
                     size="sm"
                     onClick={handleStartEdit}
                     leftIcon={<Edit className="h-4 w-4" />}
+                    className="w-full sm:w-auto"
                   >
                     Modifier
                   </Button>
@@ -1468,7 +1418,7 @@ export default function WorkoutDetailPage({
                         {row.label}
                       </p>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-xs uppercase text-foreground/60">
                           Prévu
@@ -1864,7 +1814,7 @@ export default function WorkoutDetailPage({
                         <p className="uppercase text-foreground/60 text-[10px]">
                           Min
                         </p>
-                        <p className="text-lg font-semibold text-foreground">
+                        <p className="text-lg sm:text-xl font-semibold text-foreground">
                           {formatStatNumber(card.min, card.formatter)}
                         </p>
                       </div>
@@ -1872,7 +1822,7 @@ export default function WorkoutDetailPage({
                         <p className="uppercase text-foreground/60 text-[10px]">
                           Moy
                         </p>
-                        <p className="text-lg font-semibold text-foreground">
+                        <p className="text-lg sm:text-xl font-semibold text-foreground">
                           {formatStatNumber(card.avg, card.formatter)}
                         </p>
                       </div>
@@ -1880,7 +1830,7 @@ export default function WorkoutDetailPage({
                         <p className="uppercase text-foreground/60 text-[10px]">
                           Max
                         </p>
-                        <p className="text-lg font-semibold text-foreground">
+                        <p className="text-lg sm:text-xl font-semibold text-foreground">
                           {formatStatNumber(card.max, card.formatter)}
                         </p>
                       </div>

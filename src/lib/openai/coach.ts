@@ -6,6 +6,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
+import { getWeatherContext, type WeatherContext } from "@/lib/integrations/weather";
 
 export interface AthleteProfile {
   name: string;
@@ -109,6 +110,7 @@ export interface CoachContext {
   physiological_status_today: PhysiologicalStatus;
   training_load_analysis: TrainingLoadAnalysis;
   schedule_context: ScheduleContext;
+  weather_context: WeatherContext | null;
 }
 
 /**
@@ -162,7 +164,36 @@ Les indicateurs de récupération (Whoop, HRV, etc.) sont des **signaux**, pas d
 - Termine par une question ou suggestion d'action concrète
 
 ## Contexte athlète
-Le contexte JSON ci-dessous contient les données actuelles de l'athlète. Base toutes tes analyses sur ces données réelles.`;
+Le contexte JSON ci-dessous contient les données actuelles de l'athlète. Base toutes tes analyses sur ces données réelles.
+
+## Conditions météo et entraînement
+
+Si le contexte JSON contient "weather_context", utilise-le pour adapter tes conseils :
+
+### Compatibilité sport / météo
+- **Vélo** : déconseillé si vent > 50 km/h, pluie > 5mm/h, neige, verglas (< 2°C + humidité), visibilité < 1 km
+- **Course** : plus tolérant. Déconseillé si vent > 60 km/h, orage violent, temp < -15°C ou > 38°C
+- **Natation ext.** : déconseillée en cas d'orage ou températures très basses
+- **Alerte sévère** : toutes activités → intérieur
+
+### Alternatives indoor
+- Vélo → Home trainer / vélo d'intérieur
+- Course → Tapis / renforcement musculaire
+- Natation ext. → Piscine couverte / renforcement
+- Ne supprime JAMAIS la séance : propose une alternative de même durée et intensité
+
+### Conditions au sol
+- "Neige au sol" même sans nouvelle chute → déconseille vélo route, prudence course
+- "Sol mouillé/boueux" → prudence trail, OK route
+
+### Dans les plans
+- Consulte les prévisions pour chaque jour et choisis le sport en conséquence
+- Mentionne brièvement la météo dans la description si elle influence le choix
+- Pas de paragraphe météo complet, juste une mention contextuelle naturelle
+
+### Alerte proactive
+Si la météo du jour rend la séance prévue déconseillable, signale-le IMMÉDIATEMENT avec une alternative concrète.
+`;
 
 export const PLAN_GENERATION_PROMPT = `### MODE PLANIFICATION
 Tu dois générer un plan d'entraînement personnalisé à partir du contexte JSON fourni. Respecte strictement ce format de réponse JSON (aucun texte avant/après) :
@@ -197,12 +228,16 @@ Règles :
 - Prévois au moins 2 jours légers/récupération par semaine.
 - Les durées sont en minutes entières.
 - Préfère des séances réalistes (pas plus de 2 séances intenses consécutives).
+- Si "weather_context" est présent dans le contexte, choisis les sports en fonction de la météo de chaque jour.
+  Si conditions défavorables → propose alternative intérieure.
+- Ajoute un champ optionnel "weather_note" par session si la météo influence le choix :
+  { "weather_note": "Pluie prévue l'après-midi, séance matinale recommandée" }
 `;
 
 /**
  * Build the context JSON from database
  */
-export async function buildCoachContext(userId: string): Promise<CoachContext> {
+export async function buildCoachContext(userId: string, clientTimezone?: string): Promise<CoachContext> {
   const supabase = await createClient();
   const today = new Date().toISOString().split("T")[0];
 
@@ -300,6 +335,17 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   const load = loadResult.data;
   const todayWorkout = todayWorkoutResult.data;
   const upcoming = upcomingResult.data || [];
+
+  // Fetch weather if location available
+  let weatherContext: WeatherContext | null = null;
+  if (profile?.latitude && profile?.longitude) {
+    try {
+      weatherContext = await getWeatherContext(supabase, profile.latitude, profile.longitude);
+    } catch (e) {
+      console.error("Weather fetch failed, continuing without:", e);
+      weatherContext = null;
+    }
+  }
   const atlValue =
     typeof load?.atl === "number" ? load.atl : 0;
   const ctlValue =
@@ -346,12 +392,13 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
 
   // Get current datetime with timezone
   const now = new Date();
+  const timezone = clientTimezone || 'Europe/Paris';
   const timeString = now.toLocaleTimeString("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone: timezone,
   });
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   // Build context
   const context: CoachContext = {
@@ -486,6 +533,7 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
         intensity: a.intensity || "endurance",
       })),
     },
+    weather_context: weatherContext,
   };
 
   return context;
@@ -545,6 +593,59 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
       alerts.push(
         `🎯 **${context.athlete_profile.objective.name}**: J-${days} ! On entre dans la phase finale de préparation.`
       );
+    }
+  }
+
+  // Weather alerts
+  if (context.weather_context) {
+    const weather = context.weather_context;
+    const todayWorkout = context.schedule_context.today.planned_workout;
+
+    // OWM severe/extreme alerts
+    for (const alert of weather.alerts) {
+      if (alert.severity === "severe" || alert.severity === "extreme") {
+        alerts.push(
+          `🚨 **Alerte Météo ${alert.severity === "extreme" ? "Extrême" : "Sévère"}** : ${alert.event} — ${alert.description}`
+        );
+      }
+    }
+
+    if (todayWorkout) {
+      const sport = todayWorkout.sport.toLowerCase();
+      const isOutdoorCycling = sport.includes("cycl") || sport.includes("vélo") || sport === "cycling";
+      const isOutdoorRunning = sport.includes("run") || sport.includes("course") || sport === "running";
+      const isOutdoorSwimming = sport.includes("swim") || sport.includes("nata");
+
+      // Get today's feasibility
+      const todayForecast = weather.forecast.find(
+        (f) => f.date === context.current_datetime.date
+      );
+      const feasibility = todayForecast?.outdoor_feasibility;
+
+      if (feasibility) {
+        const sportFeasibility =
+          isOutdoorCycling ? feasibility.cycling :
+          isOutdoorRunning ? feasibility.running :
+          isOutdoorSwimming ? feasibility.swimming_outdoor :
+          null;
+
+        if (sportFeasibility === "deconseille") {
+          alerts.push(
+            `🌧️ **Alerte Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C, vent ${weather.current.wind_speed_kmh.toFixed(0)} km/h). Ta séance **${todayWorkout.title}** est déconseillée en extérieur. Envisage une alternative indoor.`
+          );
+        } else if (sportFeasibility === "prudence") {
+          alerts.push(
+            `⚠️ **Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C). Prudence pour ta séance **${todayWorkout.title}** en extérieur.`
+          );
+        }
+      }
+
+      // Ground conditions
+      if (weather.ground_conditions.ground_assessment.includes("Neige") && isOutdoorCycling) {
+        alerts.push(
+          `❄️ **Conditions au sol** : ${weather.ground_conditions.ground_assessment}. Vélo route fortement déconseillé.`
+        );
+      }
     }
   }
 

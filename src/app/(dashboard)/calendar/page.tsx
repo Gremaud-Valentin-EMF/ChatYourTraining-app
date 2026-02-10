@@ -37,6 +37,8 @@ import {
   formatDuration,
   toLocalDateString,
 } from "@/lib/utils";
+import { WeatherIcon } from "@/components/weather/weather-icon";
+import { useWeatherForecast } from "@/lib/hooks/useWeatherForecast";
 
 interface Objective {
   id: string;
@@ -103,6 +105,7 @@ export default function CalendarPage() {
   const [completingActivityId, setCompletingActivityId] = useState<
     string | null
   >(null);
+  const { forecastMap } = useWeatherForecast();
 
   // Get calendar data
   const year = currentDate.getFullYear();
@@ -801,6 +804,21 @@ export default function CalendarPage() {
                             )}
                           </div>
 
+                          {/* Weather */}
+                          {(() => {
+                            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                            const forecast = forecastMap?.get(dateStr);
+                            if (!forecast) return null;
+                            return (
+                              <div className="mt-2 mb-2 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-dark-100/50 border border-dark-200">
+                                <WeatherIcon code={forecast.icon} className="h-4 w-4" />
+                                <div className="text-xs font-semibold leading-none">
+                                  <div>{Math.round(forecast.temp_max_c)}°</div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           {/* Objectifs badge (desktop) */}
                           <div className="hidden md:block space-y-1">
                             {dayObjectives.map((obj) => (
@@ -954,7 +972,7 @@ export default function CalendarPage() {
                       )}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div>
+                        <div className="flex-1">
                           <p className="text-xs text-muted uppercase">
                             {dateStr}
                           </p>
@@ -965,6 +983,19 @@ export default function CalendarPage() {
                                 }`
                               : "Repos"}
                           </p>
+                          {(() => {
+                            const dateStr = day.date.toISOString().split("T")[0];
+                            const forecast = forecastMap?.get(dateStr);
+                            if (!forecast) return null;
+                            return (
+                              <div className="mt-2 flex items-center gap-2 px-2 py-1 rounded-lg bg-dark-100/50 border border-dark-200 w-fit">
+                                <WeatherIcon code={forecast.icon} className="h-4 w-4" />
+                                <span className="text-xs font-semibold">
+                                  {Math.round(forecast.temp_max_c)}°
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </div>
                         {day.isToday && (
                           <Badge variant="outline" size="sm">
@@ -1144,6 +1175,88 @@ export default function CalendarPage() {
               </p>
             </Card>
           )}
+
+          {/* Weather Details */}
+          {selectedDate && (() => {
+            const dateStr = toLocalDateString(selectedDate);
+            const forecast = forecastMap?.get(dateStr);
+            if (!forecast) {
+              return (
+                <Card className="text-center py-4">
+                  <p className="text-sm text-muted">Météo non disponible</p>
+                  <p className="text-xs text-muted mt-2">
+                    Assure-toi d'avoir accordé la permission de géolocalisation
+                  </p>
+                </Card>
+              );
+            }
+
+            return (
+              <Card>
+                <div className="flex items-center gap-2 mb-4">
+                  <WeatherIcon code={forecast.icon} className="h-6 w-6" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold capitalize">{forecast.description}</h4>
+                    <p className="text-xs text-muted">
+                      {Math.round(forecast.temp_max_c)}° / {Math.round(forecast.temp_min_c)}°
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Temperatures */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2 rounded-lg bg-dark-100">
+                      <p className="text-xs text-muted uppercase">Max</p>
+                      <p className="text-lg font-bold">{Math.round(forecast.temp_max_c)}°</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-dark-100">
+                      <p className="text-xs text-muted uppercase">Min</p>
+                      <p className="text-lg font-bold">{Math.round(forecast.temp_min_c)}°</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-dark-100">
+                      <p className="text-xs text-muted uppercase">Ressenti</p>
+                      <p className="text-lg font-bold">{Math.round(forecast.feels_like_c)}°</p>
+                    </div>
+                  </div>
+
+                  {/* Wind & Precipitation */}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted uppercase mb-1">Vent</p>
+                      <p className="font-semibold">{forecast.wind_speed_kmh.toFixed(1)} km/h</p>
+                      {forecast.wind_gust_kmh && (
+                        <p className="text-xs text-muted">Rafales: {forecast.wind_gust_kmh.toFixed(1)} km/h</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted uppercase mb-1">Précipitations</p>
+                      <p className="font-semibold">{forecast.precipitation_mm.toFixed(1)} mm</p>
+                      <p className="text-xs text-muted">{forecast.precipitation_probability}% chance</p>
+                    </div>
+                  </div>
+
+                  {/* Snow and UV */}
+                  {(forecast.snow_mm > 0 || forecast.uv_index !== null) && (
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {forecast.snow_mm > 0 && (
+                        <div className="p-2 rounded-lg bg-dark-100">
+                          <p className="text-xs text-muted uppercase">Neige</p>
+                          <p className="font-semibold">{forecast.snow_mm.toFixed(1)} mm</p>
+                        </div>
+                      )}
+                      {forecast.uv_index !== null && (
+                        <div className="p-2 rounded-lg bg-dark-100">
+                          <p className="text-xs text-muted uppercase">UV</p>
+                          <p className="font-semibold">{forecast.uv_index.toFixed(1)}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })()}
 
           {/* Journal du jour */}
           {selectedDate && (

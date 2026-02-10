@@ -112,7 +112,7 @@ export function ActivityStreamChart({
         </div>
       </div>
 
-      <div className="mt-4 h-72">
+      <div className="mt-4 h-56 sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
@@ -125,13 +125,13 @@ export function ActivityStreamChart({
               setSelectedIndex(index);
             }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2f3a" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--dark-200)" />
             <XAxis
               dataKey="time"
               tickFormatter={(value) => formatTime(Number(value))}
               tick={{ fontSize: 11, fill: "#9ca3af" }}
               tickLine={false}
-              axisLine={{ stroke: "#374151" }}
+              axisLine={{ stroke: "var(--dark-200)" }}
               minTickGap={32}
             />
             {hasHr ? (
@@ -139,7 +139,7 @@ export function ActivityStreamChart({
                 yAxisId="hr"
                 tick={{ fontSize: 11, fill: "#9ca3af" }}
                 tickLine={false}
-                axisLine={{ stroke: "#374151" }}
+                axisLine={{ stroke: "var(--dark-200)" }}
                 width={40}
                 domain={["auto", "auto"]}
                 tickFormatter={(value) => `${Math.round(value)}`}
@@ -151,7 +151,7 @@ export function ActivityStreamChart({
                 orientation="right"
                 tick={{ fontSize: 11, fill: "#9ca3af" }}
                 tickLine={false}
-                axisLine={{ stroke: "#374151" }}
+                axisLine={{ stroke: "var(--dark-200)" }}
                 width={44}
                 domain={["auto", "auto"]}
                 tickFormatter={(value) => `${Math.round(value)}`}
@@ -206,7 +206,8 @@ export function ActivityStreamChart({
             <Brush
               dataKey="time"
               height={24}
-              stroke="#4b5563"
+              stroke="var(--dark-200)"
+              fill="var(--dark-100)"
               travellerWidth={10}
               tickFormatter={(value) => formatTime(Number(value))}
             />

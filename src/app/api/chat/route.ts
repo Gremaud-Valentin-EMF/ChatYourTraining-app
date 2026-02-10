@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       sessionId,
       includeProactiveAlerts = true,
       forcePlanMode = false,
+      timezone = 'Europe/Paris',
     } = body;
 
     if (!message) {
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     // Build context from database
-    const context = await buildCoachContext(user.id);
+    const context = await buildCoachContext(user.id, timezone);
     const contextPrompt = formatContextForPrompt(context);
 
     // Check for proactive alerts

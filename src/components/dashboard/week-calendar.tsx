@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { Card, Progress } from "@/components/ui";
 import { Calendar, Clock, Zap, Activity } from "lucide-react";
 import { getSportColor } from "@/lib/utils";
+import { WeatherDayBadge } from "@/components/weather/weather-day-badge";
+import { useWeatherForecast } from "@/lib/hooks/useWeatherForecast";
 
 interface WeekActivity {
   id: string;
@@ -43,6 +46,8 @@ export function WeekCalendar({
   weeklyTss,
   weeklySessions,
 }: WeekCalendarProps) {
+  const { forecastMap } = useWeatherForecast();
+
   const formatHours = (minutes: number) => {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -72,9 +77,9 @@ export function WeekCalendar({
 
   return (
     <Card className="col-span-full">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-accent" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-accent" />
           <h3 className="font-semibold">Calendrier de la semaine</h3>
         </div>
 
@@ -171,6 +176,19 @@ export function WeekCalendar({
                 >
                   {day.dayNumber}
                 </p>
+                {(() => {
+                  const dateStr = day.date.toISOString().split("T")[0];
+                  const forecast = forecastMap?.get(dateStr);
+                  if (!forecast) return null;
+                  return (
+                    <div className="mt-1">
+                      <WeatherDayBadge
+                        iconCode={forecast.icon}
+                        tempMax={forecast.temp_max_c}
+                      />
+                    </div>
+                  );
+                })()}
                 {day.isToday && (
                   <div className="h-1 w-1 mx-auto mt-1 bg-accent rounded-full" />
                 )}
@@ -180,47 +198,50 @@ export function WeekCalendar({
                 {day.activities.map((activity) => {
                   const intensityInfo = getIntensityInfo(activity.intensity);
                   return (
-                    <div
+                    <Link
                       key={activity.id}
-                      className="px-2 py-1.5 rounded-lg border border-dark-200 bg-dark-50 text-xs font-medium"
+                      href={`/workouts/${activity.id}`}
+                      className="block"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
+                      <div className="px-2 py-1.5 rounded-lg border border-dark-200 bg-dark-50 text-xs font-medium hover:bg-dark-100 hover:border-accent transition-colors cursor-pointer">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                              style={{
+                                backgroundColor:
+                                  activity.sportColor ||
+                                  getSportColor(activity.sport),
+                              }}
+                            />
+                            <span className="truncate">{activity.title}</span>
+                          </div>
                           <span
-                            className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                            style={{
-                              backgroundColor:
-                                activity.sportColor ||
-                                getSportColor(activity.sport),
-                            }}
-                          />
-                          <span className="truncate">{activity.title}</span>
-                        </div>
-                        <span
-                          className={`text-[10px] uppercase ${
-                            activity.status === "completed"
-                              ? "text-success"
+                            className={`text-[10px] uppercase ${
+                              activity.status === "completed"
+                                ? "text-success"
+                                : activity.status === "skipped"
+                                ? "text-error"
+                                : "text-muted"
+                            }`}
+                          >
+                            {activity.status === "completed"
+                              ? "Fait"
                               : activity.status === "skipped"
-                              ? "text-error"
-                              : "text-muted"
-                          }`}
-                        >
-                          {activity.status === "completed"
-                            ? "Fait"
-                            : activity.status === "skipped"
-                            ? "Annulé"
-                            : "Planifié"}
-                        </span>
-                      </div>
-                      {intensityInfo && (
-                        <div className="mt-1 text-[10px] text-muted flex items-center gap-1">
-                          <span className="font-semibold">
-                            {intensityInfo.zone}
+                              ? "Annulé"
+                              : "Planifié"}
                           </span>
-                          <span>{intensityInfo.label}</span>
                         </div>
-                      )}
-                    </div>
+                        {intensityInfo && (
+                          <div className="mt-1 text-[10px] text-muted flex items-center gap-1">
+                            <span className="font-semibold">
+                              {intensityInfo.zone}
+                            </span>
+                            <span>{intensityInfo.label}</span>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
                   );
                 })}
                 {day.activities.length === 0 && (
