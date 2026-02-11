@@ -1,36 +1,28 @@
 /**
- * Training Load Calculations - TrainingPeaks formulas
+ * Training Load Calculations - TrainingPeaks Aligned Formulas
  *
- * CTL (Chronic Training Load) - Forme long terme (42 jours)
- * CTL_j = CTL_{j-1} + (TSS_j - CTL_{j-1}) / 42
+ * This module implements all 5 TrainingPeaks TSS (Training Stress Score) types:
+ * 1. TSS   - Power-based (cycling) using Normalized Power (NP)
+ * 2. rTSS  - Running TSS using Normalized Graded Pace (NGP)
+ * 3. sTSS  - Swimming TSS using Critical Swim Speed (CSS)
+ * 4. hrTSS - Heart Rate TSS using TRIMP (Training Impulse) with exponential weighting
+ * 5. RPE   - Rate of Perceived Exertion based TSS using Friel's table
  *
- * ATL (Acute Training Load) - Fatigue court terme (7 jours)
- * ATL_j = ATL_{j-1} + (TSS_j - ATL_{j-1}) / 7
- *
- * TSB (Training Stress Balance) - Fraîcheur
- * TSB_j = CTL_{j-1} - ATL_{j-1}  (⚠️ utilise les valeurs de la VEILLE)
- *
- * TSS (Training Stress Score) is calculated per activity
+ * CTL/ATL/TSB Formulas (unchanged from original):
+ * CTL_j = CTL_{j-1} + (TSS_j - CTL_{j-1}) / 42   (42-day chronic load)
+ * ATL_j = ATL_{j-1} + (TSS_j - ATL_{j-1}) / 7    (7-day acute load)
+ * TSB_j = CTL_{j-1} - ATL_{j-1}                  (⚠️ uses PREVIOUS day's values)
  */
 
-/**
- * Calcule le HrTSS (Heart Rate Training Stress Score)
- * Basé sur le modèle standard TrainingPeaks/Coggan
- */
-export function calculateHrTSS(
-  movingTimeSeconds: number,
-  avgHr: number,
-  lthr: number
-): number {
-  if (!movingTimeSeconds || !avgHr || !lthr || lthr === 0) {
-    return 0;
-  }
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
-  const intensityFactor = avgHr / lthr;
-  const durationInHours = movingTimeSeconds / 3600;
-  const hrTss = durationInHours * intensityFactor * intensityFactor * 100;
+export type TSSSType = "tss" | "rtss" | "stss" | "hrtss" | "rpe" | "estimated";
 
-  return Math.round(hrTss);
+export interface TSSSResult {
+  tss: number;
+  type: TSSSType;
 }
 
 interface Activity {
@@ -46,12 +38,497 @@ interface DailyLoad {
   tsb: number;
 }
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 // Time constants for TrainingPeaks formulas
 const ATL_TIME_CONSTANT = 7; // 7 days for acute load (fatigue)
 const CTL_TIME_CONSTANT = 42; // 42 days for chronic load (fitness)
 
+// Joe Friel's TSS per hour for each RPE level (1-10 scale)
+const FRIEL_TSS_PER_HOUR: Record<number, number> = {
+  1: 10,
+  2: 20,
+  3: 30,
+  4: 40,
+  5: 50,
+  6: 60,
+  7: 70,
+  8: 80,
+  9: 90,
+  10: 100,
+};
+
+// TRIMP gender-specific constants (Banister exponential weighting)
+const TRIMP_K_MALE = 1.92;
+const TRIMP_K_FEMALE = 1.67;
+const TRIMP_BASE_COEFFICIENT = 0.64;
+
+// ============================================================================
+// HELPER FUNCTIONS FOR NORMALIZATION
+// ============================================================================
+
 /**
- * Calculate new value using TrainingPeaks formula
+ * Calculate rolling average to the 4th power (used in NP algorithm)
+ * This emphasizes high-intensity efforts
+ */
+function calculateNormalizedValue(values: number[]): number {
+  if (!values || values.length === 0) return 0;
+
+  // Rolling 30-second average (assuming 1 Hz data, or scale if different)
+  const windowSize = Math.max(1, Math.min(30, values.length));
+  const rollingAverages: number[] = [];
+
+  for (let i = 0; i < values.length; i++) {
+    const start = Math.max(0, i - Math.floor(windowSize / 2));
+    const end = Math.min(values.length, i + Math.ceil(windowSize / 2));
+    const sum = values.slice(start, end).reduce((a, b) => a + b, 0);
+    const avg = sum / (end - start);
+    rollingAverages.push(avg);
+  }
+
+  // Raise to 4th power
+  const fourthPowers = rollingAverages.map((v) => Math.pow(v, 4));
+
+  // Average the 4th powers
+  const meanFourthPower =
+    fourthPowers.reduce((a, b) => a + b, 0) / fourthPowers.length;
+
+  // Take the 4th root
+  const normalized = Math.pow(meanFourthPower, 0.25);
+
+  return normalized;
+}
+
+/**
+ * Calculate Minetti cost factor for grade-adjusted pace
+ * Used in NGP (Normalized Graded Pace) calculation for running
+ */
+function calculateMinettiCost(gradient: number): number {
+  const i = gradient; // gradient as decimal (e.g., 0.05 = 5%)
+  const cost =
+    155.4 * Math.pow(i, 5) -
+    30.4 * Math.pow(i, 4) -
+    43.3 * Math.pow(i, 3) +
+    46.3 * Math.pow(i, 2) +
+    19.5 * i +
+    3.6;
+  const flatCost = 3.6;
+  return cost / flatCost;
+}
+
+// ============================================================================
+// TSS CALCULATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Calculate hrTSS (Heart Rate TSS) using TRIMP with exponential weighting
+ *
+ * Formula: TRIMP = Σ(dt × HRR × 0.64 × e^(k × HRR))
+ * where HRR = (HR - HR_rest) / (HR_max - HR_rest)
+ * Normalized by TRIMP at LTHR for 1 hour
+ * Result: hrTSS = (TRIMP_activity / TRIMP_threshold) × 100
+ */
+export function calculateHrTSS(params: {
+  hrStream?: number[];
+  avgHr?: number;
+  hrRest: number;
+  hrMax: number;
+  lthr: number;
+  durationSeconds: number;
+  gender?: "male" | "female";
+}): number {
+  const {
+    hrStream,
+    avgHr,
+    hrRest,
+    hrMax,
+    lthr,
+    durationSeconds,
+    gender = "male",
+  } = params;
+
+  // Validation
+  if (
+    !durationSeconds ||
+    !hrMax ||
+    !lthr ||
+    hrMax <= hrRest ||
+    (!hrStream && !avgHr)
+  ) {
+    return 0;
+  }
+
+  const k = gender === "female" ? TRIMP_K_FEMALE : TRIMP_K_MALE;
+
+  // Calculate TRIMP threshold (1 hour at LTHR)
+  const lthrr = Math.max(0, Math.min(1, (lthr - hrRest) / (hrMax - hrRest)));
+  const trimpThreshold =
+    60 * lthrr * TRIMP_BASE_COEFFICIENT * Math.exp(k * lthrr);
+
+  let trimp = 0;
+
+  if (hrStream && hrStream.length > 0) {
+    // Calculate TRIMP second-by-second
+    for (const hr of hrStream) {
+      const hrr = Math.max(0, Math.min(1, (hr - hrRest) / (hrMax - hrRest)));
+      const secondTrimp =
+        (1 / 60) * hrr * TRIMP_BASE_COEFFICIENT * Math.exp(k * hrr);
+      trimp += secondTrimp;
+    }
+  } else if (avgHr) {
+    // Simplified TRIMP using average HR
+    const durationMinutes = durationSeconds / 60;
+    const hrr = Math.max(0, Math.min(1, (avgHr - hrRest) / (hrMax - hrRest)));
+    trimp = durationMinutes * hrr * TRIMP_BASE_COEFFICIENT * Math.exp(k * hrr);
+  }
+
+  const hrTss = (trimp / trimpThreshold) * 100;
+  return Math.round(hrTss);
+}
+
+/**
+ * Calculate rTSS (Running TSS) using Normalized Graded Pace (NGP)
+ *
+ * NGP accounts for elevation changes using Minetti cost coefficients
+ * Then applies NP normalization algorithm: rolling 30s → ^4 → mean → ^0.25
+ *
+ * Formula: rTSS = duration_hours × IF² × 100
+ * where IF = NGP_speed / FTPace_speed
+ */
+export function calculateRTSS(params: {
+  speedStream?: number[];
+  distanceStream?: number[];
+  altitudeStream?: number[];
+  avgPacePerKm?: number;
+  distanceKm?: number;
+  durationSeconds: number;
+  thresholdPacePerKm: number;
+}): number {
+  const {
+    speedStream,
+    distanceStream,
+    altitudeStream,
+    avgPacePerKm,
+    durationSeconds,
+    thresholdPacePerKm,
+  } = params;
+
+  // Validation
+  if (!durationSeconds || !thresholdPacePerKm || thresholdPacePerKm <= 0) {
+    return 0;
+  }
+
+  let ngpSpeed = 0; // m/s
+
+  if (speedStream && speedStream.length > 0) {
+    // Try to calculate NGP with grade adjustment
+    if (
+      distanceStream &&
+      distanceStream.length > 0 &&
+      altitudeStream &&
+      altitudeStream.length > 0
+    ) {
+      // Calculate grade-adjusted speeds
+      const adjustedSpeeds: number[] = [];
+      for (let i = 0; i < speedStream.length; i++) {
+        let gradient = 0;
+        if (i > 0 && distanceStream[i] > distanceStream[i - 1]) {
+          const distDiff = distanceStream[i] - distanceStream[i - 1];
+          const altDiff = altitudeStream[i] - altitudeStream[i - 1];
+          gradient = altDiff / distDiff;
+        }
+
+        const minettiFactor = calculateMinettiCost(gradient);
+        const adjustedSpeed = speedStream[i] * minettiFactor;
+        adjustedSpeeds.push(adjustedSpeed);
+      }
+      ngpSpeed = calculateNormalizedValue(adjustedSpeeds);
+    } else {
+      // No elevation data, use speed directly
+      ngpSpeed = calculateNormalizedValue(speedStream);
+    }
+  } else if (avgPacePerKm) {
+    // Fallback: use average pace without normalization
+    ngpSpeed = 1000 / avgPacePerKm; // convert to m/s
+  } else {
+    return 0; // No pace data available
+  }
+
+  // Convert threshold pace to speed
+  const ftpaceSpeed = 1000 / thresholdPacePerKm; // m/s
+
+  // Calculate intensity factor
+  const intensityFactor = ngpSpeed / ftpaceSpeed;
+
+  // Calculate rTSS
+  const durationHours = durationSeconds / 3600;
+  const rTss = durationHours * intensityFactor * intensityFactor * 100;
+
+  return Math.round(rTss);
+}
+
+/**
+ * Calculate sTSS (Swimming TSS) using Critical Swim Speed (CSS)
+ *
+ * Water resistance increases with speed cubed, so IF is cubed (not squared)
+ *
+ * Formula: sTSS = IF³ × duration_hours × 100
+ * where IF = NSS / CSS_speed
+ * NSS (Normalized Swim Speed) = distance / time
+ */
+export function calculateSTSS(params: {
+  distanceMeters: number;
+  durationSeconds: number;
+  cssPer100m: number;
+}): number {
+  const { distanceMeters, durationSeconds, cssPer100m } = params;
+
+  // Validation
+  if (!distanceMeters || !durationSeconds || !cssPer100m || cssPer100m <= 0) {
+    return 0;
+  }
+
+  // Calculate speeds
+  const nss = distanceMeters / durationSeconds; // m/s
+  const cssSpeed = 100 / cssPer100m; // m/s
+
+  // Calculate intensity factor
+  const intensityFactor = nss / cssSpeed;
+
+  // Calculate sTSS (note: cubed, not squared)
+  const durationHours = durationSeconds / 3600;
+  const sTss =
+    Math.pow(intensityFactor, 3) * durationHours * 100;
+
+  return Math.round(sTss);
+}
+
+/**
+ * Calculate TSS using RPE (Rate of Perceived Exertion)
+ *
+ * Uses Joe Friel's official TSS/hour table (1-10 scale)
+ * Formula: TSS = FRIEL_TSS_PER_HOUR[rpe] × duration_hours
+ */
+export function estimateTSSFromRPE(params: {
+  rpe: number;
+  durationSeconds: number;
+}): number {
+  const { rpe, durationSeconds } = params;
+
+  if (!durationSeconds || rpe < 1 || rpe > 10) {
+    return 0;
+  }
+
+  const roundedRpe = Math.round(rpe);
+  const tssPerHour = FRIEL_TSS_PER_HOUR[roundedRpe] || 50;
+  const durationHours = durationSeconds / 3600;
+
+  return Math.round(tssPerHour * durationHours);
+}
+
+/**
+ * Calculate TSS for cycling using power data (Normalized Power)
+ *
+ * Most accurate TSS method when power meter is available
+ * Formula: TSS = duration_hours × IF² × 100
+ * where IF = NP / FTP
+ * NP = Normalized Power (rolling 30s → ^4 → mean → ^0.25)
+ */
+export function calculateCyclingTSS(params: {
+  powerStream?: number[];
+  avgPowerWatts?: number;
+  ftp: number;
+  durationSeconds: number;
+}): number {
+  const { powerStream, avgPowerWatts, ftp, durationSeconds } = params;
+
+  // Validation
+  if (!ftp || ftp <= 0 || !durationSeconds) {
+    return 0;
+  }
+
+  let normalizedPower = 0;
+
+  if (powerStream && powerStream.length > 0) {
+    normalizedPower = calculateNormalizedValue(powerStream);
+  } else if (avgPowerWatts) {
+    normalizedPower = avgPowerWatts;
+  } else {
+    return 0; // No power data
+  }
+
+  // Calculate intensity factor
+  const intensityFactor = normalizedPower / ftp;
+
+  // Calculate TSS
+  const durationHours = durationSeconds / 3600;
+  const tss = durationHours * intensityFactor * intensityFactor * 100;
+
+  return Math.round(tss);
+}
+
+/**
+ * Orchestrator function that applies TrainingPeaks priority hierarchy
+ *
+ * Selects the best available TSS calculation method:
+ * 1. Power (cycling) → TSS
+ * 2. Pace (running) → rTSS
+ * 3. Distance+time (swimming) → sTSS
+ * 4. Heart Rate → hrTSS
+ * 5. RPE → RPE TSS
+ * 6. None → estimated fallback
+ */
+export function calculateActivityTSS(params: {
+  sport?: string;
+  durationSeconds: number;
+
+  // Power data (cycling)
+  powerStream?: number[];
+  avgPowerWatts?: number;
+  ftp?: number;
+
+  // Pace data (running)
+  speedStream?: number[];
+  distanceStream?: number[];
+  altitudeStream?: number[];
+  avgPacePerKm?: number;
+  distanceKm?: number;
+  thresholdPacePerKm?: number;
+
+  // Swim data
+  distanceMeters?: number;
+  cssPer100m?: number;
+
+  // HR data
+  hrStream?: number[];
+  avgHr?: number;
+  hrRest?: number;
+  hrMax?: number;
+  lthr?: number;
+  gender?: "male" | "female";
+
+  // RPE
+  rpe?: number;
+}): TSSSResult {
+  const {
+    sport,
+    durationSeconds,
+    powerStream,
+    avgPowerWatts,
+    ftp,
+    speedStream,
+    distanceStream,
+    altitudeStream,
+    avgPacePerKm,
+    distanceKm,
+    thresholdPacePerKm,
+    distanceMeters,
+    cssPer100m,
+    hrStream,
+    avgHr,
+    hrRest,
+    hrMax,
+    lthr,
+    gender,
+    rpe,
+  } = params;
+
+  // Priority 1: Power-based TSS (cycling)
+  if (
+    sport === "cycling" &&
+    (powerStream?.length || avgPowerWatts) &&
+    ftp &&
+    ftp > 0
+  ) {
+    const tss = calculateCyclingTSS({
+      powerStream,
+      avgPowerWatts,
+      ftp,
+      durationSeconds,
+    });
+    if (tss > 0) return { tss, type: "tss" };
+  }
+
+  // Priority 2: Running TSS (pace-based)
+  if (
+    sport === "running" &&
+    (speedStream?.length || avgPacePerKm) &&
+    thresholdPacePerKm &&
+    thresholdPacePerKm > 0
+  ) {
+    const tss = calculateRTSS({
+      speedStream,
+      distanceStream,
+      altitudeStream,
+      avgPacePerKm,
+      distanceKm,
+      durationSeconds,
+      thresholdPacePerKm,
+    });
+    if (tss > 0) return { tss, type: "rtss" };
+  }
+
+  // Priority 3: Swimming TSS
+  if (sport === "swimming" && distanceMeters && cssPer100m && cssPer100m > 0) {
+    const tss = calculateSTSS({
+      distanceMeters,
+      durationSeconds,
+      cssPer100m,
+    });
+    if (tss > 0) return { tss, type: "stss" };
+  }
+
+  // Priority 4: Heart Rate TSS (universal fallback)
+  if (
+    (hrStream?.length || avgHr) &&
+    hrRest !== undefined &&
+    hrMax &&
+    lthr &&
+    hrMax > hrRest
+  ) {
+    const tss = calculateHrTSS({
+      hrStream,
+      avgHr,
+      hrRest: hrRest || 60,
+      hrMax,
+      lthr,
+      durationSeconds,
+      gender,
+    });
+    if (tss > 0) return { tss, type: "hrtss" };
+  }
+
+  // Priority 5: RPE-based estimation
+  if (rpe && rpe >= 1 && rpe <= 10) {
+    const tss = estimateTSSFromRPE({
+      rpe,
+      durationSeconds,
+    });
+    if (tss > 0) return { tss, type: "rpe" };
+  }
+
+  // Priority 6: Duration-based fallback estimation
+  const baseRates: Record<string, number> = {
+    cycling: 60,
+    running: 90,
+    swimming: 55,
+    other: 45,
+  };
+  const baseRate = baseRates[sport || "other"] || 45;
+  const durationHours = durationSeconds / 3600;
+  const estimatedTss = Math.round(baseRate * durationHours);
+
+  return { tss: estimatedTss, type: "estimated" };
+}
+
+// ============================================================================
+// CTL/ATL/TSB CALCULATION (unchanged from original)
+// ============================================================================
+
+/**
+ * Calculate new value using TrainingPeaks EMA formula
  * newValue = previousValue + (todayTSS - previousValue) / timeConstant
  */
 function calculateTrainingPeaksEMA(
@@ -60,106 +537,6 @@ function calculateTrainingPeaksEMA(
   timeConstant: number
 ): number {
   return previousValue + (todayTSS - previousValue) / timeConstant;
-}
-
-/**
- * Calculate Training Stress Score (TSS) for a running activity
- * TSS = (duration_seconds * NGP * IF) / (FTP * 3600) * 100
- *
- * Simplified formula using heart rate:
- * TSS = (duration_minutes * hrTss_per_hour) / 60
- * hrTss_per_hour = ((avgHR - hrRest) / (hrMax - hrRest)) ^ 1.92 * 100
- */
-export function calculateRunningTSS(
-  durationMinutes: number,
-  avgHR: number,
-  hrMax: number,
-  hrRest: number
-): number {
-  if (!avgHR || !hrMax || !hrRest || hrMax <= hrRest) {
-    // Fallback: estimate based on duration and RPE
-    return Math.round(durationMinutes * 0.8); // ~48 TSS per hour at moderate intensity
-  }
-
-  const hrReserve = (avgHR - hrRest) / (hrMax - hrRest);
-  const intensityFactor = Math.pow(Math.max(0, Math.min(1, hrReserve)), 1.92);
-  const hrTssPerHour = intensityFactor * 100;
-
-  return Math.round((durationMinutes * hrTssPerHour) / 60);
-}
-
-/**
- * Calculate TSS for cycling using power data
- * TSS = (duration_seconds * NP * IF) / (FTP * 3600) * 100
- * where IF = NP / FTP
- */
-export function calculateCyclingTSS(
-  durationMinutes: number,
-  normalizedPower: number,
-  ftp: number
-): number {
-  if (!normalizedPower || !ftp || ftp <= 0) {
-    // Fallback: estimate based on duration
-    return Math.round(durationMinutes * 0.9);
-  }
-
-  const intensityFactor = normalizedPower / ftp;
-  const tss =
-    ((durationMinutes * 60 * normalizedPower * intensityFactor) /
-      (ftp * 3600)) *
-    100;
-
-  return Math.round(tss);
-}
-
-/**
- * Calculate TSS for swimming
- * Uses a similar approach to running but with different constants
- */
-export function calculateSwimmingTSS(
-  durationMinutes: number,
-  avgPace100m: number, // seconds per 100m
-  css100m: number // Critical Swim Speed in seconds per 100m
-): number {
-  if (!avgPace100m || !css100m || css100m <= 0) {
-    // Fallback: lower TSS for swimming (typically lower stress)
-    return Math.round(durationMinutes * 0.7);
-  }
-
-  // Intensity based on pace vs CSS
-  const intensityFactor = css100m / avgPace100m; // Faster = higher intensity
-  const tss = Math.pow(intensityFactor, 3) * durationMinutes;
-
-  return Math.round(Math.min(tss, durationMinutes * 2)); // Cap at 2x duration
-}
-
-/**
- * Estimate TSS from RPE (Rate of Perceived Exertion)
- * Useful when no other data is available
- */
-export function estimateTSSFromRPE(
-  durationMinutes: number,
-  rpe: number // 1-10 scale
-): number {
-  // RPE 5 = ~60 TSS/hour (moderate)
-  // RPE 7 = ~80 TSS/hour (hard)
-  // RPE 9 = ~100+ TSS/hour (very hard)
-
-  const rpeToIntensity: Record<number, number> = {
-    1: 0.2,
-    2: 0.3,
-    3: 0.4,
-    4: 0.5,
-    5: 0.6,
-    6: 0.7,
-    7: 0.8,
-    8: 0.9,
-    9: 1.0,
-    10: 1.2,
-  };
-
-  const intensity = rpeToIntensity[Math.round(rpe)] || 0.6;
-  return Math.round(durationMinutes * intensity);
 }
 
 /**
@@ -279,7 +656,8 @@ export function interpretTSB(tsb: number): {
       status: "fresh",
       label: "Très frais",
       color: "text-secondary",
-      advice: "Vous pouvez augmenter la charge ou planifier une compétition.",
+      advice:
+        "Vous pouvez augmenter la charge ou planifier une compétition.",
     };
   } else if (tsb > 5) {
     return {

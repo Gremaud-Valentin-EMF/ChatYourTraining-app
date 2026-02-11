@@ -44,6 +44,7 @@ export interface Database {
           latitude: number | null;
           longitude: number | null;
           location_updated_at: string | null;
+          gender: "male" | "female" | null;
           created_at: string;
           updated_at: string;
         };
@@ -58,6 +59,7 @@ export interface Database {
           latitude?: number | null;
           longitude?: number | null;
           location_updated_at?: string | null;
+          gender?: "male" | "female" | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -72,6 +74,7 @@ export interface Database {
           latitude?: number | null;
           longitude?: number | null;
           location_updated_at?: string | null;
+          gender?: "male" | "female" | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -152,6 +155,7 @@ export interface Database {
           vma_kmh: number | null;
           ftp_watts: number | null;
           css_per_100m: number | null;
+          threshold_pace_per_km: number | null;
           target_hours_per_week: number | null;
           created_at: string;
           updated_at: string;
@@ -164,6 +168,7 @@ export interface Database {
           vma_kmh?: number | null;
           ftp_watts?: number | null;
           css_per_100m?: number | null;
+          threshold_pace_per_km?: number | null;
           target_hours_per_week?: number | null;
           created_at?: string;
           updated_at?: string;
@@ -176,6 +181,7 @@ export interface Database {
           vma_kmh?: number | null;
           ftp_watts?: number | null;
           css_per_100m?: number | null;
+          threshold_pace_per_km?: number | null;
           target_hours_per_week?: number | null;
           created_at?: string;
           updated_at?: string;
@@ -241,6 +247,7 @@ export interface Database {
           avg_power_watts: number | null;
           avg_pace_per_km: string | null;
           tss: number | null;
+          tss_type: "tss" | "rtss" | "stss" | "hrtss" | "rpe" | "estimated" | null;
           rpe: number | null;
           intensity: string | null;
           source: IntegrationProvider;
@@ -268,6 +275,7 @@ export interface Database {
           avg_power_watts?: number | null;
           avg_pace_per_km?: string | null;
           tss?: number | null;
+          tss_type?: "tss" | "rtss" | "stss" | "hrtss" | "rpe" | "estimated" | null;
           rpe?: number | null;
           intensity?: string | null;
           source?: IntegrationProvider;
@@ -295,6 +303,7 @@ export interface Database {
           avg_power_watts?: number | null;
           avg_pace_per_km?: string | null;
           tss?: number | null;
+          tss_type?: "tss" | "rtss" | "stss" | "hrtss" | "rpe" | "estimated" | null;
           rpe?: number | null;
           intensity?: string | null;
           source?: IntegrationProvider;

@@ -1,6 +1,9 @@
 import type { Json } from "@/types/database";
 import type { ImportedActivityData } from "@/lib/integrations/sync-helpers";
-import { calculateHrTSS } from "@/lib/calculations/training-load";
+import {
+  calculateHrTSS,
+  calculateActivityTSS as calculateActivityTSSOrchestrator,
+} from "@/lib/calculations/training-load";
 
 /**
  * Strava API Integration
@@ -468,6 +471,7 @@ export interface TSSCalculationOptions {
   userFtp?: number;
   userLthr?: number;
   userThresholdPace?: number; // min/km at threshold
+  userGender?: "male" | "female"; // For gender-specific TRIMP calculations
   normalizedHeartRate?: number; // From stream data (more accurate)
   normalizedPower?: number; // From stream data (more accurate)
   normalizedPaceSeconds?: number; // From stream data (NGP/NTP)
@@ -506,6 +510,7 @@ export function calculateActivityTSS(
 ): number {
   const {
     userHrMax,
+    userHrRest,
     userFtp,
     userLthr,
     userThresholdPace,
@@ -573,7 +578,14 @@ export function calculateActivityTSS(
     const hrValue = normalizedHeartRate || activity.average_heartrate;
     if (hrValue) {
       const referenceLthr = resolveLthr(userLthr, userHrMax);
-      const rtss = calculateHrTSS(hrDurationSeconds, hrValue, referenceLthr);
+      const hrRest = userHrRest || 50; // Default resting HR
+      const rtss = calculateHrTSS({
+        avgHr: hrValue,
+        hrRest,
+        hrMax: userHrMax || 200,
+        lthr: referenceLthr,
+        durationSeconds: hrDurationSeconds,
+      });
       const intensityFactor = hrValue / referenceLthr;
       console.log(
         `TSS calc (running HR fallback): HR=${hrValue}${
@@ -614,11 +626,14 @@ export function calculateActivityTSS(
   const hrValueGeneric = normalizedHeartRate || activity.average_heartrate;
   if (hrValueGeneric) {
     const referenceLthr = resolveLthr(userLthr, userHrMax);
-    const hrtss = calculateHrTSS(
-      hrDurationSeconds,
-      hrValueGeneric,
-      referenceLthr
-    );
+    const hrRest = userHrRest || 50; // Default resting HR
+    const hrtss = calculateHrTSS({
+      avgHr: hrValueGeneric,
+      hrRest,
+      hrMax: userHrMax || 200,
+      lthr: referenceLthr,
+      durationSeconds: hrDurationSeconds,
+    });
     const intensityFactor = hrValueGeneric / referenceLthr;
     console.log(
       `TSS calc (hrTSS): HR=${hrValueGeneric}${
@@ -689,6 +704,47 @@ export function convertStravaActivity(
     },
   } as Json;
 
+  // Normalize sport type for the new orchestrator
+  const sportType = stravaActivity.sport_type || stravaActivity.type;
+  let sport: string | undefined;
+  if (sportType === "Run" || sportType === "Trail Run") {
+    sport = "running";
+  } else if (sportType === "Ride" || sportType === "VirtualRide") {
+    sport = "cycling";
+  } else if (sportType === "Swim") {
+    sport = "swimming";
+  }
+
+  // Calculate pace data for running activities
+  const distanceKm = stravaActivity.distance / 1000;
+  const durationMinutes = stravaActivity.moving_time / 60;
+  const avgPacePerKm = distanceKm > 0 && durationMinutes > 0 ? durationMinutes / distanceKm : undefined;
+
+  // Calculate TSS using new orchestrator function from training-load.ts
+  const tssResult = calculateActivityTSSOrchestrator({
+    sport,
+    durationSeconds: stravaActivity.moving_time,
+    // Power data
+    powerStream: options.powerStream,
+    avgPowerWatts: stravaActivity.weighted_average_watts || stravaActivity.average_watts || undefined,
+    ftp: options.userFtp,
+    // Pace data (running)
+    distanceStream: options.distanceStream,
+    altitudeStream: options.altitudeStream,
+    avgPacePerKm,
+    distanceKm: distanceKm || undefined,
+    thresholdPacePerKm: options.userThresholdPace,
+    // Swim data
+    distanceMeters: sport === "swimming" ? stravaActivity.distance : undefined,
+    // HR data
+    hrStream: options.heartrateStream,
+    avgHr: stravaActivity.average_heartrate || options.normalizedHeartRate || undefined,
+    hrRest: options.userHrRest,
+    hrMax: options.userHrMax,
+    lthr: options.userLthr,
+    gender: options.userGender,
+  });
+
   return {
     title: stravaActivity.name,
     description: stravaActivity.description || null,
@@ -710,7 +766,7 @@ export function convertStravaActivity(
       stravaActivity.weighted_average_watts ||
       stravaActivity.average_watts ||
       null,
-    tss: calculateActivityTSS(stravaActivity, options),
+    tss: Math.round(tssResult.tss),
     source: "strava" as const,
     external_id: String(stravaActivity.id),
     raw_data: enrichedRawData,

@@ -18,6 +18,9 @@ import {
   matchPlannedWorkout,
   SyncLockError,
 } from "@/lib/integrations/sync-helpers";
+import {
+  calculateActivityTSS as calculateActivityTSSOrchestrator,
+} from "@/lib/calculations/training-load";
 import type {
   ImportedActivityData,
   SyncState,
@@ -148,6 +151,34 @@ export async function POST() {
         { status: 401 }
       );
     }
+
+    // Get user's physiological data for hrTSS calculation
+    const { data: physioData } = await (supabase as any)
+      .from("physiological_data")
+      .select("hr_max, hr_rest, lthr")
+      .eq("user_id", user.id)
+      .limit(1);
+
+    // Get user's gender for gender-specific TRIMP calculations
+    const { data: userData } = await (supabase as any)
+      .from("users")
+      .select("gender")
+      .eq("id", user.id)
+      .single();
+
+    const userHrMax = physioData?.[0]?.hr_max || undefined;
+    const userHrRest = physioData?.[0]?.hr_rest || undefined;
+    const userGender = userData?.gender as "male" | "female" | undefined;
+    const userLthr =
+      physioData?.[0]?.lthr ||
+      (userHrMax ? Math.round(userHrMax * 0.7) : undefined);
+
+    console.log("WHOOP sync - User physio data:", {
+      userHrMax,
+      userHrRest,
+      userGender,
+      userLthr,
+    });
 
     // Smart sync: Check oldest WHOOP data to determine sync range
     console.log("Fetching WHOOP data...");
@@ -553,10 +584,31 @@ export async function POST() {
 
         if (!sportId) continue;
 
-        // Calculate TSS from WHOOP strain (strain 0-21 maps roughly to 0-200+ TSS)
-        // Strain is a logarithmic scale, so we use exponential conversion
-        const strain = workout.score?.strain || 0;
-        const tss = Math.round(Math.pow(strain / 21, 2) * 200);
+        // Calculate TSS using hrTSS from the new orchestrator
+        // WHOOP provides average and max HR, we use these for accurate TRIMP-based TSS
+        const durationSeconds = Math.round(
+          (new Date(workout.end).getTime() - new Date(workout.start).getTime()) / 1000
+        );
+        const avgHr = workout.score?.average_heart_rate;
+
+        let tss: number;
+        if (avgHr && avgHr > 0 && userHrMax && userLthr && durationSeconds > 0) {
+          // Use hrTSS (TRIMP-based) for better accuracy
+          const tssResult = calculateActivityTSSOrchestrator({
+            durationSeconds,
+            avgHr,
+            hrRest: userHrRest || 50,
+            hrMax: userHrMax,
+            lthr: userLthr,
+            gender: userGender,
+          });
+          tss = Math.round(tssResult.tss);
+        } else {
+          // Fallback: estimate from strain if HR data is unavailable
+          // Strain 0-21 maps roughly to 0-200+ TSS
+          const strain = workout.score?.strain || 0;
+          tss = Math.round(Math.pow(strain / 21, 2) * 200);
+        }
 
         const titlePrefix = sportType
           .split("_")

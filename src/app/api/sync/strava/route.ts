@@ -127,17 +127,27 @@ export async function POST() {
       .eq("user_id", user.id)
       .limit(1);
 
-    // Get user's cycling FTP from user_sports
-    const { data: cyclingSport } = await (supabase as any)
+    // Get user's gender for gender-specific TRIMP calculations
+    const { data: userData } = await (supabase as any)
+      .from("users")
+      .select("gender")
+      .eq("id", user.id)
+      .single();
+
+    // Get user's sports data (FTP for cycling, threshold pace for running)
+    const { data: userSports } = await (supabase as any)
       .from("user_sports")
-      .select("ftp_watts")
-      .eq("user_id", user.id)
-      .not("ftp_watts", "is", null)
-      .limit(1);
+      .select("ftp_watts, threshold_pace_per_km, sport_id")
+      .eq("user_id", user.id);
 
     const userHrMax = physioData?.[0]?.hr_max || undefined;
     const userHrRest = physioData?.[0]?.hr_rest || undefined;
-    const userFtp = cyclingSport?.[0]?.ftp_watts || undefined;
+    const userGender = userData?.gender as "male" | "female" | undefined;
+
+    // Extract FTP and threshold pace from user_sports
+    const userFtp = userSports?.find((s: any) => s.ftp_watts)?.ftp_watts || undefined;
+    const userThresholdPace = userSports?.find((s: any) => s.threshold_pace_per_km)?.threshold_pace_per_km || undefined;
+
     // Use stored LTHR or calculate from HRmax
     // For running, LTHR is typically around 70-75% of HRmax (lower than cycling's 85%)
     // Based on Garmin data analysis, using 70% for running LTHR estimate
@@ -147,7 +157,9 @@ export async function POST() {
     console.log("Strava sync - User physio data:", {
       userHrMax,
       userHrRest,
+      userGender,
       userFtp,
+      userThresholdPace,
       userLthr,
       storedLthr: physioData?.[0]?.lthr,
     });
@@ -322,8 +334,10 @@ export async function POST() {
       const tssOptions: TSSCalculationOptions = {
         userHrMax,
         userHrRest,
+        userGender,
         userFtp,
         userLthr,
+        userThresholdPace,
       };
 
       // Fetch streams for activities with HR/power data (for more accurate TSS and charting)
