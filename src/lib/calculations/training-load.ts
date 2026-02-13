@@ -61,9 +61,11 @@ const FRIEL_TSS_PER_HOUR: Record<number, number> = {
 };
 
 // TRIMP gender-specific constants (Banister exponential weighting)
-const TRIMP_K_MALE = 1.92;
-const TRIMP_K_FEMALE = 1.67;
-const TRIMP_BASE_COEFFICIENT = 0.64;
+// Coefficients from Banister (1991): TRIMP = dt × HRR × b × e^(k × HRR)
+const TRIMP_COEFFICIENTS = {
+  male: { base: 0.64, k: 1.92 },
+  female: { base: 0.86, k: 1.67 },
+};
 
 // ============================================================================
 // HELPER FUNCTIONS FOR NORMALIZATION
@@ -71,21 +73,28 @@ const TRIMP_BASE_COEFFICIENT = 0.64;
 
 /**
  * Calculate rolling average to the 4th power (used in NP algorithm)
- * This emphasizes high-intensity efforts
+ * Uses TRAILING 30-second window per Coggan algorithm (not centered)
+ * Algorithm: rolling_avg[i] = mean(values[i-29..i]), then ^4, mean, ^0.25
  */
 function calculateNormalizedValue(values: number[]): number {
   if (!values || values.length === 0) return 0;
 
-  // Rolling 30-second average (assuming 1 Hz data, or scale if different)
-  const windowSize = Math.max(1, Math.min(30, values.length));
+  const windowSize = 30;
   const rollingAverages: number[] = [];
 
-  for (let i = 0; i < values.length; i++) {
-    const start = Math.max(0, i - Math.floor(windowSize / 2));
-    const end = Math.min(values.length, i + Math.ceil(windowSize / 2));
-    const sum = values.slice(start, end).reduce((a, b) => a + b, 0);
-    const avg = sum / (end - start);
-    rollingAverages.push(avg);
+  // Only calculate rolling average for i >= 29 (need 30 points)
+  // This matches Coggan's algorithm exactly
+  for (let i = Math.min(windowSize - 1, values.length - 1); i < values.length; i++) {
+    let sum = 0;
+    for (let j = i - (windowSize - 1); j <= i; j++) {
+      sum += values[j];
+    }
+    rollingAverages.push(sum / windowSize);
+  }
+
+  if (rollingAverages.length === 0) {
+    // Not enough data for 30s window, use simple average
+    return values.reduce((a, b) => a + b, 0) / values.length;
   }
 
   // Raise to 4th power
@@ -104,9 +113,11 @@ function calculateNormalizedValue(values: number[]): number {
 /**
  * Calculate Minetti cost factor for grade-adjusted pace
  * Used in NGP (Normalized Graded Pace) calculation for running
+ * Gradient is clamped to [-0.3, 0.3] to avoid polynomial divergence
  */
 function calculateMinettiCost(gradient: number): number {
-  const i = gradient; // gradient as decimal (e.g., 0.05 = 5%)
+  // Clamp gradient to valid range to avoid polynomial divergence
+  const i = Math.max(-0.3, Math.min(0.3, gradient)); // gradient as decimal (e.g., 0.05 = 5%)
   const cost =
     155.4 * Math.pow(i, 5) -
     30.4 * Math.pow(i, 4) -
@@ -160,28 +171,29 @@ export function calculateHrTSS(params: {
     return 0;
   }
 
-  const k = gender === "female" ? TRIMP_K_FEMALE : TRIMP_K_MALE;
+  const coeff = TRIMP_COEFFICIENTS[gender] || TRIMP_COEFFICIENTS.male;
 
   // Calculate TRIMP threshold (1 hour at LTHR)
   const lthrr = Math.max(0, Math.min(1, (lthr - hrRest) / (hrMax - hrRest)));
   const trimpThreshold =
-    60 * lthrr * TRIMP_BASE_COEFFICIENT * Math.exp(k * lthrr);
+    60 * lthrr * coeff.base * Math.exp(coeff.k * lthrr);
 
   let trimp = 0;
 
   if (hrStream && hrStream.length > 0) {
-    // Calculate TRIMP second-by-second
+    // Calculate TRIMP from HR stream data
+    // Strava streams are NOT always 1 Hz - actual sampling rate varies
+    // Scale dt to match actual duration (e.g., 3182s with 1134 points = 2.8s per point)
+    const dtMinutes = (durationSeconds / hrStream.length) / 60;
     for (const hr of hrStream) {
       const hrr = Math.max(0, Math.min(1, (hr - hrRest) / (hrMax - hrRest)));
-      const secondTrimp =
-        (1 / 60) * hrr * TRIMP_BASE_COEFFICIENT * Math.exp(k * hrr);
-      trimp += secondTrimp;
+      trimp += dtMinutes * hrr * coeff.base * Math.exp(coeff.k * hrr);
     }
   } else if (avgHr) {
     // Simplified TRIMP using average HR
     const durationMinutes = durationSeconds / 60;
     const hrr = Math.max(0, Math.min(1, (avgHr - hrRest) / (hrMax - hrRest)));
-    trimp = durationMinutes * hrr * TRIMP_BASE_COEFFICIENT * Math.exp(k * hrr);
+    trimp = durationMinutes * hrr * coeff.base * Math.exp(coeff.k * hrr);
   }
 
   const hrTss = (trimp / trimpThreshold) * 100;
@@ -383,6 +395,7 @@ export function calculateCyclingTSS(params: {
 export function calculateActivityTSS(params: {
   sport?: string;
   durationSeconds: number;
+  elapsedTimeSeconds?: number; // Total elapsed time (including rest) - used for hrTSS
 
   // Power data (cycling)
   powerStream?: number[];
@@ -415,6 +428,7 @@ export function calculateActivityTSS(params: {
   const {
     sport,
     durationSeconds,
+    elapsedTimeSeconds,
     powerStream,
     avgPowerWatts,
     ftp,
@@ -434,6 +448,12 @@ export function calculateActivityTSS(params: {
     gender,
     rpe,
   } = params;
+
+  // For hrTSS, use elapsed_time (heart works during rest periods too)
+  // For pace/power TSS, use moving_time (only active movement counts)
+  const hrDurationSeconds = elapsedTimeSeconds && elapsedTimeSeconds > 0
+    ? elapsedTimeSeconds
+    : durationSeconds;
 
   // Priority 1: Power-based TSS (cycling)
   if (
@@ -481,6 +501,7 @@ export function calculateActivityTSS(params: {
   }
 
   // Priority 4: Heart Rate TSS (universal fallback)
+  // Uses elapsed_time (not moving_time) because the heart works during rest periods too
   if (
     (hrStream?.length || avgHr) &&
     hrRest !== undefined &&
@@ -494,7 +515,7 @@ export function calculateActivityTSS(params: {
       hrRest: hrRest || 60,
       hrMax,
       lthr,
-      durationSeconds,
+      durationSeconds: hrDurationSeconds,
       gender,
     });
     if (tss > 0) return { tss, type: "hrtss" };

@@ -134,32 +134,43 @@ export async function POST() {
       .eq("id", user.id)
       .single();
 
-    // Get user's sports data (FTP for cycling, threshold pace for running)
+    // Get user's sports data (FTP, threshold pace, VMA, CSS)
     const { data: userSports } = await (supabase as any)
       .from("user_sports")
-      .select("ftp_watts, threshold_pace_per_km, sport_id")
+      .select("ftp_watts, threshold_pace_per_km, vma_kmh, css_per_100m, sport_id")
       .eq("user_id", user.id);
 
-    const userHrMax = physioData?.[0]?.hr_max || undefined;
-    const userHrRest = physioData?.[0]?.hr_rest || undefined;
+    const userHrMax = physioData?.[0]?.hr_max ?? undefined;
+    const userHrRest = physioData?.[0]?.hr_rest ?? undefined;
     const userGender = userData?.gender as "male" | "female" | undefined;
 
-    // Extract FTP and threshold pace from user_sports
-    const userFtp = userSports?.find((s: any) => s.ftp_watts)?.ftp_watts || undefined;
-    const userThresholdPace = userSports?.find((s: any) => s.threshold_pace_per_km)?.threshold_pace_per_km || undefined;
+    // Extract sport-specific thresholds from user_sports
+    const userFtp = userSports?.find((s: any) => s.ftp_watts)?.ftp_watts ?? undefined;
+    const userCssPer100m = userSports?.find((s: any) => s.css_per_100m)?.css_per_100m ?? undefined;
+
+    // Threshold pace: explicit value OR derive from VMA (FTPace ≈ 85% VMA speed)
+    let userThresholdPace = userSports?.find((s: any) => s.threshold_pace_per_km)?.threshold_pace_per_km ?? undefined;
+    if (!userThresholdPace) {
+      const vmaKmh = userSports?.find((s: any) => s.vma_kmh)?.vma_kmh;
+      if (vmaKmh && vmaKmh > 0) {
+        // FTPace speed = VMA × 0.85 (km/h) → convert to s/km
+        userThresholdPace = Math.round(3600 / (vmaKmh * 0.85));
+        console.log(`Strava sync - Threshold pace derived from VMA ${vmaKmh} km/h → ${userThresholdPace} s/km (${Math.floor(userThresholdPace / 60)}:${String(userThresholdPace % 60).padStart(2, "0")}/km)`);
+      }
+    }
 
     // Use stored LTHR or calculate from HRmax
-    // For running, LTHR is typically around 70-75% of HRmax (lower than cycling's 85%)
-    // Based on Garmin data analysis, using 70% for running LTHR estimate
+    // LTHR is typically ~85% of HRmax for most athletes
     const userLthr =
-      physioData?.[0]?.lthr ||
-      (userHrMax ? Math.round(userHrMax * 0.7) : undefined);
+      physioData?.[0]?.lthr ??
+      (userHrMax ? Math.round(userHrMax * 0.85) : undefined);
     console.log("Strava sync - User physio data:", {
       userHrMax,
       userHrRest,
       userGender,
       userFtp,
       userThresholdPace,
+      userCssPer100m,
       userLthr,
       storedLthr: physioData?.[0]?.lthr,
     });
@@ -338,6 +349,7 @@ export async function POST() {
         userFtp,
         userLthr,
         userThresholdPace,
+        userCssPer100m,
       };
 
       // Fetch streams for activities with HR/power data (for more accurate TSS and charting)
@@ -375,7 +387,7 @@ export async function POST() {
             // Calculate and store Heart Rate data
             if (streams.heartrate?.data) {
               tssOptions.heartrateStream = streams.heartrate.data;
-              const nhr = calculateNormalizedHeartRate(streams.heartrate.data);
+              const nhr = calculateNormalizedHeartRate(streams.heartrate.data, streams.time?.data);
               if (nhr > 0) {
                 tssOptions.normalizedHeartRate = nhr;
                 console.log(
@@ -387,7 +399,7 @@ export async function POST() {
             // Calculate and store Power data
             if (streams.watts?.data) {
               tssOptions.powerStream = streams.watts.data;
-              const np = calculateNormalizedPower(streams.watts.data);
+              const np = calculateNormalizedPower(streams.watts.data, streams.time?.data);
               if (np > 0) {
                 tssOptions.normalizedPower = np;
                 console.log(

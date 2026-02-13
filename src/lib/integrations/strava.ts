@@ -1,7 +1,6 @@
 import type { Json } from "@/types/database";
 import type { ImportedActivityData } from "@/lib/integrations/sync-helpers";
 import {
-  calculateHrTSS,
   calculateActivityTSS as calculateActivityTSSOrchestrator,
 } from "@/lib/calculations/training-load";
 
@@ -230,31 +229,58 @@ export async function getActivityStreams(
 
 /**
  * Calculate Normalized Heart Rate (NHR) from HR stream data
- * Similar to Normalized Power calculation:
- * 1. Calculate 30-second rolling average
+ * Similar to Normalized Power calculation (Coggan's algorithm):
+ * 1. Calculate 30-second rolling average (using timeStream for accuracy)
  * 2. Raise each 30s average to the 4th power
  * 3. Take the mean of all values
  * 4. Take the 4th root
  *
  * This accounts for the physiological lag and gives more weight to high-intensity efforts
  */
-export function calculateNormalizedHeartRate(hrData: number[]): number {
-  if (!hrData || hrData.length < 30) {
-    // Not enough data for 30s rolling average, return simple average
+export function calculateNormalizedHeartRate(hrData: number[], timeStream?: number[]): number {
+  if (!hrData || hrData.length < 2) {
+    // Not enough data
     if (hrData && hrData.length > 0) {
       return Math.round(hrData.reduce((a, b) => a + b, 0) / hrData.length);
     }
     return 0;
   }
 
-  // Calculate 30-second rolling averages
+  // Use time-based 30-second window if available, otherwise use 30-point window
   const rollingAverages: number[] = [];
-  for (let i = 29; i < hrData.length; i++) {
-    let sum = 0;
-    for (let j = i - 29; j <= i; j++) {
-      sum += hrData[j];
+
+  if (timeStream && timeStream.length === hrData.length) {
+    // Time-based rolling average (more accurate for non-1Hz data)
+    for (let i = 0; i < hrData.length; i++) {
+      const targetStart = timeStream[i] - 30;
+      let startIdx = i;
+      while (startIdx > 0 && timeStream[startIdx - 1] >= targetStart) {
+        startIdx--;
+      }
+
+      let sum = 0;
+      let count = 0;
+      for (let j = startIdx; j <= i; j++) {
+        sum += hrData[j];
+        count++;
+      }
+      if (count > 0) {
+        rollingAverages.push(sum / count);
+      }
     }
-    rollingAverages.push(sum / 30);
+  } else {
+    // Point-based rolling average (30 points)
+    for (let i = 29; i < hrData.length; i++) {
+      let sum = 0;
+      for (let j = i - 29; j <= i; j++) {
+        sum += hrData[j];
+      }
+      rollingAverages.push(sum / 30);
+    }
+  }
+
+  if (rollingAverages.length === 0) {
+    return Math.round(hrData.reduce((a, b) => a + b, 0) / hrData.length);
   }
 
   // Raise each to the 4th power and take mean
@@ -272,8 +298,8 @@ export function calculateNormalizedHeartRate(hrData: number[]): number {
  * Calculate Normalized Power (NP) from power stream data
  * Same algorithm as NHR but for power
  */
-export function calculateNormalizedPower(powerData: number[]): number {
-  if (!powerData || powerData.length < 30) {
+export function calculateNormalizedPower(powerData: number[], timeStream?: number[]): number {
+  if (!powerData || powerData.length < 2) {
     if (powerData && powerData.length > 0) {
       return Math.round(
         powerData.reduce((a, b) => a + b, 0) / powerData.length
@@ -282,14 +308,41 @@ export function calculateNormalizedPower(powerData: number[]): number {
     return 0;
   }
 
-  // Calculate 30-second rolling averages
+  // Use time-based 30-second window if available, otherwise use 30-point window
   const rollingAverages: number[] = [];
-  for (let i = 29; i < powerData.length; i++) {
-    let sum = 0;
-    for (let j = i - 29; j <= i; j++) {
-      sum += powerData[j];
+
+  if (timeStream && timeStream.length === powerData.length) {
+    // Time-based rolling average (more accurate for non-1Hz data)
+    for (let i = 0; i < powerData.length; i++) {
+      const targetStart = timeStream[i] - 30;
+      let startIdx = i;
+      while (startIdx > 0 && timeStream[startIdx - 1] >= targetStart) {
+        startIdx--;
+      }
+
+      let sum = 0;
+      let count = 0;
+      for (let j = startIdx; j <= i; j++) {
+        sum += powerData[j];
+        count++;
+      }
+      if (count > 0) {
+        rollingAverages.push(sum / count);
+      }
     }
-    rollingAverages.push(sum / 30);
+  } else {
+    // Point-based rolling average (30 points)
+    for (let i = 29; i < powerData.length; i++) {
+      let sum = 0;
+      for (let j = i - 29; j <= i; j++) {
+        sum += powerData[j];
+      }
+      rollingAverages.push(sum / 30);
+    }
+  }
+
+  if (rollingAverages.length === 0) {
+    return Math.round(powerData.reduce((a, b) => a + b, 0) / powerData.length);
   }
 
   // Raise each to the 4th power and take mean
@@ -470,11 +523,12 @@ export interface TSSCalculationOptions {
   userHrRest?: number;
   userFtp?: number;
   userLthr?: number;
-  userThresholdPace?: number; // min/km at threshold
+  userThresholdPace?: number; // Threshold pace in seconds/km (e.g. 300 = 5:00/km)
+  userCssPer100m?: number; // Critical Swim Speed in seconds per 100m
   userGender?: "male" | "female"; // For gender-specific TRIMP calculations
   normalizedHeartRate?: number; // From stream data (more accurate)
   normalizedPower?: number; // From stream data (more accurate)
-  normalizedPaceSeconds?: number; // From stream data (NGP/NTP)
+  normalizedPaceSeconds?: number; // From stream data (NGP/NTP) in seconds/km
   // Raw stream data for storage and charting
   heartrateStream?: number[];
   powerStream?: number[];
@@ -483,209 +537,6 @@ export interface TSSCalculationOptions {
   altitudeStream?: number[]; // Meters
 }
 
-const DEFAULT_LTHR = 170;
-
-function resolveLthr(userLthr?: number, userHrMax?: number): number {
-  if (userLthr && userLthr > 0) return userLthr;
-  if (userHrMax && userHrMax > 0) return Math.round(userHrMax * 0.9);
-  return DEFAULT_LTHR;
-}
-
-/**
- * Calculate TSS from activity data using TrainingPeaks-compatible formulas
- *
- * TSS = Duration (hours) × IF² × 100
- *
- * IF calculation varies by activity type:
- * - Cycling with power: IF = NP / FTP (NP from streams if available)
- * - Running/Trail with HR: IF = NHR / LTHR (NHR = Normalized Heart Rate from streams)
- * - Other activities with HR: IF = NHR / 200 (reference HR)
- *
- * Normalized values (NP, NHR) are calculated from second-by-second streams
- * using 30-second rolling averages raised to the 4th power.
- */
-export function calculateActivityTSS(
-  activity: StravaActivity,
-  options: TSSCalculationOptions = {}
-): number {
-  const {
-    userHrMax,
-    userHrRest,
-    userFtp,
-    userLthr,
-    userThresholdPace,
-    normalizedHeartRate,
-    normalizedPower,
-    normalizedPaceSeconds,
-  } = options;
-
-  const durationHours = activity.moving_time / 3600;
-  const durationMinutes = activity.moving_time / 60;
-  const hrDurationSeconds =
-    typeof activity.elapsed_time === "number" && activity.elapsed_time > 0
-      ? activity.elapsed_time
-      : activity.moving_time;
-  const sportType = activity.sport_type || activity.type;
-
-  // Method 1: Cycling with power data (most accurate for cycling)
-  // Use Normalized Power from streams if available, otherwise Strava's weighted_average_watts
-  if (
-    (sportType === "Ride" || sportType === "VirtualRide") &&
-    (normalizedPower || activity.weighted_average_watts)
-  ) {
-    const np = normalizedPower || activity.weighted_average_watts!;
-    const ftp = userFtp || 250; // Default FTP estimate
-    const intensityFactor = np / ftp;
-    // TSS = (Duration_s × NP × IF) / (FTP × 3600) × 100
-    const tss =
-      ((activity.moving_time * np * intensityFactor) / (ftp * 3600)) * 100;
-    console.log(
-      `TSS calc (power): NP=${np}${
-        normalizedPower ? " (streams)" : " (strava)"
-      }, FTP=${ftp}, IF=${intensityFactor.toFixed(2)}, TSS=${Math.round(tss)}`
-    );
-    return Math.round(tss);
-  }
-
-  // Method 2: Running/Trail - pace-based rTSS preferred with HR fallback
-  if (sportType === "Run" || sportType === "Trail Run") {
-    const distanceKm = activity.distance / 1000;
-    if (distanceKm > 0.3 && durationMinutes > 0) {
-      const actualPace = durationMinutes / distanceKm; // min/km
-      const normalizedPace =
-        normalizedPaceSeconds && normalizedPaceSeconds > 0
-          ? normalizedPaceSeconds / 60
-          : actualPace;
-      // Default threshold: 5:30/km (moderately fit runner)
-      const thresholdPace = userThresholdPace || 5.5;
-      const intensityFactor = Math.min(
-        1.5,
-        Math.max(0.5, thresholdPace / normalizedPace)
-      );
-      const rtss = durationHours * Math.pow(intensityFactor, 2) * 100;
-      console.log(
-        `TSS calc (running pace): pace=${actualPace.toFixed(
-          1
-        )}/km, NGP=${normalizedPace.toFixed(
-          1
-        )}/km, threshold=${thresholdPace}/km, IF=${intensityFactor.toFixed(
-          2
-        )}, rTSS=${Math.round(rtss)}`
-      );
-      return Math.round(rtss);
-    }
-
-    const hrValue = normalizedHeartRate || activity.average_heartrate;
-    if (hrValue) {
-      const referenceLthr = resolveLthr(userLthr, userHrMax);
-      const hrRest = userHrRest || 50; // Default resting HR
-      const rtss = calculateHrTSS({
-        avgHr: hrValue,
-        hrRest,
-        hrMax: userHrMax || 200,
-        lthr: referenceLthr,
-        durationSeconds: hrDurationSeconds,
-      });
-      const intensityFactor = hrValue / referenceLthr;
-      console.log(
-        `TSS calc (running HR fallback): HR=${hrValue}${
-          normalizedHeartRate ? " (NHR)" : " (avg)"
-        }, LTHR=${referenceLthr}, IF=${intensityFactor.toFixed(
-          2
-        )}, rTSS=${Math.round(rtss)}`
-      );
-      return Math.round(rtss);
-    }
-  }
-
-  // Method 3: Swimming with pace - sTSS formula
-  if (sportType === "Swim") {
-    const distanceM = activity.distance;
-    if (distanceM > 100) {
-      const pace100m = (durationMinutes / distanceM) * 100; // min per 100m
-      // CSS (Critical Swim Speed): ~1:45/100m for recreational, ~1:20/100m for competitive
-      const cssEstimate = 1.75;
-      const intensityFactor = Math.min(
-        1.5,
-        Math.max(0.5, cssEstimate / pace100m)
-      );
-      const stss = durationHours * Math.pow(intensityFactor, 2) * 100;
-      console.log(
-        `TSS calc (swim): pace=${pace100m.toFixed(
-          1
-        )}/100m, CSS=${cssEstimate}, IF=${intensityFactor.toFixed(
-          2
-        )}, sTSS=${Math.round(stss)}`
-      );
-      return Math.round(stss);
-    }
-  }
-
-  // Method 4: Heart rate based for strength, walking, hiking, and other activities
-  // Uses HrTSS formula with the same LTHR cascade
-  const hrValueGeneric = normalizedHeartRate || activity.average_heartrate;
-  if (hrValueGeneric) {
-    const referenceLthr = resolveLthr(userLthr, userHrMax);
-    const hrRest = userHrRest || 50; // Default resting HR
-    const hrtss = calculateHrTSS({
-      avgHr: hrValueGeneric,
-      hrRest,
-      hrMax: userHrMax || 200,
-      lthr: referenceLthr,
-      durationSeconds: hrDurationSeconds,
-    });
-    const intensityFactor = hrValueGeneric / referenceLthr;
-    console.log(
-      `TSS calc (hrTSS): HR=${hrValueGeneric}${
-        normalizedHeartRate ? " (NHR)" : " (avg)"
-      }, LTHR=${referenceLthr}, IF=${intensityFactor.toFixed(
-        2
-      )}, hrTSS=${Math.round(hrtss)}`
-    );
-    return Math.round(hrtss);
-  }
-
-  // Method 5: Strava suffer score as fallback (relative effort)
-  if (activity.suffer_score) {
-    // Strava's relative effort correlates loosely with TSS
-    // Multiply by ~1.5 to better approximate TSS
-    const tss = Math.round(activity.suffer_score * 1.5);
-    console.log(
-      `TSS calc (suffer): sufferScore=${activity.suffer_score}, TSS=${tss}`
-    );
-    return tss;
-  }
-
-  // Method 6: Duration-based estimation with sport-specific multipliers
-  // Conservative estimates based on typical intensity
-  const baseTssPerHour: Record<string, number> = {
-    Run: 90,
-    "Trail Run": 100,
-    Ride: 60,
-    VirtualRide: 70,
-    Swim: 55,
-    WeightTraining: 40,
-    Workout: 45,
-    Walk: 30,
-    Hike: 60,
-    Yoga: 15,
-    CrossFit: 80,
-    Elliptical: 55,
-    StairStepper: 60,
-    "Nordic Ski": 70,
-    "Cross Country Skiing": 70,
-    Rowing: 65,
-  };
-
-  const baseTss = baseTssPerHour[sportType] || 45;
-  const tss = durationHours * baseTss;
-  console.log(
-    `TSS calc (duration): sport=${sportType}, duration=${durationHours.toFixed(
-      2
-    )}h, rate=${baseTss}/h, TSS=${Math.round(tss)}`
-  );
-  return Math.round(tss);
-}
 
 /**
  * Convert Strava activity to our activity format
@@ -716,33 +567,77 @@ export function convertStravaActivity(
   }
 
   // Calculate pace data for running activities
+  // avgPacePerKm must be in SECONDS/km (e.g. 300 = 5:00/km) for calculateRTSS
   const distanceKm = stravaActivity.distance / 1000;
   const durationMinutes = stravaActivity.moving_time / 60;
-  const avgPacePerKm = distanceKm > 0 && durationMinutes > 0 ? durationMinutes / distanceKm : undefined;
+  const avgPaceSecondsPerKm = distanceKm > 0 && durationMinutes > 0
+    ? (durationMinutes / distanceKm) * 60 // Convert min/km to seconds/km
+    : undefined;
+
+  // Use pre-computed NGP from streams (already in s/km) if available, otherwise simple avg pace
+  const effectivePacePerKm = (options.normalizedPaceSeconds && options.normalizedPaceSeconds > 0)
+    ? options.normalizedPaceSeconds
+    : avgPaceSecondsPerKm;
+
+  // Provide sensible defaults for all TSS methods (not just hrTSS)
+  // This ensures rTSS and TSS power don't get skipped due to missing user config
+  const effectiveHrMax = options.userHrMax ?? 190;
+  const effectiveHrRest = options.userHrRest ?? 60;
+  const effectiveLthr = options.userLthr ?? Math.round(effectiveHrMax * 0.88); // TrainingPeaks default: ~88% of HRmax
+  const effectiveFtp = options.userFtp ?? 200; // Default recreational cyclist FTP
+  const effectiveThresholdPace = options.userThresholdPace ?? 330; // Default recreational runner: 5:30/km (330 s/km)
 
   // Calculate TSS using new orchestrator function from training-load.ts
-  const tssResult = calculateActivityTSSOrchestrator({
+  // elapsed_time includes rest periods (important for hrTSS - heart works during pauses)
+  // moving_time is used for pace/power TSS (only active movement counts)
+  const elapsedTime = typeof stravaActivity.elapsed_time === "number" && stravaActivity.elapsed_time > 0
+    ? stravaActivity.elapsed_time
+    : stravaActivity.moving_time;
+
+  const orchestratorParams = {
     sport,
     durationSeconds: stravaActivity.moving_time,
+    elapsedTimeSeconds: elapsedTime,
     // Power data
     powerStream: options.powerStream,
     avgPowerWatts: stravaActivity.weighted_average_watts || stravaActivity.average_watts || undefined,
-    ftp: options.userFtp,
+    ftp: effectiveFtp,
     // Pace data (running)
     distanceStream: options.distanceStream,
     altitudeStream: options.altitudeStream,
-    avgPacePerKm,
+    avgPacePerKm: effectivePacePerKm,
     distanceKm: distanceKm || undefined,
-    thresholdPacePerKm: options.userThresholdPace,
+    thresholdPacePerKm: effectiveThresholdPace,
     // Swim data
     distanceMeters: sport === "swimming" ? stravaActivity.distance : undefined,
-    // HR data
+    cssPer100m: options.userCssPer100m,
+    // HR data (with defaults to ensure hrTSS can always fire as fallback)
     hrStream: options.heartrateStream,
     avgHr: stravaActivity.average_heartrate || options.normalizedHeartRate || undefined,
-    hrRest: options.userHrRest,
-    hrMax: options.userHrMax,
-    lthr: options.userLthr,
+    hrRest: effectiveHrRest,
+    hrMax: effectiveHrMax,
+    lthr: effectiveLthr,
     gender: options.userGender,
+  };
+
+  console.log(`[TSS DEBUG] "${stravaActivity.name}" input:`, {
+    sport,
+    movingTime: stravaActivity.moving_time,
+    elapsedTime: elapsedTime,
+    pace: effectivePacePerKm,
+    thresholdPace: options.userThresholdPace,
+    hrStream: options.heartrateStream?.length ?? 0,
+    avgHr: orchestratorParams.avgHr,
+    hrMax: effectiveHrMax,
+    lthr: effectiveLthr,
+  });
+
+  const tssResult = calculateActivityTSSOrchestrator(orchestratorParams);
+
+  console.log(`[TSS DEBUG] "${stravaActivity.name}" → TSS=${tssResult.tss} (${tssResult.type})`);
+  console.log(`[TSS DEBUG] "${stravaActivity.name}" result:`, {
+    tss: tssResult.tss,
+    type: tssResult.type,
   });
 
   return {

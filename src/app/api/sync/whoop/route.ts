@@ -166,12 +166,12 @@ export async function POST() {
       .eq("id", user.id)
       .single();
 
-    const userHrMax = physioData?.[0]?.hr_max || undefined;
-    const userHrRest = physioData?.[0]?.hr_rest || undefined;
+    const userHrMax = physioData?.[0]?.hr_max ?? undefined;
+    const userHrRest = physioData?.[0]?.hr_rest ?? undefined;
     const userGender = userData?.gender as "male" | "female" | undefined;
     const userLthr =
-      physioData?.[0]?.lthr ||
-      (userHrMax ? Math.round(userHrMax * 0.7) : undefined);
+      physioData?.[0]?.lthr ??
+      (userHrMax ? Math.round(userHrMax * 0.85) : undefined);
 
     console.log("WHOOP sync - User physio data:", {
       userHrMax,
@@ -591,15 +591,21 @@ export async function POST() {
         );
         const avgHr = workout.score?.average_heart_rate;
 
+        // Provide sensible defaults so hrTSS can always fire when HR data is available
+        const effectiveHrMax = userHrMax ?? 190;
+        const effectiveHrRest = userHrRest ?? 60;
+        const effectiveLthr = userLthr ?? Math.round(effectiveHrMax * 0.85);
+
         let tss: number;
-        if (avgHr && avgHr > 0 && userHrMax && userLthr && durationSeconds > 0) {
+        if (avgHr && avgHr > 0 && durationSeconds > 0) {
           // Use hrTSS (TRIMP-based) for better accuracy
           const tssResult = calculateActivityTSSOrchestrator({
             durationSeconds,
+            elapsedTimeSeconds: durationSeconds, // WHOOP duration is already elapsed time
             avgHr,
-            hrRest: userHrRest || 50,
-            hrMax: userHrMax,
-            lthr: userLthr,
+            hrRest: effectiveHrRest,
+            hrMax: effectiveHrMax,
+            lthr: effectiveLthr,
             gender: userGender,
           });
           tss = Math.round(tssResult.tss);
