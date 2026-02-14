@@ -486,17 +486,23 @@ async function recalculateTSS() {
           const newTss = tssResult.tss;
           const oldTss = activity.tss || 0;
 
-          if (newTss !== oldTss) {
-            await supabase
-              .from("activities")
-              .update({ tss: newTss })
-              .eq("id", activity.id);
+          // Always update to ensure we're using the latest calculation formula
+          await supabase
+            .from("activities")
+            .update({ tss: newTss })
+            .eq("id", activity.id);
 
-            totalRecalculated++;
-            const change = newTss - oldTss;
-            const changePercent = oldTss > 0 ? ((change / oldTss) * 100).toFixed(1) : "N/A";
+          totalRecalculated++;
+          const change = newTss - oldTss;
+          const changePercent = oldTss > 0 ? ((change / oldTss) * 100).toFixed(1) : "N/A";
+
+          if (newTss !== oldTss) {
             console.log(
               `    ✓ Activity: TSS ${oldTss} → ${newTss} (${change > 0 ? "+" : ""}${change}, ${changePercent}%)`
+            );
+          } else {
+            console.log(
+              `    ✓ Activity: TSS ${newTss} (unchanged, ${tssResult.type})`
             );
           }
         } catch (error) {
