@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "generate:icons": "node scripts/generate-icons.js"
+    "generate:icons": "node scripts/generate-icons.js",
+    "recalculate-tss": "node scripts/recalculate-tss.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
