@@ -421,11 +421,11 @@ async function recalculateTSS() {
       // Fetch all activities for user
       const { data: activities, error: activitiesError } = await supabase
         .from("activities")
-        .select("id, sport_id, moving_time, elapsed_time, distance, avg_hr, max_hr, avg_power_watts, raw_data, tss")
+        .select("id, sport_id, actual_duration_minutes, actual_distance_km, avg_hr, max_hr, avg_power_watts, raw_data, tss")
         .eq("user_id", userId);
 
       if (activitiesError) {
-        console.log(`  ❌ Error fetching activities for user ${userId}`);
+        console.log(`  ❌ Error fetching activities for user ${userId}: ${activitiesError.message}`);
         totalErrors++;
         continue;
       }
@@ -454,12 +454,13 @@ async function recalculateTSS() {
             sport = "swimming";
           }
 
-          const durationSeconds = activity.moving_time || 0;
-          const elapsedTime = activity.elapsed_time || activity.moving_time || 0;
-          const distanceKm = (activity.distance || 0) / 1000;
+          const durationMinutes = activity.actual_duration_minutes || 0;
+          const durationSeconds = durationMinutes * 60;
+          const elapsedTime = durationSeconds; // Use moving time as elapsed time
+          const distanceKm = activity.actual_distance_km || 0;
           const avgPacePerKm =
-            distanceKm > 0 && durationSeconds > 0
-              ? (durationSeconds / 3600 / distanceKm) * 3600 / 60
+            distanceKm > 0 && durationMinutes > 0
+              ? (durationMinutes / distanceKm) * 60 // Convert minutes/km to seconds/km
               : undefined;
 
           const rawData = activity.raw_data || {};
