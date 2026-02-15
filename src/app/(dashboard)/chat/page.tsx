@@ -830,11 +830,11 @@ export default function ChatPage() {
                     onClick={() => handleSend(action.prompt, { forcePlan: action.forcePlan })}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-accent/20 rounded-xl flex items-center justify-center">
+                      <div className="h-10 w-10 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
                         <action.icon className="h-5 w-5 text-accent" />
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{action.label}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm break-words">{action.label}</p>
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted" />
                     </div>

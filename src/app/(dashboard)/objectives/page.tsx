@@ -333,7 +333,7 @@ export default function ObjectivesPage() {
                       onClick={() => handleOpenEdit(obj)}
                       aria-label="Modifier"
                     >
-                      <Edit2 className="h-4 w-4 text-muted" />
+                      <Edit2 className="h-5 w-5 text-foreground/70 hover:text-accent transition-colors" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -342,7 +342,7 @@ export default function ObjectivesPage() {
                       aria-label="Supprimer"
                       isLoading={isDeletingId === obj.id}
                     >
-                      <Trash className="h-4 w-4 text-muted" />
+                      <Trash className="h-5 w-5 text-foreground/70 hover:text-error transition-colors" />
                     </Button>
                   </div>
                 </div>

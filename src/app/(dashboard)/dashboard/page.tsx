@@ -79,7 +79,7 @@ export default function DashboardPage() {
   const [userData, setUserData] = useState<{
     fullName: string;
     objective: { name: string; date: string; priority: "A" | "B" | "C" } | null;
-    todayWorkout: {
+    todayWorkouts: Array<{
       id: string;
       sport: string;
       sportName: string;
@@ -90,7 +90,7 @@ export default function DashboardPage() {
       intensity: string;
       tss: number;
       status: "planned" | "completed" | "skipped" | "in_progress";
-    } | null;
+    }>;
     recovery: RecoveryContext;
     healthData: HealthContext;
     objectiveInsights?: ObjectiveInsights;
@@ -307,8 +307,19 @@ export default function DashboardPage() {
         // Ignore
       }
 
-      // Load today's workout
-      let todayWorkout = null;
+      // Load today's workouts
+      let todayWorkouts: Array<{
+        id: string;
+        sport: string;
+        sportName: string;
+        sportColor?: string;
+        title: string;
+        plannedDuration: number;
+        actualDuration: number | null;
+        intensity: string;
+        tss: number;
+        status: "planned" | "completed" | "skipped" | "in_progress";
+      }> = [];
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: activities } = await (supabase as any)
@@ -319,33 +330,69 @@ export default function DashboardPage() {
           .eq("user_id", user.id)
           .eq("scheduled_date", today);
 
-        const todayActivity =
-          activities?.find((a: { status: string }) => a.status === "completed") ||
-          activities?.find((a: { status: string }) => a.status === "in_progress") ||
-          activities?.find((a: { status: string }) => a.status === "planned") ||
-          activities?.find((a: { status: string }) => a.status === "skipped") ||
-          activities?.[0];
-        if (todayActivity) {
-          const sport = sportMap[todayActivity.sport_id];
-          todayWorkout = {
-            id: todayActivity.id,
-            sport: sport?.name || "other",
-            sportName: sport?.nameFr || "Autre",
-            sportColor: sport?.color,
-            title: todayActivity.title,
-            plannedDuration:
-              todayActivity.planned_duration_minutes ||
-              todayActivity.actual_duration_minutes ||
-              60,
-            actualDuration: todayActivity.actual_duration_minutes || null,
-            intensity: todayActivity.intensity || "endurance",
-            tss: todayActivity.tss || 0,
-            status: todayActivity.status as
-              | "planned"
-              | "completed"
-              | "skipped"
-              | "in_progress",
-          };
+        if (activities && activities.length > 0) {
+          // Sort by status priority: completed > in_progress > planned > skipped
+          const statusPriority = { completed: 0, in_progress: 1, planned: 2, skipped: 3 };
+          const sorted = activities.sort(
+            (
+              a: {
+                id: string;
+                title: string;
+                planned_duration_minutes: number | null;
+                actual_duration_minutes: number | null;
+                intensity: string | null;
+                tss: number | null;
+                status: string;
+                sport_id: string | null;
+              },
+              b: {
+                id: string;
+                title: string;
+                planned_duration_minutes: number | null;
+                actual_duration_minutes: number | null;
+                intensity: string | null;
+                tss: number | null;
+                status: string;
+                sport_id: string | null;
+              }
+            ) =>
+              (statusPriority[a.status as keyof typeof statusPriority] ?? 4) -
+              (statusPriority[b.status as keyof typeof statusPriority] ?? 4)
+          );
+
+          todayWorkouts = sorted.map(
+            (activity: {
+              id: string;
+              title: string;
+              planned_duration_minutes: number | null;
+              actual_duration_minutes: number | null;
+              intensity: string | null;
+              tss: number | null;
+              status: string;
+              sport_id: string | null;
+            }) => {
+            const sport = activity.sport_id ? sportMap[activity.sport_id] : undefined;
+            return {
+              id: activity.id,
+              sport: sport?.name || "other",
+              sportName: sport?.nameFr || "Autre",
+              sportColor: sport?.color,
+              title: activity.title,
+              plannedDuration:
+                activity.planned_duration_minutes ||
+                activity.actual_duration_minutes ||
+                60,
+              actualDuration: activity.actual_duration_minutes || null,
+              intensity: activity.intensity || "endurance",
+              tss: activity.tss || 0,
+              status: activity.status as
+                | "planned"
+                | "completed"
+                | "skipped"
+                | "in_progress",
+            };
+            }
+          );
         }
       } catch {
         // No activity today
@@ -686,7 +733,7 @@ export default function DashboardPage() {
       setUserData({
         fullName,
         objective,
-        todayWorkout,
+        todayWorkouts,
         recovery,
         healthData,
         objectiveInsights,
@@ -721,8 +768,8 @@ export default function DashboardPage() {
       {/* <div className="mb-8">
         <h1 className="text-2xl font-bold mb-1">Bonjour, {firstName} 👋</h1>
         <p className="text-muted">
-          {userData?.todayWorkout
-            ? `Prêt pour votre séance de ${userData.todayWorkout.title} ?`
+          {userData?.todayWorkouts && userData.todayWorkouts.length > 0
+            ? `Prêt pour votre séance de ${userData.todayWorkouts[0].title} ?`
             : "Jour de repos aujourd'hui. Profitez-en pour récupérer !"}
         </p>
       </div> */}
@@ -771,8 +818,8 @@ export default function DashboardPage() {
 
       {/* Second row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {userData?.todayWorkout ? (
-          <TodayWorkout workout={userData.todayWorkout} />
+        {userData?.todayWorkouts && userData.todayWorkouts.length > 0 ? (
+          <TodayWorkout workouts={userData.todayWorkouts} />
         ) : (
           <div className="bg-dark-card border border-dark-border rounded-2xl p-6">
             <h3 className="text-lg font-semibold mb-2">Séance du Jour</h3>

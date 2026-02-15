@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -105,16 +104,22 @@ export default function WorkoutDetailPage({
     useState(false);
   const intensityMenuRef = useRef<HTMLDivElement>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isSportInlineEditing, setIsSportInlineEditing] = useState(false);
+  const sportMenuRef = useRef<HTMLDivElement>(null);
   const [streamData, setStreamData] = useState<{
     time?: number[] | null;
     heartrate?: number[] | null;
     power?: number[] | null;
   } | null>(null);
+  const [userSports, setUserSports] = useState<
+    Array<{ id: string; name: string; name_fr: string }>
+  >([]);
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
     intensity: "",
     tss: "",
+    sport_id: "" as string | null,
     planned_duration_minutes: "",
     planned_distance_km: "",
     planned_pace_min_km: "",
@@ -141,6 +146,7 @@ export default function WorkoutDetailPage({
 
   useEffect(() => {
     loadActivity();
+    loadUserSports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
@@ -184,6 +190,7 @@ export default function WorkoutDetailPage({
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
         tss: activity.tss?.toString() || "",
+        sport_id: activity.sport_id || "",
         planned_duration_minutes: activity.planned_duration_minutes?.toString() || "",
         planned_distance_km: activity.planned_distance_km?.toString() || "",
         planned_pace_min_km:
@@ -197,6 +204,39 @@ export default function WorkoutDetailPage({
       setRpeInput(activity.rpe ?? 0);
     }
   }, [activity]);
+
+  const loadUserSports = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("user_sports")
+        .select("sport_id, sports(id, name, name_fr)")
+        .eq("user_id", user.id);
+
+      if (data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mappedSports = (data as any).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (us: any) => us.sports
+        )
+          .filter(Boolean)
+          .sort(
+            (
+              a: { id: string; name: string; name_fr: string },
+              b: { id: string; name: string; name_fr: string }
+            ) =>
+              (a.name_fr || a.name).localeCompare(b.name_fr || b.name, "fr")
+          );
+        setUserSports(mappedSports);
+      }
+    } catch (error) {
+      console.error("Error loading user sports:", error);
+    }
+  };
 
   useEffect(() => {
     if (!isIntensityInlineEditing) return;
@@ -223,6 +263,32 @@ export default function WorkoutDetailPage({
       document.removeEventListener("keydown", handleEscape);
     };
   }, [isIntensityInlineEditing]);
+
+  useEffect(() => {
+    if (!isSportInlineEditing) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        sportMenuRef.current &&
+        !sportMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsSportInlineEditing(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSportInlineEditing(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isSportInlineEditing]);
 
   const loadActivity = async () => {
     setIsLoading(true);
@@ -489,6 +555,7 @@ export default function WorkoutDetailPage({
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
         tss: activity.tss?.toString() || "",
+        sport_id: activity.sport_id || "",
         planned_duration_minutes: activity.planned_duration_minutes?.toString() || "",
         planned_distance_km: activity.planned_distance_km?.toString() || "",
         planned_pace_min_km:
@@ -554,6 +621,7 @@ export default function WorkoutDetailPage({
         description: activity.description ?? "",
         intensity: activity.intensity ?? "endurance",
         tss: activity.tss?.toString() || "",
+        sport_id: activity.sport_id || "",
         planned_duration_minutes: activity.planned_duration_minutes?.toString() || "",
         planned_distance_km: activity.planned_distance_km?.toString() || "",
         planned_pace_min_km:
@@ -655,26 +723,33 @@ export default function WorkoutDetailPage({
         ...(currentRawData ?? {}),
         _manual: nextManual,
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updatePayload: any = {
+        title: editForm.title,
+        description: editForm.description || null,
+        intensity: editForm.intensity,
+        planned_duration_minutes:
+          parsedPlannedDuration !== null && Number.isFinite(parsedPlannedDuration)
+            ? parsedPlannedDuration
+            : null,
+        planned_distance_km:
+          parsedPlannedDistance !== null && Number.isFinite(parsedPlannedDistance)
+            ? parsedPlannedDistance
+            : null,
+        tss:
+          parsedTss !== null && Number.isFinite(parsedTss)
+            ? parsedTss
+            : null,
+        raw_data: nextRawData as Json,
+      };
+
+      if (editForm.sport_id) {
+        updatePayload.sport_id = editForm.sport_id;
+      }
+
       const { error } = await supabase
         .from("activities")
-        .update({
-          title: editForm.title,
-          description: editForm.description || null,
-          intensity: editForm.intensity,
-          planned_duration_minutes:
-            parsedPlannedDuration !== null && Number.isFinite(parsedPlannedDuration)
-              ? parsedPlannedDuration
-              : null,
-          planned_distance_km:
-            parsedPlannedDistance !== null && Number.isFinite(parsedPlannedDistance)
-              ? parsedPlannedDistance
-              : null,
-          tss:
-            parsedTss !== null && Number.isFinite(parsedTss)
-              ? parsedTss
-              : null,
-          raw_data: nextRawData as Json,
-        })
+        .update(updatePayload)
         .eq("id", activity.id);
 
       if (!error) {
@@ -1183,20 +1258,20 @@ export default function WorkoutDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/workouts"
+      <button
+        onClick={() => router.back()}
         className="inline-flex items-center text-sm text-muted hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Retour à la liste
-      </Link>
+        Retour
+      </button>
 
       <Card>
         <div className="space-y-6">
           <header className="border-b border-dark-200 pb-4 space-y-3">
             <div className="flex items-start gap-4">
               <div
-                className="h-16 w-16 rounded-2xl flex items-center justify-center text-3xl"
+                className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl flex items-center justify-center text-3xl"
                 style={{ backgroundColor: sportColor }}
               >
                 <SportIcon className="h-8 w-8" aria-hidden="true" />
@@ -1205,7 +1280,7 @@ export default function WorkoutDetailPage({
                 <div>
                   <p className="text-xs uppercase text-foreground/60">{date}</p>
                 </div>
-                <div className="flex flex-row items-center gap-3">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
                   {isEditing ? (
                     isTitleInlineEditing ? (
                       <input
@@ -1248,9 +1323,64 @@ export default function WorkoutDetailPage({
                     {activity.source.toUpperCase()}
                   </Badge>
                 </div>
-                <p className="text-sm text-foreground/70">
-                  {activity.sport_label}
-                </p>
+                {isEditing ? (
+                  <div className="relative" ref={sportMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsSportInlineEditing((prev) => !prev)}
+                      className="text-sm text-foreground/70 underline underline-offset-2 decoration-dotted hover:text-foreground transition-colors"
+                    >
+                      {editForm.sport_id
+                        ? userSports.find((s) => s.id === editForm.sport_id)
+                            ?.name_fr ||
+                          userSports.find((s) => s.id === editForm.sport_id)?.name ||
+                          activity.sport_label
+                        : activity.sport_label}
+                    </button>
+                    {isSportInlineEditing && (
+                      <div className="absolute left-0 top-full z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-dark-200 bg-dark-100/95 backdrop-blur-sm shadow-2xl">
+                        {userSports.map((sport, index) => {
+                          const isSelected = editForm.sport_id === sport.id;
+                          return (
+                            <button
+                              key={sport.id}
+                              type="button"
+                              onClick={() => {
+                                setEditForm((prev) => ({
+                                  ...prev,
+                                  sport_id: sport.id,
+                                }));
+                                setIsSportInlineEditing(false);
+                              }}
+                              className={
+                                "w-full px-4 py-3 text-left text-sm font-medium transition-all duration-200 " +
+                                (index === 0 ? "rounded-t-2xl " : "") +
+                                (index === userSports.length - 1 ? "rounded-b-2xl " : "") +
+                                (isSelected
+                                  ? "bg-accent/20 text-accent shadow-inner"
+                                  : "text-foreground hover:bg-dark-200 hover:text-accent")
+                              }
+                            >
+                              <span className="flex items-center gap-2">
+                                {isSelected && (
+                                  <span className="flex h-4 w-4 items-center justify-center">
+                                    <span className="h-2 w-2 rounded-full bg-accent" />
+                                  </span>
+                                )}
+                                {!isSelected && <span className="w-4" />}
+                                {sport.name_fr || sport.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground/70">
+                    {activity.sport_label}
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="text-xs uppercase text-foreground/60">
                     Objectif de la séance
@@ -1418,7 +1548,7 @@ export default function WorkoutDetailPage({
                         {row.label}
                       </p>
                     </div>
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-xs uppercase text-foreground/60">
                           Prévu

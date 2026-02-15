@@ -232,7 +232,7 @@ export default function DashboardLayout({
 
       {/* Bottom navigation for mobile */}
       <nav
-        className="lg:hidden fixed inset-x-0 bottom-0 bg-dark-50 border-t border-dark-200 px-1 py-3 z-40 flex-shrink-0"
+        className="lg:hidden fixed inset-x-0 bottom-0 bg-dark-50 border-t border-dark-200 px-2 py-3 z-40 flex-shrink-0"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0) + 0.75rem)" }}
       >
         <div className="flex items-center justify-between gap-1 flex-shrink-0">
@@ -243,7 +243,7 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-xl p-3 text-xs font-semibold transition-colors min-w-0 flex-1 flex-shrink-0",
+                  "flex flex-col items-center gap-1 rounded-xl p-2 text-xs font-semibold transition-colors min-w-0 flex-1 flex-shrink-0",
                   isActive ? "text-accent bg-dark-100" : "text-muted hover:text-foreground hover:bg-dark-100"
                 )}
               >

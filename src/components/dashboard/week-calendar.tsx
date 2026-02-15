@@ -185,6 +185,7 @@ export function WeekCalendar({
                       <WeatherDayBadge
                         iconCode={forecast.icon}
                         tempMax={forecast.temp_max_c}
+                        tempMin={forecast.temp_min_c}
                       />
                     </div>
                   );

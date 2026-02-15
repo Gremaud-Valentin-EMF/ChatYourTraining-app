@@ -74,6 +74,7 @@ export interface TrainingLoadAnalysis {
     date: string;
     sport: string;
     title: string;
+    description: string | null;
     duration_minutes: number;
     tss: number;
     rpe: number | null;
@@ -86,6 +87,7 @@ export interface ScheduleContext {
     date: string;
     planned_workout: {
       title: string;
+      description: string | null;
       sport: string;
       duration_minutes: number;
       intensity: string;
@@ -95,6 +97,7 @@ export interface ScheduleContext {
   upcoming: {
     date: string;
     title: string;
+    description: string | null;
     sport: string;
     intensity: string;
   }[];
@@ -504,6 +507,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
         date: a.scheduled_date,
         sport: a.sports?.name || "other",
         title: a.title,
+        description: a.description || null,
         duration_minutes:
           a.actual_duration_minutes || a.planned_duration_minutes || 0,
         tss: a.tss || 0,
@@ -518,6 +522,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
         planned_workout: todayWorkout
           ? {
               title: todayWorkout.title,
+              description: todayWorkout.description || null,
               sport: (todayWorkout.sports as { name: string })?.name || "other",
               duration_minutes: todayWorkout.planned_duration_minutes || 60,
               intensity: todayWorkout.intensity || "endurance",
@@ -529,6 +534,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       upcoming: upcoming.map((a: any) => ({
         date: a.scheduled_date,
         title: a.title,
+        description: a.description || null,
         sport: a.sports?.name || "other",
         intensity: a.intensity || "endurance",
       })),

@@ -134,6 +134,7 @@ export default function WorkoutsPage() {
     duration: "",
     distance: "",
     intensity: "endurance",
+    description: "",
   });
 
   const [sports, setSports] = useState<SportOption[]>([]);
@@ -423,6 +424,7 @@ export default function WorkoutsPage() {
           ? parseFloat(newSession.distance)
           : null,
         intensity: newSession.intensity,
+        description: newSession.description || null,
         status: "planned",
       });
 
@@ -978,7 +980,7 @@ export default function WorkoutsPage() {
             <Input
               label="Date"
               type="date"
-              className="w-full"
+              className="w-full max-w-full"
               value={newSession.date}
               onChange={(e) =>
                 setNewSession((prev) => ({ ...prev, date: e.target.value }))
@@ -1025,6 +1027,13 @@ export default function WorkoutsPage() {
               setNewSession((prev) => ({ ...prev, intensity: value }))
             }
             options={manualIntensityOptions}
+          />
+          <textarea
+            className="w-full px-3 py-2 bg-dark-100 border border-dark-200 rounded-xl text-sm resize-none focus:border-accent focus:outline-none"
+            rows={3}
+            placeholder="Description de la séance (optionnel)..."
+            value={newSession.description}
+            onChange={(e) => setNewSession(prev => ({ ...prev, description: e.target.value }))}
           />
 
           <div className="flex justify-end gap-3">

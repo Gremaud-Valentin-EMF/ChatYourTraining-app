@@ -343,7 +343,42 @@ export async function getWeatherContext(
   ]);
 
   const current = transformCurrentWeather(currentData as Record<string, unknown>);
-  const forecast = transformForecast(forecastData as Record<string, unknown>);
+  const forecastOriginal = transformForecast(forecastData as Record<string, unknown>);
+  const forecast = [...forecastOriginal];
+
+  // Ensure today is included in forecast
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayForecast = forecast.find((f) => f.date === todayStr);
+
+  if (!todayForecast) {
+    // Today is missing, add it from current data
+    forecast.unshift({
+      date: todayStr,
+      temp_min_c: current.temperature_c,
+      temp_max_c: current.temperature_c,
+      feels_like_c: current.feels_like_c,
+      description: current.description,
+      icon: current.icon,
+      wind_speed_kmh: current.wind_speed_kmh,
+      wind_gust_kmh: current.wind_gust_kmh,
+      precipitation_probability: 0,
+      precipitation_mm: current.precipitation_mm,
+      snow_mm: current.snow_mm,
+      uv_index: current.uv_index,
+      outdoor_feasibility: assessOutdoorFeasibility(
+        current.temperature_c,
+        current.temperature_c,
+        current.wind_speed_kmh,
+        current.precipitation_mm,
+        current.snow_mm
+      ),
+    });
+  } else if (todayForecast) {
+    // Today exists but might have incomplete data, merge with current
+    todayForecast.temp_min_c = Math.min(todayForecast.temp_min_c, current.temperature_c);
+    todayForecast.temp_max_c = Math.max(todayForecast.temp_max_c, current.temperature_c);
+  }
+
   const groundConditions = assessGroundConditions(forecast);
 
   // Extract alerts from OWM if present
