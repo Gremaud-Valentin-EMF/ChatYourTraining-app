@@ -11,6 +11,7 @@ import {
   HealthSummary,
   WeekCalendar,
 } from "@/components/dashboard";
+import { DailyFatigueModal } from "@/components/dashboard/daily-fatigue-modal";
 import { calculateTrainingLoad } from "@/lib/calculations/training-load";
 import { toLocalDateString } from "@/lib/utils";
 
@@ -107,6 +108,7 @@ export default function DashboardPage() {
     completedSessions: 0,
     targetSessions: 0,
   });
+  const [isDailyFatigueModalOpen, setIsDailyFatigueModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -749,6 +751,76 @@ export default function DashboardPage() {
     loadData();
   }, [loadData]);
 
+  // Check if first visit of the day for fatigue modal
+  useEffect(() => {
+    const checkFirstVisitToday = async () => {
+      const today = toLocalDateString(new Date());
+      const lastVisit = localStorage.getItem("lastDashboardVisit");
+
+      // Only show modal if it's a new day
+      if (lastVisit !== today && !isLoading) {
+        // Check if user already has a fatigue entry for today
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: todayMetrics } = await supabase
+          .from("daily_metrics")
+          .select("date")
+          .eq("user_id", user.id)
+          .eq("date", today)
+          .maybeSingle();
+
+        // Only show modal if no metrics entry for today
+        if (!todayMetrics) {
+          setIsDailyFatigueModalOpen(true);
+        }
+
+        // Mark today as visited
+        localStorage.setItem("lastDashboardVisit", today);
+      }
+    };
+
+    checkFirstVisitToday();
+  }, [isLoading, supabase]);
+
+  const handleSaveDailyFatigue = async (fatigue: number) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = toLocalDateString(new Date());
+
+      // Insert or update daily_metrics with fatigue (stored as strain)
+      const { error } = await supabase
+        .from("daily_metrics")
+        .upsert(
+          {
+            user_id: user.id,
+            date: today,
+            strain: fatigue,
+            source: "manual",
+          },
+          {
+            onConflict: "user_id,date",
+          }
+        );
+
+      if (error) {
+        throw error;
+      }
+
+      // Reload data to reflect the new metric
+      await loadData();
+    } catch (error) {
+      console.error("Error saving daily fatigue:", error);
+      throw error;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -858,6 +930,13 @@ export default function DashboardPage() {
           completed: weekStats.completedSessions,
           target: weekStats.targetSessions,
         }}
+      />
+
+      {/* Daily Fatigue Modal */}
+      <DailyFatigueModal
+        isOpen={isDailyFatigueModalOpen}
+        onClose={() => setIsDailyFatigueModalOpen(false)}
+        onSave={handleSaveDailyFatigue}
       />
     </div>
   );

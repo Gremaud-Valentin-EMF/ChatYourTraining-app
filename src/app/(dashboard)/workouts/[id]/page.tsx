@@ -20,6 +20,7 @@ import {
 import { getSportIconComponent } from "@/lib/sport-icons";
 import type { Json } from "@/types/database";
 import { ActivityStreamChart } from "@/components/workouts/activity-stream-chart";
+import { FirstVisitRpeModal } from "@/components/workouts/first-visit-rpe-modal";
 
 const focusByIntensity: Record<string, string> = {
   endurance: "Endurance fondamentale",
@@ -60,6 +61,7 @@ interface ActivityDetail {
   description: string | null;
   rpe: number | null;
   raw_data: Json | null;
+  first_viewed_at: string | null;
 }
 
 const parseLocalDate = (dateStr: string) => {
@@ -135,6 +137,7 @@ export default function WorkoutDetailPage({
     return now;
   }, []);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isFirstVisitRpeModalOpen, setIsFirstVisitRpeModalOpen] = useState(false);
 
   const parseStreamArray = (value: unknown): number[] | null => {
     if (!Array.isArray(value)) return null;
@@ -322,7 +325,8 @@ export default function WorkoutDetailPage({
         source,
         description,
         avg_power_watts,
-        raw_data
+        raw_data,
+        first_viewed_at
       `
       )
       .eq("id", params.id)
@@ -387,7 +391,21 @@ export default function WorkoutDetailPage({
         source: data.source,
         rpe: data.rpe ?? null,
         raw_data: data.raw_data ?? null,
+        first_viewed_at: data.first_viewed_at ?? null,
       });
+
+      // Check if this is the first visit to a completed activity
+      const isFirstVisit = !data.first_viewed_at && data.status === "completed";
+      if (isFirstVisit) {
+        // Mark as viewed immediately
+        await supabase
+          .from("activities")
+          .update({ first_viewed_at: new Date().toISOString() })
+          .eq("id", data.id);
+
+        // Show RPE modal
+        setIsFirstVisitRpeModalOpen(true);
+      }
 
       const { data: streamRows } = await supabase
         .from("activity_streams")
@@ -488,6 +506,59 @@ export default function WorkoutDetailPage({
             }
           : prev
       );
+    }
+  };
+
+  const handleFirstVisitRpeSave = async (data: {
+    rpe: number;
+    comment: string;
+  }) => {
+    if (!activity) return;
+
+    try {
+      // Update RPE
+      await supabase
+        .from("activities")
+        .update({ rpe: data.rpe })
+        .eq("id", activity.id);
+
+      // Append comment to description if provided
+      if (data.comment.trim()) {
+        const currentDescription = activity.description || "";
+        const separator = currentDescription ? "\n\n---\n\n" : "";
+        const newDescription = `${currentDescription}${separator}**Ressenti:** ${data.comment.trim()}`;
+
+        await supabase
+          .from("activities")
+          .update({ description: newDescription })
+          .eq("id", activity.id);
+
+        // Update local state
+        setActivity((prev) =>
+          prev
+            ? {
+                ...prev,
+                rpe: data.rpe,
+                description: newDescription,
+              }
+            : prev
+        );
+      } else {
+        // Update only RPE in local state
+        setActivity((prev) =>
+          prev
+            ? {
+                ...prev,
+                rpe: data.rpe,
+              }
+            : prev
+        );
+      }
+
+      setRpeInput(data.rpe);
+    } catch (error) {
+      console.error("Error saving first visit RPE:", error);
+      throw error;
     }
   };
 
@@ -2003,6 +2074,13 @@ export default function WorkoutDetailPage({
         onConfirm={handleDeleteActivity}
         isLoading={isDeleting}
         description={`Supprimer la séance "${activity.title}" et toutes ses données est définitif.`}
+      />
+      <FirstVisitRpeModal
+        isOpen={isFirstVisitRpeModalOpen}
+        onClose={() => setIsFirstVisitRpeModalOpen(false)}
+        onSave={handleFirstVisitRpeSave}
+        activityTitle={activity.title}
+        sportColor={sportColor}
       />
     </div>
   );

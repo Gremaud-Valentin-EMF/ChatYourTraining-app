@@ -253,6 +253,7 @@ export interface Database {
           source: IntegrationProvider;
           external_id: string | null;
           raw_data: Json | null;
+          first_viewed_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -281,6 +282,7 @@ export interface Database {
           source?: IntegrationProvider;
           external_id?: string | null;
           raw_data?: Json | null;
+          first_viewed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -309,6 +311,7 @@ export interface Database {
           source?: IntegrationProvider;
           external_id?: string | null;
           raw_data?: Json | null;
+          first_viewed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
