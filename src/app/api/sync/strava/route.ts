@@ -134,24 +134,45 @@ export async function POST() {
       .eq("id", user.id)
       .single();
 
-    // Get user's sports data (FTP, threshold pace, VMA, CSS)
+    // Get user's sports data (FTP, threshold pace, VMA, CSS) WITH sport names for sport-specific lookup
     const { data: userSports } = await (supabase as any)
       .from("user_sports")
-      .select("ftp_watts, threshold_pace_per_km, vma_kmh, css_per_100m, sport_id")
+      .select("ftp_watts, threshold_pace_per_km, vma_kmh, css_per_100m, sport_id, sports(name)")
       .eq("user_id", user.id);
 
     const userHrMax = physioData?.[0]?.hr_max ?? undefined;
     const userHrRest = physioData?.[0]?.hr_rest ?? undefined;
     const userGender = userData?.gender as "male" | "female" | undefined;
 
-    // Extract sport-specific thresholds from user_sports
-    const userFtp = userSports?.find((s: any) => s.ftp_watts)?.ftp_watts ?? undefined;
-    const userCssPer100m = userSports?.find((s: any) => s.css_per_100m)?.css_per_100m ?? undefined;
+    // Sport-specific threshold lookup: prefer the running sport entry for pace/VMA,
+    // and the cycling sport entry for FTP
+    const runningSports = userSports?.filter((s: any) => {
+      const name = s.sports?.name;
+      return name === "running" || name === "trail_running";
+    }) || [];
+    const cyclingSports = userSports?.filter((s: any) => {
+      const name = s.sports?.name;
+      return name === "cycling" || name === "spin";
+    }) || [];
+    const swimmingSports = userSports?.filter((s: any) => {
+      const name = s.sports?.name;
+      return name === "swimming";
+    }) || [];
 
-    // Threshold pace: explicit value OR derive from VMA (FTPace ≈ 85% VMA speed)
-    let userThresholdPace = userSports?.find((s: any) => s.threshold_pace_per_km)?.threshold_pace_per_km ?? undefined;
+    // FTP: prefer cycling-specific, then any sport
+    const userFtp = cyclingSports.find((s: any) => s.ftp_watts)?.ftp_watts
+      ?? userSports?.find((s: any) => s.ftp_watts)?.ftp_watts ?? undefined;
+
+    // CSS: prefer swimming-specific, then any sport
+    const userCssPer100m = swimmingSports.find((s: any) => s.css_per_100m)?.css_per_100m
+      ?? userSports?.find((s: any) => s.css_per_100m)?.css_per_100m ?? undefined;
+
+    // Threshold pace: ONLY from running-specific sport data (not "other")
+    let userThresholdPace = runningSports.find((s: any) => s.threshold_pace_per_km)?.threshold_pace_per_km
+      ?? undefined;
     if (!userThresholdPace) {
-      const vmaKmh = userSports?.find((s: any) => s.vma_kmh)?.vma_kmh;
+      // Derive from VMA: ONLY from running-specific sport data
+      const vmaKmh = runningSports.find((s: any) => s.vma_kmh)?.vma_kmh;
       if (vmaKmh && vmaKmh > 0) {
         // FTPace speed = VMA × 0.85 (km/h) → convert to s/km
         userThresholdPace = Math.round(3600 / (vmaKmh * 0.85));
@@ -412,15 +433,11 @@ export async function POST() {
               const ngp = calculateNormalizedGradedPace(
                 streams.time.data,
                 streams.distance.data,
-                streams.altitude?.data
+                streams.altitude?.data,
+                stravaActivity.name
               );
               if (ngp > 0) {
                 tssOptions.normalizedPaceSeconds = ngp;
-                console.log(
-                  `Streams: ${stravaActivity.name} - NGP=${ngp.toFixed(
-                    1
-                  )}s/km`
-                );
               }
             }
           } catch (streamError) {
