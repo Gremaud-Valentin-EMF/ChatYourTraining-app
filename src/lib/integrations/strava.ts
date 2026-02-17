@@ -680,7 +680,9 @@ export function convertStravaActivity(
     speedStream: options.distanceStream && options.timeStream ?
       options.distanceStream.map((d, i) => {
         const dt = i === 0 ? (options.timeStream![1] - options.timeStream![0]) : (options.timeStream![i] - options.timeStream![i - 1]);
-        return d / Math.max(dt, 1); // speed in m/s
+        // distanceStream is cumulative, so calculate delta distance
+        const dd = i === 0 ? d : (d - options.distanceStream![i - 1]);
+        return dd / Math.max(dt, 1); // speed in m/s
       }) : undefined,
     distanceStream: options.distanceStream,
     altitudeStream: options.altitudeStream,
