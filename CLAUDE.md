@@ -11,10 +11,14 @@ ChatYourTraining is an AI-powered training coaching platform for endurance athle
 ## Common Commands
 
 ```bash
-npm run dev      # Start development server (localhost:3000)
-npm run build    # Production build
-npm run lint     # ESLint with Next.js + TypeScript rules
+npm run dev              # Start development server (localhost:3000)
+npm run build            # Production build (run before deploying)
+npm run lint             # ESLint with Next.js + TypeScript rules
+npm run recalculate-tss  # Backfill TSS values for all activities (node script)
+npm run generate:icons   # Regenerate sport icon list from Lucide
 ```
+
+There are no automated tests. Validate logic changes by running `npm run build` and checking the Vercel function logs.
 
 ## Architecture
 
@@ -22,79 +26,107 @@ npm run lint     # ESLint with Next.js + TypeScript rules
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── (auth)/            # Auth pages (login, register, onboarding)
-│   ├── (dashboard)/       # Protected routes (dashboard, calendar, workouts, chat, etc.)
-│   └── api/               # API routes (chat, sync, auth callbacks)
+├── app/
+│   ├── (auth)/            # login, register, onboarding (public routes)
+│   ├── (dashboard)/       # calendar, chat, health, integrations, objectives,
+│   │                      # profile, workouts/[id] (protected routes)
+│   └── api/               # chat, sync/strava, sync/whoop, plans/accept,
+│                          # auth/strava, auth/whoop, location, weather, admin
 ├── components/
-│   ├── dashboard/         # Dashboard-specific components (charts, gauges)
-│   └── ui/                # Reusable UI primitives (button, card, modal, etc.)
+│   ├── dashboard/         # Charts and gauges (CTL/ATL/TSB, power curves, etc.)
+│   ├── workouts/          # Activity stream chart, RPE modal
+│   ├── weather/           # Day badge and icon components
+│   └── ui/                # Reusable primitives (button, card, modal, tabs, etc.)
 ├── lib/
-│   ├── supabase/          # Supabase clients (server.ts, client.ts, middleware.ts)
-│   ├── openai/coach.ts    # AI coach system prompts & context builder
-│   ├── integrations/      # Strava & Whoop OAuth + sync logic
-│   └── calculations/      # Training load formulas (CTL/ATL/TSB)
-└── types/database.ts      # Supabase-generated database types
+│   ├── supabase/          # server.ts (RSC/API), client.ts (browser), middleware.ts
+│   ├── openai/coach.ts    # AI coach: context builder + streaming for OpenAI & Gemini
+│   ├── integrations/      # strava.ts, whoop.ts, weather.ts, sync-helpers.ts
+│   ├── calculations/training-load.ts  # All TSS types + CTL/ATL/TSB
+│   └── hooks/             # useGeolocation.ts, useWeatherForecast.ts
+├── types/database.ts      # Supabase-generated DB types (do not hand-edit)
+└── middleware.ts           # Session refresh via updateSession()
 ```
 
 ### Key Architectural Patterns
 
 **AI Coach ("Stateful Context, Stateless Model")**
-See `src/lib/openai/coach.ts`. Before each AI message, the backend builds a complete JSON context (athlete profile, physiological status, training load, schedule) and injects it into the system prompt. Supports both OpenAI and Google Gemini with streaming responses.
+`src/lib/openai/coach.ts` builds a complete JSON snapshot (athlete profile, physiological status, training load, planned workouts, weather) and injects it into the system prompt on every request. The route handler at `app/api/chat/route.ts` supports streaming for both OpenAI (`openai` SDK) and Google Gemini, selected via the `AI_PROVIDER` env var.
 
-**Training Load Calculations**
-See `src/lib/calculations/training-load.ts`. Implements TrainingPeaks formulas:
-- CTL (Chronic Training Load): 42-day exponential moving average
-- ATL (Acute Training Load): 7-day exponential moving average
-- TSB (Training Stress Balance): CTL - ATL (uses previous day's values)
-- HrTSS: Heart rate-based training stress score
+**TSS Calculation Pipeline**
+`src/lib/calculations/training-load.ts` implements all five TrainingPeaks TSS types:
+- `tss` – cycling power-based (Normalized Power vs FTP)
+- `rTSS` – running (Normalized Graded Pace vs vVMA)
+- `sTSS` – swimming (pace vs CSS)
+- `hrTSS` – heart rate TRIMP with exponential sex-based weighting
+- `rpe` – RPE-based via Friel's TSS-per-hour table
+
+CTL (42-day EMA), ATL (7-day EMA), TSB (previous-day CTL − ATL). During activity import the best available TSS type is computed automatically. The `recalculate-tss` script in `scripts/` can backfill all activities.
 
 **Authentication Flow**
-Supabase Auth with server-side session validation via middleware. Browser client in `lib/supabase/client.ts`, server client in `lib/supabase/server.ts`.
+`src/middleware.ts` calls `updateSession()` for every non-static route, refreshing the Supabase session server-side. Use `createClient()` from `lib/supabase/server.ts` in Server Components and API routes; use `lib/supabase/client.ts` in Client Components.
 
 **Data Sync**
-Strava and Whoop integrate via OAuth. Manual sync triggers via `/api/sync/*` endpoints. Duplicate prevention via sync logs. Automatic TSS calculation during activity import.
+Strava and Whoop use OAuth token exchange stored in `integration_credentials`. Sync endpoints (`/api/sync/strava`, `/api/sync/whoop`) acquire a distributed lock via `sync-helpers.ts` to prevent duplicate runs. Each synced activity is matched against `scheduled_activities` by date/sport and linked automatically.
+
+**Weather Integration**
+`lib/integrations/weather.ts` provides forecast data injected into the AI context and rendered on the calendar. Client-side geolocation is abstracted via `lib/hooks/useGeolocation.ts` and `useWeatherForecast.ts`.
 
 ### API Routes
 
-- `POST /api/chat` - Stream AI responses
-- `GET /api/chat` - Fetch chat history by session
-- `POST /api/plans/accept` - Accept AI-generated training plans
-- `GET /api/auth/strava/callback` - Strava OAuth callback
-- `POST /api/sync/strava` - Trigger Strava data sync
-- `GET /api/auth/whoop/callback` - Whoop OAuth callback
-- `POST /api/sync/whoop` - Trigger Whoop data sync
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/chat` | POST | Stream AI responses (OpenAI or Gemini) |
+| `/api/chat` | GET | Fetch chat history by session ID |
+| `/api/plans/accept` | POST | Persist AI-generated training plan to DB |
+| `/api/sync/strava` | POST | Trigger full Strava activity sync |
+| `/api/sync/whoop` | POST | Trigger Whoop metrics sync |
+| `/api/auth/strava/callback` | GET | Strava OAuth callback |
+| `/api/auth/whoop/callback` | GET | Whoop OAuth callback |
+| `/api/location` | GET | Reverse-geocode user coordinates |
+| `/api/weather` | GET | Fetch weather forecast |
+| `/api/admin/backfill-tss` | POST | Admin-only TSS backfill |
 
 ## Database
 
-Supabase PostgreSQL with Row Level Security (RLS). Types auto-generated in `src/types/database.ts`.
+Supabase PostgreSQL with Row Level Security (RLS). Types are auto-generated — update `src/types/database.ts` by running `supabase gen types typescript`. Schema migrations live in `supabase/migrations/` (sequential numbered SQL files).
 
 **Key Tables:**
-- `users`, `physiological_data`, `user_sports` - Athlete profiles
-- `activities`, `daily_metrics`, `scheduled_activities` - Training data
-- `training_load` - Pre-computed CTL/ATL/TSB values
-- `chat_sessions`, `chat_messages` - AI conversation history
-- `integration_credentials`, `sync_logs` - OAuth and sync state
+- `users`, `physiological_data`, `user_sports` – Athlete profiles and thresholds (FTP, vVMA, LTHR, CSS)
+- `activities`, `daily_metrics`, `scheduled_activities` – Training data
+- `training_load` – Pre-computed daily CTL/ATL/TSB
+- `chat_sessions`, `chat_messages` – AI conversation history
+- `integration_credentials`, `sync_logs` – OAuth tokens and sync state
 
 ## Environment Variables
 
-**Required for development:**
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `AI_PROVIDER` ("openai" or "gemini")
-- OpenAI: `OPENAI_API_KEY`, `OPENAI_CHAT_MODEL`, `OPENAI_MAX_OUTPUT_TOKENS`
-- Gemini: `GOOGLE_GEMINI_API_KEY`, `GOOGLE_GEMINI_MODEL`, `GOOGLE_GEMINI_MAX_OUTPUT_TOKENS`
-- Strava: `NEXT_PUBLIC_STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REDIRECT_URI`
-- Whoop: `NEXT_PUBLIC_WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URI`
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+AI_PROVIDER                    # "openai" or "gemini"
+OPENAI_API_KEY
+OPENAI_CHAT_MODEL
+OPENAI_MAX_OUTPUT_TOKENS
+GOOGLE_GEMINI_API_KEY
+GOOGLE_GEMINI_MODEL
+GOOGLE_GEMINI_MAX_OUTPUT_TOKENS
+NEXT_PUBLIC_STRAVA_CLIENT_ID
+STRAVA_CLIENT_SECRET
+STRAVA_REDIRECT_URI
+NEXT_PUBLIC_WHOOP_CLIENT_ID
+WHOOP_CLIENT_SECRET
+WHOOP_REDIRECT_URI
+```
 
 ## Code Conventions
 
-- **Localization:** UI and AI responses are in French
-- **Imports:** Use `@/*` path alias for `src/*` directory
-- **Styling:** Tailwind CSS with custom dark theme (see `tailwind.config.ts`)
-- **Icons:** Lucide React library
-- **Charts:** Recharts with custom wrapper in `components/ui/chart.tsx`
+- **Language:** UI labels and AI responses are in French
+- **Imports:** Use `@/*` path alias for `src/*`
+- **Styling:** Tailwind CSS with a custom dark theme (`tailwind.config.ts`); use `clsx` + `tailwind-merge` for conditional classes
+- **Icons:** Lucide React only
+- **Charts:** Recharts wrapped by `components/ui/chart.tsx`
+- **DB access in API routes:** always use the server Supabase client (`lib/supabase/server.ts`), never the browser client
 
 ## Deployment
 
-Vercel deployment with environment variables per environment (Preview/Production). OAuth redirect URIs must match the deployed domain.
+Vercel with automatic Preview deployments on push. Build command: `next build`. OAuth redirect URIs must exactly match the deployed domain registered with Strava/Whoop.
