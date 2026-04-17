@@ -1,29 +1,42 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-function hasValidSession(request: NextRequest): boolean {
-  const projectId = process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0];
-  const cookieName = `sb-${projectId}-auth-token`;
-  const cookie = request.cookies.get(cookieName);
-
-  if (!cookie?.value) return false;
-
-  try {
-    // Cookie value may be prefixed with "base64-"
-    const raw = cookie.value.startsWith("base64-")
-      ? Buffer.from(cookie.value.slice(7), "base64").toString("utf-8")
-      : cookie.value;
-
-    const session = JSON.parse(raw);
-
-    // A refresh_token means the user has an active session even if the
-    // access token is expired — route handlers will refresh it automatically.
-    return typeof session.refresh_token === "string" && session.refresh_token.length > 0;
-  } catch {
-    return false;
-  }
-}
-
 export async function updateSession(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // Do not run code between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Protected routes
   const protectedPaths = [
     "/dashboard",
     "/calendar",
@@ -36,24 +49,25 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   );
 
+  // Auth routes (redirect if already logged in)
   const authPaths = ["/login", "/register"];
   const isAuthPath = authPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
 
-  const hasSession = hasValidSession(request);
-
-  if (isProtectedPath && !hasSession) {
+  if (isProtectedPath && !user) {
+    // User is not logged in and trying to access protected route
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (isAuthPath && hasSession) {
+  if (isAuthPath && user) {
+    // User is logged in and trying to access auth routes
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next({ request });
+  return supabaseResponse;
 }
