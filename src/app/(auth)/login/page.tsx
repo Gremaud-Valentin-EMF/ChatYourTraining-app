@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,11 @@ import { Mail, Lock, Chrome } from "lucide-react";
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+
+  // Clear any stale session when landing on login page
+  useEffect(() => {
+    supabase.auth.signOut();
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
