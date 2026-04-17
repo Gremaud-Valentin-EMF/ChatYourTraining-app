@@ -1,7 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+function hasValidSession(request: NextRequest): boolean {
+  const projectId = process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0];
+  const cookieName = `sb-${projectId}-auth-token`;
+  const cookie = request.cookies.get(cookieName);
+
+  if (!cookie?.value) return false;
+
+  try {
+    // Cookie value may be prefixed with "base64-"
+    const raw = cookie.value.startsWith("base64-")
+      ? Buffer.from(cookie.value.slice(7), "base64").toString("utf-8")
+      : cookie.value;
+
+    const session = JSON.parse(raw);
+
+    // A refresh_token means the user has an active session even if the
+    // access token is expired — route handlers will refresh it automatically.
+    return typeof session.refresh_token === "string" && session.refresh_token.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function updateSession(request: NextRequest) {
-  // Protected routes
   const protectedPaths = [
     "/dashboard",
     "/calendar",
@@ -14,15 +36,12 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   );
 
-  // Auth routes (redirect if already logged in)
   const authPaths = ["/login", "/register"];
   const isAuthPath = authPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
 
-  // Read session from cookie without any network call
-  const cookieName = `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0]}-auth-token`;
-  const hasSession = request.cookies.has(cookieName);
+  const hasSession = hasValidSession(request);
 
   if (isProtectedPath && !hasSession) {
     const url = request.nextUrl.clone();
