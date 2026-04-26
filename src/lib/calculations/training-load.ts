@@ -237,13 +237,15 @@ function calculateNHR(
 }
 
 /**
- * Calculate hrTSS using IF²-based formula (aligned with TrainingPeaks).
+ * Calculate hrTSS using Allen-Coggan IF²-based formula (TrainingPeaks standard).
  *
  * Formula: hrTSS = IF² × hours × 100
- * where IF = max(0.6, effectiveHR / HRmax)
+ * where IF = NHR / LTHR  (Lactate Threshold HR, not HRmax)
  * effectiveHR = NHR (^4 normalized) from HR stream if available, else avgHR
  *
- * Calibrated against TrainingPeaks non-running activities.
+ * Duration must be moving_time (not elapsed_time) — long stops drop HR to ambient
+ * which does not represent training stress, and Coggan ^4 already emphasises
+ * high-intensity periods within the recorded stream.
  */
 export function calculateHrTSS(params: {
   hrStream?: number[];
@@ -255,9 +257,9 @@ export function calculateHrTSS(params: {
   durationSeconds: number;
   gender?: "male" | "female";
 }): number {
-  const { hrStream, timeStream, avgHr, hrMax, durationSeconds } = params;
+  const { hrStream, timeStream, avgHr, lthr, durationSeconds } = params;
 
-  if (!durationSeconds || !hrMax || (!hrStream && !avgHr)) {
+  if (!durationSeconds || !lthr || (!hrStream && !avgHr)) {
     return 0;
   }
 
@@ -271,9 +273,8 @@ export function calculateHrTSS(params: {
   }
   if (effectiveHR <= 0) return 0;
 
-  // IF = max(0.6, effectiveHR / HRmax) — floor prevents underestimation for low-HR activities
-  const IF_MIN = 0.6;
-  const intensityFactor = Math.max(IF_MIN, effectiveHR / hrMax);
+  // IF = NHR / LTHR  (Allen-Coggan / TrainingPeaks standard)
+  const intensityFactor = effectiveHR / lthr;
   const durationHours = durationSeconds / 3600;
 
   const hrTss = intensityFactor * intensityFactor * durationHours * 100;
@@ -628,11 +629,10 @@ export function calculateActivityTSS(params: {
     rpe,
   } = params;
 
-  // For hrTSS, use elapsed_time (heart works during rest periods too)
-  // For pace/power TSS, use moving_time (only active movement counts)
-  const hrDurationSeconds = elapsedTimeSeconds && elapsedTimeSeconds > 0
-    ? elapsedTimeSeconds
-    : durationSeconds;
+  // hrTSS uses moving_time like power/pace TSS: long stops drop HR to ambient
+  // and are not training stress. Coggan ^4 already emphasises high-intensity
+  // periods within the recorded stream.
+  const hrDurationSeconds = durationSeconds;
 
   // Sanity cap: no single activity should exceed 500 TSS
   const MAX_TSS = 500;

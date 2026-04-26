@@ -274,12 +274,13 @@ function calculateNHR(hrStream, timeStream) {
 
 /**
  * hrTSS = IF² × hours × 100
- * where IF = max(0.6, effectiveHR / HRmax)
+ * where IF = NHR / LTHR  (Allen-Coggan / TrainingPeaks standard)
  * effectiveHR = NHR from stream if available, else avgHR
+ * durationSeconds must be moving_time (not elapsed_time)
  */
 function calculateHrTSS(params) {
-  const { hrStream, timeStream, avgHr, hrMax, durationSeconds } = params;
-  if (!durationSeconds || !hrMax || (!hrStream && !avgHr)) return 0;
+  const { hrStream, timeStream, avgHr, lthr, durationSeconds } = params;
+  if (!durationSeconds || !lthr || (!hrStream && !avgHr)) return 0;
 
   let effectiveHR = 0;
   if (hrStream && hrStream.length > 0) {
@@ -288,7 +289,7 @@ function calculateHrTSS(params) {
   if (effectiveHR <= 0 && avgHr) effectiveHR = avgHr;
   if (effectiveHR <= 0) return 0;
 
-  const intensityFactor = Math.max(0.6, effectiveHR / hrMax);
+  const intensityFactor = effectiveHR / lthr;
   const durationHours = durationSeconds / 3600;
   return Math.round(intensityFactor * intensityFactor * durationHours * 100);
 }
@@ -339,8 +340,8 @@ function calculateActivityTSS(params) {
     hrStream, timeStream, avgHr, hrRest, hrMax, lthr, gender,
   } = params;
 
-  const hrDurationSeconds = (elapsedTimeSeconds && elapsedTimeSeconds > 0)
-    ? elapsedTimeSeconds : durationSeconds;
+  // hrTSS uses moving_time — see calculateHrTSS comment
+  const hrDurationSeconds = durationSeconds;
 
   const MAX_TSS = 500;
   function capped(result) {
@@ -549,11 +550,13 @@ async function recalculateTSS() {
         const altitudeStream = streams.altitude || null;
 
         // --- Compute normalized values from streams (same as sync route) ---
+        // Only use power data if from a real sensor, not estimated by Strava
+        const hasRealPower = rawData.device_watts === true;
         let normalizedPower = null;
         let normalizedPaceSeconds = null;
 
         // NP from power stream
-        if (powerStream && powerStream.length > 0) {
+        if (hasRealPower && powerStream && powerStream.length > 0) {
           normalizedPower = Math.round(calculateNormalizedValue(powerStream, timeStream, `activity-power`));
         }
 
@@ -585,7 +588,7 @@ async function recalculateTSS() {
           durationSeconds,
           elapsedTimeSeconds,
           normalizedPower,
-          avgPowerWatts: activity.avg_power_watts || rawData.weighted_average_watts || rawData.average_watts || undefined,
+          avgPowerWatts: (hasRealPower && (activity.avg_power_watts || rawData.weighted_average_watts || rawData.average_watts)) || undefined,
           ftp: effectiveFtp,
           avgPacePerKm: effectivePacePerKm,
           thresholdPacePerKm: effectiveThresholdPace,
@@ -603,10 +606,10 @@ async function recalculateTSS() {
         const newTss = tssResult.tss;
         const oldTss = activity.tss || 0;
 
-        // Always update
+        // Always update tss and tss_type together
         await supabase
           .from("activities")
-          .update({ tss: newTss })
+          .update({ tss: newTss, tss_type: tssResult.type })
           .eq("id", activity.id);
 
         totalRecalculated++;

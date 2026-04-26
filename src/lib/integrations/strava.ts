@@ -44,6 +44,7 @@ export interface StravaActivity {
   max_heartrate?: number;
   average_watts?: number;
   weighted_average_watts?: number;
+  device_watts?: boolean; // true if power from a sensor, false if estimated by Strava
   kilojoules?: number;
   suffer_score?: number;
   workout_type?: number;
@@ -658,8 +659,8 @@ export function convertStravaActivity(
   const effectiveThresholdPace = options.userThresholdPace ?? 330; // Default recreational runner: 5:30/km (330 s/km)
 
   // Calculate TSS using new orchestrator function from training-load.ts
-  // elapsed_time includes rest periods (important for hrTSS - heart works during pauses)
-  // moving_time is used for pace/power TSS (only active movement counts)
+  // elapsed_time is passed for rTSS (TP uses total recording time for running)
+  // moving_time is used for hrTSS and power TSS (long stops drop HR/power to ambient)
   // Guard against corrupt elapsed_time (e.g. activity left recording for days)
   let elapsedTime = stravaActivity.moving_time;
   if (typeof stravaActivity.elapsed_time === "number" && stravaActivity.elapsed_time > 0
@@ -667,14 +668,17 @@ export function convertStravaActivity(
     elapsedTime = stravaActivity.elapsed_time;
   }
 
+  // Only use power data if from a real sensor, not estimated by Strava
+  const hasRealPower = stravaActivity.device_watts === true;
+
   const orchestratorParams = {
     sport,
     durationSeconds: stravaActivity.moving_time,
     elapsedTimeSeconds: elapsedTime,
     // Power data (use pre-calculated NP if available, don't re-calculate)
-    normalizedPower: options.normalizedPower || undefined,
-    powerStream: options.normalizedPower ? undefined : options.powerStream,
-    avgPowerWatts: stravaActivity.weighted_average_watts || stravaActivity.average_watts || undefined,
+    normalizedPower: (hasRealPower && options.normalizedPower) || undefined,
+    powerStream: (hasRealPower && options.normalizedPower) ? undefined : (hasRealPower ? options.powerStream : undefined),
+    avgPowerWatts: (hasRealPower && (stravaActivity.weighted_average_watts || stravaActivity.average_watts)) || undefined,
     ftp: effectiveFtp,
     // Pace data (running)
     speedStream: options.distanceStream && options.timeStream ?
