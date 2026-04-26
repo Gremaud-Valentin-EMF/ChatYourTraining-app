@@ -265,9 +265,18 @@ export async function POST() {
     });
     console.log("Strava sync - Activities from API:", activities.length);
 
+    // Log all activities from API for debugging
+    for (const activity of activities) {
+      console.log(
+        `Strava API activity: ${activity.id} | ${activity.start_date_local.split("T")[0]} | ${activity.sport_type} | ${activity.name}`
+      );
+    }
+
     let synced = 0;
     let skipped = 0;
     let matchedToPlan = 0;
+    let failedInserts = 0;
+    const errors: { activityId: number; name: string; error: string }[] = [];
 
     // Process activities with rate limiting for streams API
     // Strava rate limit: 100 requests per 15 minutes, 1000 per day
@@ -495,7 +504,16 @@ export async function POST() {
         .select("id");
 
       if (insertError) {
-        console.error("Error inserting activity:", insertError);
+        const errorMsg = insertError.message || JSON.stringify(insertError);
+        console.error(
+          `Error inserting activity ${stravaActivity.id} "${stravaActivity.name}": ${errorMsg}`
+        );
+        failedInserts++;
+        errors.push({
+          activityId: stravaActivity.id,
+          name: stravaActivity.name,
+          error: errorMsg,
+        });
       } else {
         const insertedActivityId =
           Array.isArray(inserted) && inserted.length > 0
@@ -534,7 +552,9 @@ export async function POST() {
       synced,
       skipped,
       matchedToPlan,
+      failedInserts,
       total: activities.length,
+      errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
     console.error("Strava sync error:", error);
