@@ -244,8 +244,8 @@ export async function POST() {
           ? new Date(integration.last_sync_at)
           : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-        // Go back 7 days from last sync to catch any late-synced activities
-        lastSyncDate.setDate(lastSyncDate.getDate() - 7);
+        // Go back 30 days from last sync to catch activities uploaded with a delay
+        lastSyncDate.setDate(lastSyncDate.getDate() - 30);
         syncFromDate = lastSyncDate;
         syncReason = `incremental (from ${
           lastSyncDate.toISOString().split("T")[0]
