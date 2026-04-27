@@ -550,13 +550,11 @@ async function recalculateTSS() {
         const altitudeStream = streams.altitude || null;
 
         // --- Compute normalized values from streams (same as sync route) ---
-        // Only use power data if from a real sensor, not estimated by Strava
-        const hasRealPower = rawData.device_watts === true;
         let normalizedPower = null;
         let normalizedPaceSeconds = null;
 
-        // NP from power stream
-        if (hasRealPower && powerStream && powerStream.length > 0) {
+        // NP from power stream (use regardless of device_watts — estimated power aligns with TP)
+        if (powerStream && powerStream.length > 0) {
           normalizedPower = Math.round(calculateNormalizedValue(powerStream, timeStream, `activity-power`));
         }
 
@@ -588,7 +586,7 @@ async function recalculateTSS() {
           durationSeconds,
           elapsedTimeSeconds,
           normalizedPower,
-          avgPowerWatts: (hasRealPower && (activity.avg_power_watts || rawData.weighted_average_watts || rawData.average_watts)) || undefined,
+          avgPowerWatts: activity.avg_power_watts || rawData.weighted_average_watts || rawData.average_watts || undefined,
           ftp: effectiveFtp,
           avgPacePerKm: effectivePacePerKm,
           thresholdPacePerKm: effectiveThresholdPace,

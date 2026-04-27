@@ -668,17 +668,14 @@ export function convertStravaActivity(
     elapsedTime = stravaActivity.elapsed_time;
   }
 
-  // Only use power data if from a real sensor, not estimated by Strava
-  const hasRealPower = stravaActivity.device_watts === true;
-
   const orchestratorParams = {
     sport,
     durationSeconds: stravaActivity.moving_time,
     elapsedTimeSeconds: elapsedTime,
-    // Power data (use pre-calculated NP if available, don't re-calculate)
-    normalizedPower: (hasRealPower && options.normalizedPower) || undefined,
-    powerStream: (hasRealPower && options.normalizedPower) ? undefined : (hasRealPower ? options.powerStream : undefined),
-    avgPowerWatts: (hasRealPower && (stravaActivity.weighted_average_watts || stravaActivity.average_watts)) || undefined,
+    // Power data — use regardless of device_watts (estimated power aligns with TP's TSS convention)
+    normalizedPower: options.normalizedPower || undefined,
+    powerStream: options.normalizedPower ? undefined : options.powerStream,
+    avgPowerWatts: stravaActivity.weighted_average_watts || stravaActivity.average_watts || undefined,
     ftp: effectiveFtp,
     // Pace data (running)
     speedStream: options.distanceStream && options.timeStream ?

@@ -387,14 +387,14 @@ export async function POST() {
       if (streamsFetched < MAX_STREAMS_PER_SYNC) {
         const shouldFetchStreams =
           stravaActivity.average_heartrate ||
-          (stravaActivity.weighted_average_watts && stravaActivity.device_watts === true);
+          stravaActivity.weighted_average_watts;
 
         if (shouldFetchStreams) {
           try {
             // Always include time stream for charting
             const streamKeys = ["time", "distance", "altitude"];
             if (stravaActivity.average_heartrate) streamKeys.push("heartrate");
-            if (stravaActivity.weighted_average_watts && stravaActivity.device_watts === true) streamKeys.push("watts");
+            if (stravaActivity.weighted_average_watts) streamKeys.push("watts");
 
             const streams = await getActivityStreams(
               accessToken,
