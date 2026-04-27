@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
+  StravaActivity,
   getActivities,
   getActivityStreams,
   refreshTokens,
@@ -259,11 +260,20 @@ export async function POST() {
       syncFromDate.toISOString()
     );
 
-    const activities = await getActivities(accessToken, {
-      after: syncFromTimestamp,
-      per_page: 200,
-    });
-    console.log("Strava sync - Activities from API:", activities.length);
+    const activities: StravaActivity[] = [];
+    let page = 1;
+    while (true) {
+      const batch = await getActivities(accessToken, {
+        after: syncFromTimestamp,
+        per_page: 200,
+        page,
+      });
+      if (!batch || batch.length === 0) break;
+      activities.push(...batch);
+      if (batch.length < 200) break;
+      page++;
+    }
+    console.log("Strava sync - Activities from API:", activities.length, `(${page} page${page > 1 ? "s" : ""})`);
 
     // Log all activities from API for debugging
     for (const activity of activities) {

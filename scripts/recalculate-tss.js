@@ -289,7 +289,12 @@ function calculateHrTSS(params) {
   if (effectiveHR <= 0 && avgHr) effectiveHR = avgHr;
   if (effectiveHR <= 0) return 0;
 
-  const intensityFactor = effectiveHR / lthr;
+  // Karvonen formula: IF = (NHR - HRrest) / (LTHR - HRrest) — matches TrainingPeaks
+  const hrRest = params.hrRest || 60;
+  const workingHrRange = lthr - hrRest;
+  const intensityFactor = workingHrRange > 0
+    ? (effectiveHR - hrRest) / workingHrRange
+    : effectiveHR / lthr;
   const durationHours = durationSeconds / 3600;
   return Math.round(intensityFactor * intensityFactor * durationHours * 100);
 }
@@ -352,8 +357,9 @@ function calculateActivityTSS(params) {
     return result;
   }
 
-  // Priority 1: Power-based TSS (cycling)
-  if (sport === "cycling" && (normalizedPower || avgPowerWatts) && ftp && ftp > 0) {
+  // Priority 1: Power-based TSS (cycling) — skip if power is Strava-estimated
+  const { hasRealPower } = params;
+  if (sport === "cycling" && hasRealPower !== false && (normalizedPower || avgPowerWatts) && ftp && ftp > 0) {
     const tss = calculateCyclingTSS({ normalizedPower, avgPowerWatts, ftp, durationSeconds });
     if (tss > 0) return capped({ tss, type: "tss" });
   }
@@ -553,7 +559,8 @@ async function recalculateTSS() {
         let normalizedPower = null;
         let normalizedPaceSeconds = null;
 
-        // NP from power stream (use regardless of device_watts — estimated power aligns with TP)
+        // NP from power stream — only meaningful when hasRealPower=true
+        const hasRealPower = rawData.device_watts !== false;
         if (powerStream && powerStream.length > 0) {
           normalizedPower = Math.round(calculateNormalizedValue(powerStream, timeStream, `activity-power`));
         }
@@ -585,6 +592,7 @@ async function recalculateTSS() {
           sport,
           durationSeconds,
           elapsedTimeSeconds,
+          hasRealPower,
           normalizedPower,
           avgPowerWatts: activity.avg_power_watts || rawData.weighted_average_watts || rawData.average_watts || undefined,
           ftp: effectiveFtp,

@@ -672,7 +672,8 @@ export function convertStravaActivity(
     sport,
     durationSeconds: stravaActivity.moving_time,
     elapsedTimeSeconds: elapsedTime,
-    // Power data — use regardless of device_watts (estimated power aligns with TP's TSS convention)
+    hasRealPower: stravaActivity.device_watts !== false,
+    // Power data — only used when hasRealPower=true (real sensor)
     normalizedPower: options.normalizedPower || undefined,
     powerStream: options.normalizedPower ? undefined : options.powerStream,
     avgPowerWatts: stravaActivity.weighted_average_watts || stravaActivity.average_watts || undefined,
@@ -740,10 +741,10 @@ export function convertStravaActivity(
     max_hr: stravaActivity.max_heartrate
       ? Math.round(stravaActivity.max_heartrate)
       : null,
-    avg_power_watts:
-      stravaActivity.weighted_average_watts ||
-      stravaActivity.average_watts ||
-      null,
+    avg_power_watts: (() => {
+      const w = stravaActivity.weighted_average_watts || stravaActivity.average_watts;
+      return w ? Math.round(w) : null;
+    })(),
     tss: Math.round(tssResult.tss),
     source: "strava" as const,
     external_id: String(stravaActivity.id),

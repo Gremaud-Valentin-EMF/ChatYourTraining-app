@@ -273,8 +273,12 @@ export function calculateHrTSS(params: {
   }
   if (effectiveHR <= 0) return 0;
 
-  // IF = NHR / LTHR  (Allen-Coggan / TrainingPeaks standard)
-  const intensityFactor = effectiveHR / lthr;
+  // IF = (NHR - HRrest) / (LTHR - HRrest)  — Karvonen / heart rate reserve formula
+  // Matches TrainingPeaks: at HRrest→IF=0, at LTHR→IF=1 (100 TSS/h)
+  const workingHrRange = lthr - params.hrRest;
+  const intensityFactor = workingHrRange > 0
+    ? (effectiveHR - params.hrRest) / workingHrRange
+    : effectiveHR / lthr;
   const durationHours = durationSeconds / 3600;
 
   const hrTss = intensityFactor * intensityFactor * durationHours * 100;
@@ -578,6 +582,7 @@ export function calculateActivityTSS(params: {
   powerStream?: number[];
   avgPowerWatts?: number;
   ftp?: number;
+  hasRealPower?: boolean; // true = real sensor, false = Strava-estimated (skip power TSS)
 
   // Pace data (running)
   speedStream?: number[];
@@ -611,6 +616,7 @@ export function calculateActivityTSS(params: {
     powerStream,
     avgPowerWatts,
     ftp,
+    hasRealPower,
     speedStream,
     distanceStream,
     altitudeStream,
@@ -644,9 +650,10 @@ export function calculateActivityTSS(params: {
     return result;
   }
 
-  // Priority 1: Power-based TSS (cycling)
+  // Priority 1: Power-based TSS (cycling) — skip if power is Strava-estimated (not a real sensor)
   if (
     sport === "cycling" &&
+    hasRealPower !== false &&
     (normalizedPower || powerStream?.length || avgPowerWatts) &&
     ftp &&
     ftp > 0
