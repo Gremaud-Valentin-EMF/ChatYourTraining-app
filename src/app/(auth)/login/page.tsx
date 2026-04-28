@@ -1,11 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input } from "@/components/ui";
-import { Mail, Lock, Chrome } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
+
+const MAX_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
+
+interface AttemptRecord {
+  count: number;
+  lockedUntil: number | null;
+}
+
+function getAttemptRecord(email: string): AttemptRecord {
+  try {
+    const raw = localStorage.getItem(`login_attempts_${email}`);
+    if (!raw) return { count: 0, lockedUntil: null };
+    return JSON.parse(raw) as AttemptRecord;
+  } catch {
+    return { count: 0, lockedUntil: null };
+  }
+}
+
+function saveAttemptRecord(email: string, record: AttemptRecord) {
+  localStorage.setItem(`login_attempts_${email}`, JSON.stringify(record));
+}
+
+function clearAttemptRecord(email: string) {
+  localStorage.removeItem(`login_attempts_${email}`);
+}
+
+function formatRemaining(ms: number): string {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) return `${minutes} min ${seconds > 0 ? `${seconds} s` : ""}`.trim();
+  return `${seconds} s`;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,23 +49,77 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [lockRemaining, setLockRemaining] = useState<number>(0);
+
+  // Tick countdown when account is locked
+  useEffect(() => {
+    if (lockRemaining <= 0) return;
+    const interval = setInterval(() => {
+      setLockRemaining((prev) => {
+        const next = prev - 1000;
+        if (next <= 0) {
+          clearInterval(interval);
+          setError(null);
+          return 0;
+        }
+        setError(`Compte temporairement bloqué. Réessayez dans ${formatRemaining(next)}.`);
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockRemaining]);
+
+  // Check lock state whenever email changes
+  useEffect(() => {
+    if (!email) return;
+    const record = getAttemptRecord(email);
+    if (record.lockedUntil && record.lockedUntil > Date.now()) {
+      const remaining = record.lockedUntil - Date.now();
+      setLockRemaining(remaining);
+      setError(`Compte temporairement bloqué. Réessayez dans ${formatRemaining(remaining)}.`);
+    } else {
+      setLockRemaining(0);
+    }
+  }, [email]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Check if currently locked
+    const record = getAttemptRecord(email);
+    if (record.lockedUntil && record.lockedUntil > Date.now()) {
+      const remaining = record.lockedUntil - Date.now();
+      setLockRemaining(remaining);
+      setError(`Compte temporairement bloqué. Réessayez dans ${formatRemaining(remaining)}.`);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        setError(error.message);
+        const updated: AttemptRecord = {
+          count: record.count + 1,
+          lockedUntil: record.count + 1 >= MAX_ATTEMPTS
+            ? Date.now() + LOCK_DURATION_MS
+            : null,
+        };
+        saveAttemptRecord(email, updated);
+
+        if (updated.lockedUntil) {
+          const remaining = updated.lockedUntil - Date.now();
+          setLockRemaining(remaining);
+          setError(`Compte temporairement bloqué. Réessayez dans ${formatRemaining(remaining)}.`);
+        } else {
+          setError("E-mail ou mot de passe incorrect.");
+        }
         return;
       }
 
+      clearAttemptRecord(email);
       router.push("/dashboard");
       router.refresh();
     } catch {
@@ -41,27 +129,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        setError(error.message);
-      }
-    } catch {
-      setError("Une erreur est survenue. Veuillez réessayer.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const isLocked = lockRemaining > 0;
 
   return (
     <div className="max-w-md mx-auto">
@@ -74,34 +142,11 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* Google Login */}
-      <Button
-        variant="secondary"
-        size="lg"
-        className="w-full mb-6"
-        onClick={handleGoogleLogin}
-        disabled={isLoading}
-        leftIcon={<Chrome className="h-5 w-5" />}
-      >
-        Continuer avec Google
-      </Button>
-
-      {/* Divider */}
-      <div className="relative mb-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-dark-200" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-dark text-muted">ou</span>
-        </div>
-      </div>
-
-      {/* Email Login Form */}
       <form onSubmit={handleEmailLogin} className="space-y-4">
         <Input
           label="Email"
           type="email"
-          placeholder="vous@exemple.com"
+          placeholder="Votre email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           leftIcon={<Mail className="h-5 w-5" />}
@@ -112,7 +157,7 @@ export default function LoginPage() {
         <Input
           label="Mot de passe"
           type="password"
-          placeholder="••••••••"
+          placeholder="Votre mot de passe"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           leftIcon={<Lock className="h-5 w-5" />}
@@ -141,12 +186,12 @@ export default function LoginPage() {
           size="lg"
           className="w-full"
           isLoading={isLoading}
+          disabled={isLocked || isLoading}
         >
           Se connecter
         </Button>
       </form>
 
-      {/* Register link */}
       <p className="mt-8 text-center text-muted">
         Pas encore de compte ?{" "}
         <Link

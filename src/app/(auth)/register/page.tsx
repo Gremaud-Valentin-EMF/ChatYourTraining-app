@@ -5,7 +5,27 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input } from "@/components/ui";
-import { Mail, Lock, User, Chrome } from "lucide-react";
+import { Mail, Lock, User, CheckCircle2, XCircle } from "lucide-react";
+
+interface PasswordCriteria {
+  minLength: boolean;
+  hasUppercase: boolean;
+  hasNumber: boolean;
+  hasSpecial: boolean;
+}
+
+function checkPassword(password: string): PasswordCriteria {
+  return {
+    minLength: password.length >= 12,
+    hasUppercase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[^A-Za-z0-9]/.test(password),
+  };
+}
+
+function isPasswordValid(criteria: PasswordCriteria): boolean {
+  return Object.values(criteria).every(Boolean);
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -17,8 +37,12 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
+  const criteria = checkPassword(password);
+  const passwordValid = isPasswordValid(criteria);
+  const canSubmit = passwordValid && confirmPassword === password && fullName && email;
 
   const handleEmailRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +53,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Le mot de passe doit contenir au moins 8 caractères.");
+    if (!passwordValid) {
+      setPasswordTouched(true);
       return;
     }
 
@@ -41,24 +65,34 @@ export default function RegisterPage() {
         email,
         password,
         options: {
-          data: {
-            full_name: fullName,
-          },
+          data: { full_name: fullName },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
       if (error) {
-        setError(error.message);
+        if (
+          error.message.toLowerCase().includes("already registered") ||
+          error.message.toLowerCase().includes("already exists") ||
+          error.message.toLowerCase().includes("user already")
+        ) {
+          setError("already_exists");
+        } else {
+          setError(error.message);
+        }
         return;
       }
 
-      // Check if user needs to confirm email
+      // Supabase may return a user with identities=[] when email is already registered
+      // (when email confirmation is enabled it silently returns a fake user)
+      if (data.user && data.user.identities?.length === 0) {
+        setError("already_exists");
+        return;
+      }
+
       if (data.user && !data.session) {
-        // Email confirmation required
         setShowConfirmation(true);
       } else if (data.session) {
-        // No email confirmation needed, user is logged in
         router.push("/onboarding");
         router.refresh();
       }
@@ -69,29 +103,6 @@ export default function RegisterPage() {
     }
   };
 
-  const handleGoogleRegister = async () => {
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        setError(error.message);
-      }
-    } catch {
-      setError("Une erreur est survenue. Veuillez réessayer.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Show confirmation message if email needs to be verified
   if (showConfirmation) {
     return (
       <div className="text-center max-w-md mx-auto">
@@ -99,14 +110,14 @@ export default function RegisterPage() {
           <Mail className="h-8 w-8 text-accent" />
         </div>
         <h2 className="text-2xl font-bold text-foreground mb-2">
-          Vérifiez votre email
+          Vérifiez votre boîte mail
         </h2>
         <p className="text-muted mb-6">
           Nous avons envoyé un lien de confirmation à{" "}
           <strong className="text-foreground">{email}</strong>
         </p>
         <p className="text-sm text-muted mb-6">
-          Cliquez sur le lien dans l&apos;email pour activer votre compte et
+          Cliquez sur le lien dans l&apos;e-mail pour activer votre compte et
           accéder à l&apos;application.
         </p>
         <Button variant="secondary" onClick={() => setShowConfirmation(false)}>
@@ -127,34 +138,11 @@ export default function RegisterPage() {
         </p>
       </div>
 
-      {/* Google Register */}
-      <Button
-        variant="secondary"
-        size="lg"
-        className="w-full mb-6"
-        onClick={handleGoogleRegister}
-        disabled={isLoading}
-        leftIcon={<Chrome className="h-5 w-5" />}
-      >
-        Continuer avec Google
-      </Button>
-
-      {/* Divider */}
-      <div className="relative mb-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-dark-200" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-dark text-muted">ou</span>
-        </div>
-      </div>
-
-      {/* Email Register Form */}
       <form onSubmit={handleEmailRegister} className="space-y-4">
         <Input
           label="Nom complet"
           type="text"
-          placeholder="Jean Dupont"
+          placeholder="Prénom Nom"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           leftIcon={<User className="h-5 w-5" />}
@@ -165,7 +153,7 @@ export default function RegisterPage() {
         <Input
           label="Email"
           type="email"
-          placeholder="vous@exemple.com"
+          placeholder="Votre email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           leftIcon={<Mail className="h-5 w-5" />}
@@ -173,22 +161,32 @@ export default function RegisterPage() {
           autoComplete="email"
         />
 
-        <Input
-          label="Mot de passe"
-          type="password"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          leftIcon={<Lock className="h-5 w-5" />}
-          hint="Minimum 8 caractères"
-          required
-          autoComplete="new-password"
-        />
+        <div>
+          <Input
+            label="Mot de passe"
+            type="password"
+            placeholder="Votre mot de passe"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onBlur={() => setPasswordTouched(true)}
+            leftIcon={<Lock className="h-5 w-5" />}
+            required
+            autoComplete="new-password"
+          />
+          {passwordTouched && (
+            <ul className="mt-2 space-y-1">
+              <CriteriaItem ok={criteria.minLength} label="Au moins 12 caractères" />
+              <CriteriaItem ok={criteria.hasUppercase} label="Une majuscule" />
+              <CriteriaItem ok={criteria.hasNumber} label="Un chiffre" />
+              <CriteriaItem ok={criteria.hasSpecial} label="Un caractère spécial" />
+            </ul>
+          )}
+        </div>
 
         <Input
           label="Confirmer le mot de passe"
           type="password"
-          placeholder="••••••••"
+          placeholder="Confirmez votre mot de passe"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           leftIcon={<Lock className="h-5 w-5" />}
@@ -196,9 +194,18 @@ export default function RegisterPage() {
           autoComplete="new-password"
         />
 
-        {error && (
+        {error && error !== "already_exists" && (
           <div className="p-3 bg-error/10 border border-error/20 rounded-xl text-error text-sm">
             {error}
+          </div>
+        )}
+
+        {error === "already_exists" && (
+          <div className="p-3 bg-error/10 border border-error/20 rounded-xl text-error text-sm">
+            Cette adresse e-mail est déjà utilisée.{" "}
+            <Link href="/login" className="underline font-medium hover:opacity-80">
+              Se connecter
+            </Link>
           </div>
         )}
 
@@ -208,12 +215,12 @@ export default function RegisterPage() {
           size="lg"
           className="w-full"
           isLoading={isLoading}
+          disabled={!canSubmit || isLoading}
         >
           Créer mon compte
         </Button>
       </form>
 
-      {/* Terms */}
       <p className="mt-6 text-center text-sm text-muted">
         En créant un compte, vous acceptez nos{" "}
         <Link href="/terms" className="text-accent hover:text-accent-400 transition-[color]">
@@ -226,7 +233,6 @@ export default function RegisterPage() {
         .
       </p>
 
-      {/* Login link */}
       <p className="mt-6 text-center text-muted">
         Déjà un compte ?{" "}
         <Link
@@ -237,5 +243,18 @@ export default function RegisterPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+function CriteriaItem({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className={`flex items-center gap-2 text-xs ${ok ? "text-success" : "text-error"}`}>
+      {ok ? (
+        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+      ) : (
+        <XCircle className="h-3.5 w-3.5 shrink-0" />
+      )}
+      {label}
+    </li>
   );
 }
