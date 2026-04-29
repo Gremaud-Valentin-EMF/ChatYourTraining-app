@@ -46,18 +46,18 @@ interface DailyLoad {
 const ATL_TIME_CONSTANT = 7; // 7 days for acute load (fatigue)
 const CTL_TIME_CONSTANT = 42; // 42 days for chronic load (fitness)
 
-// Joe Friel's TSS per hour for each RPE level (1-10 scale)
+// Friel TSS per hour by RPE (1-10 scale) — source: "Estimating TSS from RPE or Average Heart Rate"
 const FRIEL_TSS_PER_HOUR: Record<number, number> = {
-  1: 10,
-  2: 20,
-  3: 30,
-  4: 40,
-  5: 50,
-  6: 60,
-  7: 70,
-  8: 80,
-  9: 90,
-  10: 100,
+  1: 20,
+  2: 30,
+  3: 40,
+  4: 50,
+  5: 60,
+  6: 70,
+  7: 80,
+  8: 100,
+  9: 120,
+  10: 140,
 };
 
 
