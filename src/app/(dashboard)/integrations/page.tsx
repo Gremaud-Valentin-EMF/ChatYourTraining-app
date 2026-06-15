@@ -368,6 +368,7 @@ function IntegrationsPageContent() {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
 
+    if (minutes < 1) return "À l'instant";
     if (minutes < 60) return `il y a ${minutes}m`;
     if (hours < 24) return `il y a ${hours}h`;
     return d.toLocaleDateString("fr-FR");

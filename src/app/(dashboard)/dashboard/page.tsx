@@ -540,7 +540,7 @@ export default function DashboardPage() {
 
       try {
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const { data: activities, error: activitiesError } = await (
+        const { data: activities } = await (
           supabase as any
         )
           .from("activities")
@@ -549,39 +549,16 @@ export default function DashboardPage() {
           .gte("scheduled_date", trainingLoadStartDate)
           .order("scheduled_date");
 
-        console.log("Dashboard - Activities fetched:", {
-          count: activities?.length || 0,
-          error: activitiesError?.message,
-          sample: activities?.slice(0, 3),
-        });
-
         if (activities && activities.length > 0) {
-          // Calculate training load from real activities
           const tssData = activities.map(
             (a: { scheduled_date: string; tss: number; status: string }) => ({
               date: a.scheduled_date,
               tss: a.status === "completed" ? a.tss || 0 : 0,
             })
           );
-          console.log("Dashboard - TSS data for training load:", {
-            totalActivities: tssData.length,
-            activitiesWithTSS: tssData.filter((t: { tss: number }) => t.tss > 0)
-              .length,
-            totalTSS: tssData.reduce(
-              (sum: number, t: { tss: number }) => sum + t.tss,
-              0
-            ),
-            sample: tssData.slice(0, 5),
-          });
           const loadData = calculateTrainingLoad(tssData);
-          console.log("Dashboard - Training load calculated:", {
-            dataPoints: loadData.length,
-            lastPoint: loadData[loadData.length - 1],
-          });
           setTrainingLoadData(loadData);
         } else {
-          // No activities - show empty chart
-          console.log("Dashboard - No activities found for training load");
           setTrainingLoadData([]);
         }
       } catch (err) {

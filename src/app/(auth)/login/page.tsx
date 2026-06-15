@@ -159,7 +159,7 @@ export default function LoginPage() {
           type="password"
           placeholder="Votre mot de passe"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => { setPassword(e.target.value); setError(null); }}
           leftIcon={<Lock className="h-5 w-5" />}
           required
           autoComplete="current-password"

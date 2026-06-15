@@ -1,0 +1,22 @@
+[     174ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[     512ms] [LOG] [Fast Refresh] done in 338ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[     686ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js:38559
+[   31580ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://bgyqogwzrozoxpzfejdr.supabase.co/auth/v1/token?grant_type=password:0
+[   46241ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://bgyqogwzrozoxpzfejdr.supabase.co/auth/v1/token?grant_type=password:0
+[   61272ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://bgyqogwzrozoxpzfejdr.supabase.co/auth/v1/token?grant_type=password:0
+[   69553ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[   70299ms] [LOG] [Fast Refresh] done in 746ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[   72941ms] [LOG] Dashboard - Activities fetched: {count: 177, error: undefined, sample: Array(3)} @ webpack-internal:///(app-pages-browser)/./src/app/(dashboard)/dashboard/page.tsx:279
+[   72942ms] [LOG] Dashboard - TSS data for training load: {totalActivities: 177, activitiesWithTSS: 142, totalTSS: 9263, sample: Array(5)} @ webpack-internal:///(app-pages-browser)/./src/app/(dashboard)/dashboard/page.tsx:290
+[   72955ms] [LOG] Dashboard - Training load calculated: {dataPoints: 90, lastPoint: Object} @ webpack-internal:///(app-pages-browser)/./src/app/(dashboard)/dashboard/page.tsx:297
+[   73033ms] [LOG] Dashboard - Activities fetched: {count: 177, error: undefined, sample: Array(3)} @ webpack-internal:///(app-pages-browser)/./src/app/(dashboard)/dashboard/page.tsx:279
+[   73033ms] [LOG] Dashboard - TSS data for training load: {totalActivities: 177, activitiesWithTSS: 142, totalTSS: 9263, sample: Array(5)} @ webpack-internal:///(app-pages-browser)/./src/app/(dashboard)/dashboard/page.tsx:290
+[   73034ms] [LOG] Dashboard - Training load calculated: {dataPoints: 90, lastPoint: Object} @ webpack-internal:///(app-pages-browser)/./src/app/(dashboard)/dashboard/page.tsx:297
+[   73105ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ webpack-internal:///(app-pages-browser)/./node_modules/recharts/es6/util/LogUtils.js:18
+[   73105ms] [WARNING] The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width. @ webpack-internal:///(app-pages-browser)/./node_modules/recharts/es6/util/LogUtils.js:18

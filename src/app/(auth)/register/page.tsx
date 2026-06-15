@@ -155,7 +155,7 @@ export default function RegisterPage() {
           type="email"
           placeholder="Votre email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => { setEmail(e.target.value); setError(null); }}
           leftIcon={<Mail className="h-5 w-5" />}
           required
           autoComplete="email"

@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import {
   Card,
   Button,
@@ -431,22 +434,17 @@ export default function ChatPage() {
               "prose prose-sm max-w-none",
               isUser ? "prose-invert" : ""
             )}
-            dangerouslySetInnerHTML={{
-              __html: formatMessageContent(message.content),
-            }}
-          />
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeSanitize]}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
         </div>
       </div>
     );
-  };
-
-  const formatMessageContent = (content: string) => {
-    // Convert markdown-like formatting to HTML
-    return content
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, "<code>$1</code>")
-      .replace(/\n/g, "<br>");
   };
 
   const handleAcceptPlan = async (planId: string) => {

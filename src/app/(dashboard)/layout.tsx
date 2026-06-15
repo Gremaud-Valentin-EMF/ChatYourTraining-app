@@ -151,8 +151,16 @@ export default function DashboardLayout({
           <div className="h-full px-4 lg:px-8 flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold">
-                {navItems.find((item) => item.href === pathname)?.label ||
-                  "Dashboard"}
+                {navItems.find(
+                  (item) =>
+                    pathname === item.href ||
+                    pathname.startsWith(item.href + "/")
+                )?.label ||
+                  (pathname === "/chat"
+                    ? "Coach IA"
+                    : pathname === "/profile"
+                    ? "Profil"
+                    : "Tableau de bord")}
               </h1>
             </div>
 

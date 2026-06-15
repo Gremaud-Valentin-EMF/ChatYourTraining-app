@@ -107,7 +107,9 @@ export function WeekCalendar({
               <span title="TSS = Stress de ton entraînement">(semaine)</span>:
             </span>
             <span className="font-bold">{weeklyTss.completed}</span>
-            <span className="text-muted">/ {weeklyTss.target}</span>
+            <span className="text-muted">
+              / {weeklyTss.target > 0 ? weeklyTss.target : "—"}
+            </span>
           </div>
         </div>
       </div>
@@ -131,7 +133,9 @@ export function WeekCalendar({
           <div className="flex justify-between text-xs mb-1">
             <span className="text-muted">Charge TSS</span>
             <span>
-              {getPercent(weeklyTss.completed, weeklyTss.target)}%
+              {weeklyTss.target > 0
+                ? `${getPercent(weeklyTss.completed, weeklyTss.target)}%`
+                : "—"}
             </span>
           </div>
           <Progress

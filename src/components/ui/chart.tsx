@@ -35,7 +35,7 @@ export const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerPro
         {...props}
       >
         <Style id={chartId} config={config} />
-        <ResponsiveContainer>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           {children}
         </ResponsiveContainer>
       </div>

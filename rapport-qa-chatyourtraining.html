@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport QA — ChatYourTraining</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f13; color: #e2e8f0; line-height: 1.6; }
+  .header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-bottom: 2px solid #f43f5e; padding: 32px 48px; }
+  .header h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; }
+  .header .subtitle { color: #94a3b8; margin-top: 4px; font-size: 14px; }
+  .header .meta { margin-top: 16px; display: flex; gap: 24px; flex-wrap: wrap; }
+  .meta-item { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 8px 16px; font-size: 13px; }
+  .meta-item span { color: #94a3b8; }
+  .meta-item strong { color: #e2e8f0; }
+
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 32px 48px; background: #0f0f13; }
+  .summary-card { border-radius: 12px; padding: 20px; text-align: center; border: 1px solid; }
+  .summary-card.critique { background: #1f0a0a; border-color: #f43f5e; }
+  .summary-card.majeur { background: #1a0e00; border-color: #f97316; }
+  .summary-card.mineur { background: #0d1a00; border-color: #84cc16; }
+  .summary-card.cosmetique { background: #0a0d1a; border-color: #60a5fa; }
+  .summary-card .count { font-size: 40px; font-weight: 800; }
+  .summary-card.critique .count { color: #f43f5e; }
+  .summary-card.majeur .count { color: #f97316; }
+  .summary-card.mineur .count { color: #84cc16; }
+  .summary-card.cosmetique .count { color: #60a5fa; }
+  .summary-card .label { font-size: 12px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 48px 48px; }
+  .section { margin-bottom: 48px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #1e293b; }
+  .section-number { background: #334155; color: #f1f5f9; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .section-title { font-size: 20px; font-weight: 700; color: #f1f5f9; }
+
+  .subsection { margin-bottom: 24px; }
+  .subsection-title { font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .subsection-title::after { content: ''; flex: 1; height: 1px; background: #1e293b; }
+
+  .bug-list { display: flex; flex-direction: column; gap: 12px; }
+  .bug-item { background: #111827; border-radius: 10px; border-left: 4px solid; padding: 16px 20px; }
+  .bug-item.critique { border-color: #f43f5e; }
+  .bug-item.majeur { border-color: #f97316; }
+  .bug-item.mineur { border-color: #84cc16; }
+  .bug-item.cosmetique { border-color: #60a5fa; }
+  .bug-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+  .badge.critique { background: #f43f5e22; color: #f43f5e; border: 1px solid #f43f5e44; }
+  .badge.majeur { background: #f9731622; color: #f97316; border: 1px solid #f9731644; }
+  .badge.mineur { background: #84cc1622; color: #84cc16; border: 1px solid #84cc1644; }
+  .badge.cosmetique { background: #60a5fa22; color: #60a5fa; border: 1px solid #60a5fa44; }
+  .bug-title { font-weight: 600; color: #f1f5f9; font-size: 14px; }
+  .bug-body { font-size: 13px; color: #94a3b8; }
+  .bug-body .label { color: #64748b; font-weight: 600; margin-top: 8px; display: block; }
+  .bug-body code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .info-item { background: #111827; border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #94a3b8; border: 1px solid #1e293b; }
+  .info-item strong { color: #e2e8f0; display: block; margin-bottom: 4px; }
+
+  .ok-list, .suggestion-list { list-style: none; }
+  .ok-list li, .suggestion-list li { padding: 6px 0; font-size: 13px; color: #94a3b8; padding-left: 20px; position: relative; }
+  .ok-list li::before { content: '✅'; position: absolute; left: 0; }
+  .suggestion-list li::before { content: '💡'; position: absolute; left: 0; }
+
+  .risk-item { background: #1a0a0a; border: 1px solid #f43f5e33; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; color: #fca5a5; }
+  .risk-item strong { color: #f87171; display: block; margin-bottom: 4px; }
+
+  .footer { background: #0a0a0f; border-top: 1px solid #1e293b; padding: 24px 48px; text-align: center; color: #475569; font-size: 12px; }
+
+  @media (max-width: 768px) {
+    .header, .container, .footer { padding-left: 16px; padding-right: 16px; }
+    .summary { grid-template-columns: repeat(2, 1fr); padding: 16px; }
+    .info-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔍 Rapport QA — ChatYourTraining</h1>
+  <div class="subtitle">Audit qualité & sécurité — Session automatisée Playwright</div>
+  <div class="meta">
+    <div class="meta-item"><span>Date : </span><strong>14 juin 2026</strong></div>
+    <div class="meta-item"><span>Environnement : </span><strong>localhost:3000 (dev)</strong></div>
+    <div class="meta-item"><span>Compte test : </span><strong>test@example.com</strong></div>
+    <div class="meta-item"><span>Intégrations : </span><strong>Strava ✓ &amp; Whoop ✓</strong></div>
+    <div class="meta-item"><span>Browser : </span><strong>Chrome 148 (Headless)</strong></div>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-card critique">
+    <div class="count">2</div>
+    <div class="label">🔴 Critique</div>
+  </div>
+  <div class="summary-card majeur">
+    <div class="count">5</div>
+    <div class="label">🟠 Majeur</div>
+  </div>
+  <div class="summary-card mineur">
+    <div class="count">4</div>
+    <div class="label">🟡 Mineur</div>
+  </div>
+  <div class="summary-card cosmetique">
+    <div class="count">3</div>
+    <div class="label">🔵 Cosmétique</div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ==================== SECTION 1 — AUTH ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <div class="section-title">Authentification &amp; Onboarding</div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">✅ Ce qui fonctionne</div>
+    <ul class="ok-list">
+      <li>Login avec credentials valides → redirection correcte vers /dashboard</li>
+      <li>Mauvais mot de passe → message "E-mail ou mot de passe incorrect." (non discriminant)</li>
+      <li>Compte inexistant → même message générique (pas de user enumeration via le message)</li>
+      <li>Injection SQL dans le mot de passe → correctement rejeté (Supabase paramétrisé)</li>
+      <li>Utilisateur déjà connecté → tentative d'accès à /register ou /login redirige vers /dashboard</li>
+      <li>Route protégée sans auth → redirection correcte vers /login</li>
+      <li>Formulaire inscription : password strength checker temps réel (12 car, maj, chiffre, spécial)</li>
+      <li>Bouton inscription désactivé tant que le mot de passe ne remplit pas les critères</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">🐛 Bugs trouvés</div>
+    <div class="bug-list">
+
+      <div class="bug-item critique">
+        <div class="bug-header">
+          <span class="badge critique">CRITIQUE</span>
+          <span class="bug-title">Page "Mot de passe oublié" → 404</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Étapes :</span>
+          Aller sur /login → cliquer "Mot de passe oublié ?" → la page <code>/forgot-password</code> retourne une 404 Next.js.
+          <span class="label">Attendu :</span> Un formulaire de réinitialisation de mot de passe.
+          <span class="label">Observé :</span> "404 — This page could not be found." La route n'existe pas.
+          <span class="label">Impact :</span> Aucun utilisateur ne peut récupérer son compte s'il oublie son mot de passe. Lien affiché dans l'UI = lien mort.
+        </div>
+      </div>
+
+      <div class="bug-item majeur">
+        <div class="bug-header">
+          <span class="badge majeur">MAJEUR</span>
+          <span class="bug-title">Message "email déjà utilisé" persiste après modification du champ email</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Étapes :</span>
+          Sur /register, remplir le formulaire avec un email existant → cliquer "Créer mon compte" → erreur affichée → modifier le champ email avec un nouvel email.
+          <span class="label">Attendu :</span> Le message d'erreur disparaît quand l'utilisateur corrige l'email.
+          <span class="label">Observé :</span> "Cette adresse e-mail est déjà utilisée." reste affiché même après avoir tapé une nouvelle adresse.
+          <span class="label">Impact :</span> L'utilisateur pense que son nouvel email est aussi refusé → abandon potentiel.
+        </div>
+      </div>
+
+      <div class="bug-item mineur">
+        <div class="bug-header">
+          <span class="badge mineur">MINEUR</span>
+          <span class="bug-title">Formulaire vide → aucun message d'erreur visible</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Étapes :</span>
+          Aller sur /login → cliquer "Se connecter" sans remplir les champs.
+          <span class="label">Attendu :</span> Messages de validation visibles sous les champs (ex. "Ce champ est requis").
+          <span class="label">Observé :</span> La validation HTML5 native bloque la soumission et focus l'email, mais aucun message personnalisé n'apparaît dans le DOM. Sur mobile ou certains navigateurs la bulle native ne s'affiche pas du tout.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">🔒 Risques sécurité</div>
+    <div class="risk-item">
+      <strong>User Enumeration partielle sur /register</strong>
+      Le message "Cette adresse e-mail est déjà utilisée." révèle qu'un email est enregistré dans la base. Un attaquant peut utiliser ce formulaire pour tester une liste d'emails et savoir lesquels ont un compte. Mitigation recommandée : utiliser un message générique du type "Si cet email est disponible, vous recevrez une confirmation."
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">💡 Suggestions</div>
+    <ul class="suggestion-list">
+      <li>Créer la route <code>/forgot-password</code> avec un formulaire Supabase <code>resetPasswordForEmail()</code> — priorité maximale</li>
+      <li>Ajouter la validation client-side inline (sous chaque champ) pour les formulaires login et register</li>
+      <li>Remplacer le message "email déjà utilisé" par un message générique ou effacer l'erreur dès le premier keystroke</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== SECTION 2 — DASHBOARD ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <div class="section-title">Dashboard &amp; Visualisation</div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">✅ Ce qui fonctionne</div>
+    <ul class="ok-list">
+      <li>Dashboard se charge avec données réelles (CTL, ATL, TSB, récupération Whoop)</li>
+      <li>Changement de période graphique (7J/30J/90J) : les valeurs résumé CTL/ATL/TSB restent celles du jour courant (correct)</li>
+      <li>Calendrier hebdomadaire affiché avec statuts (Fait / Planifié)</li>
+      <li>Données santé Whoop affichées (HRV, FC repos, sommeil, strain)</li>
+      <li>Météo intégrée dans le calendrier (26°/17° pour dimanche)</li>
+      <li>Vue mobile (375px) : layout adaptatif, navigation bottom, contenu lisible</li>
+      <li>La modal "fatigue du jour" apparaît à la première visite de la journée</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">🐛 Bugs trouvés</div>
+    <div class="bug-list">
+
+      <div class="bug-item majeur">
+        <div class="bug-header">
+          <span class="badge majeur">MAJEUR</span>
+          <span class="bug-title">Recharts : avertissement width(-1) height(-1) → graphiques potentiellement vides</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Console :</span> <code>The width(-1) and height(-1) of chart should be greater than 0</code> (×2 à chaque chargement du dashboard)
+          <span class="label">Observé :</span> Les graphiques CTL/ATL/TSB et Récupération émettent cet avertissement à chaque rendu. Cela indique que le conteneur du chart n'a pas de dimensions CSS correctes au premier rendu.
+          <span class="label">Impact :</span> Sur certaines tailles d'écran ou lors d'un rendu SSR/hydration, les charts peuvent ne pas s'afficher.
+          <span class="label">Fichier suspect :</span> ResponsiveContainer dans les composants dashboard.
+        </div>
+      </div>
+
+      <div class="bug-item majeur">
+        <div class="bug-header">
+          <span class="badge majeur">MAJEUR</span>
+          <span class="bug-title">Double fetch des activités au chargement du dashboard</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Console :</span> "Dashboard - Activities fetched" et "Dashboard - TSS data for training load" apparaissent deux fois à chaque chargement.
+          <span class="label">Cause probable :</span> Deux <code>useEffect</code> déclenchés ou un composant qui se monte deux fois (React StrictMode en dev).
+          <span class="label">Impact :</span> En production, double appel API Supabase par chargement de page, frais inutiles et latence accrue.
+          <span class="label">Ligne :</span> <code>src/app/(dashboard)/dashboard/page.tsx:279</code>
+        </div>
+      </div>
+
+      <div class="bug-item mineur">
+        <div class="bug-header">
+          <span class="badge mineur">MINEUR</span>
+          <span class="bug-title">TSS semaine cible = 0 → "Charge TSS: 0%"</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Observé :</span> Dans le calendrier hebdomadaire : "TSS (semaine): 333 / 0" et "Charge TSS: 0%". La cible hebdomadaire TSS est à 0.
+          <span class="label">Attendu :</span> Soit une valeur calculée basée sur le CTL cible, soit "—" si non configuré.
+          <span class="label">Impact :</span> La métrique "Charge TSS" est inutilisable (division par zéro).
+        </div>
+      </div>
+
+      <div class="bug-item cosmetique">
+        <div class="bug-header">
+          <span class="badge cosmetique">COSMÉTIQUE</span>
+          <span class="bug-title">Titre de page h1 "Dashboard" (anglais) sur la page /chat et /workouts/[id]</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Observé :</span> Les pages /chat et /workouts/:id affichent <code>&lt;h1&gt;Dashboard&lt;/h1&gt;</code> dans la barre de navigation supérieure au lieu du titre de la page courante.
+          <span class="label">Attendu :</span> "Coach IA" pour /chat, "Détail séance" pour /workouts/:id.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">⚠️ UX Problématique</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <strong>Aucune notification après sync réussi</strong>
+        Après un sync Strava ou Whoop, le seul feedback est la mise à jour discrète du timestamp "Dernière synchro: il y a 0m". Pas de toast / notification de succès.
+      </div>
+      <div class="info-item">
+        <strong>Format "Dernière synchro: il y a 0m"</strong>
+        "0m" est une formulation étrange pour "à l'instant". Utiliser "À l'instant" ou "Maintenant".
+      </div>
+      <div class="info-item">
+        <strong>Aucun objectif défini → encart vide</strong>
+        "Aucun objectif défini. Ajoutez un objectif dans votre profil !" sans lien direct vers la page objectifs.
+      </div>
+      <div class="info-item">
+        <strong>Séance du jour : "0 TSS"</strong>
+        La séance planifiée d'aujourd'hui (Vélo 150 min) affiche "0 TSS" en charge. Pour une séance planifiée non complétée, afficher le TSS estimé serait plus informatif.
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">💡 Suggestions</div>
+    <ul class="suggestion-list">
+      <li>Ajouter <code>minWidth: 0</code> sur le conteneur des ResponsiveContainer Recharts pour corriger le warning de dimensions</li>
+      <li>Consolider les fetches dashboard en un seul appel ou utiliser <code>useMemo</code> / <code>useCallback</code></li>
+      <li>Calculer automatiquement le TSS cible hebdomadaire depuis le CTL cible (CTL_target × 7)</li>
+      <li>Toast de confirmation après sync (succès / erreur) avec nombre d'activités importées</li>
+      <li>Ajouter un lien direct "Ajouter un objectif" depuis le widget "Prochain Objectif"</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== SECTION 3 — COACH IA ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <div class="section-title">Coach IA Conversationnel</div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">✅ Ce qui fonctionne</div>
+    <ul class="ok-list">
+      <li>Réponse à une demande vague : contextualisée et pertinente (météo, séance du jour, conseils)</li>
+      <li>Injection de prompt bloquée : "je ne peux pas ignorer mes instructions précédentes"</li>
+      <li>Question hors scope (météo Paris) : refusée proprement, redirigée vers le sujet entraînement</li>
+      <li>Bouton Envoyer désactivé tant que le champ est vide</li>
+      <li>Historique des conversations accessible en sidebar avec titres automatiques</li>
+      <li>Puce "Nouvelle conversation" fonctionnelle</li>
+      <li>Suggestions rapides (Analyser ma forme / Séance du jour / Adapter le planning)</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">🐛 Bugs trouvés</div>
+    <div class="bug-list">
+
+      <div class="bug-item critique">
+        <div class="bug-header">
+          <span class="badge critique">CRITIQUE</span>
+          <span class="bug-title">XSS Stored — Exécution de JavaScript via le chat</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Payload testé :</span> <code>&lt;img src=x onerror=alert(1)&gt;</code>
+          <span class="label">Résultat :</span> La dialog JavaScript <code>alert("1")</code> s'est exécutée dans le navigateur. Le payload est rendu en HTML brut dans la zone de messages sans sanitisation.
+          <span class="label">Impact :</span> Un attaquant peut injecter n'importe quel script : vol de cookie de session, redirection de phishing, keylogger, accès à l'API Supabase au nom de l'utilisateur connecté. Si les conversations sont partagées entre utilisateurs (historique commun), la vulnérabilité est amplifiée.
+          <span class="label">Root cause probable :</span> Le rendu Markdown des réponses IA et/ou des messages utilisateur utilise <code>dangerouslySetInnerHTML</code> sans passer par une librairie de sanitisation (DOMPurify, sanitize-html).
+          <span class="label">Fix :</span> Utiliser <code>DOMPurify.sanitize()</code> avant tout <code>dangerouslySetInnerHTML</code>, ou remplacer par react-markdown avec <code>rehype-sanitize</code>.
+        </div>
+      </div>
+
+      <div class="bug-item majeur">
+        <div class="bug-header">
+          <span class="badge majeur">MAJEUR</span>
+          <span class="bug-title">Coach IA déclare ne pas avoir accès aux données ATL/CTL/TSB alors qu'elles existent</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Observé :</span> Le coach répond "Actuellement, je n'ai pas accès à tes données de charge d'entraînement réelles (ATL, CTL, TSB)". Or le dashboard affiche CTL=45, ATL=43, TSB=-4.
+          <span class="label">Impact :</span> Les conseils d'entraînement donnés sans ces métriques sont génériques et potentiellement dangereux (risque surentraînement non détecté). C'est la proposition de valeur centrale de l'app.
+          <span class="label">Cause probable :</span> Le builder de contexte dans <code>src/lib/openai/coach.ts</code> ne reçoit pas ou n'inclut pas correctement les données de <code>training_load</code>.
+        </div>
+      </div>
+
+      <div class="bug-item majeur">
+        <div class="bug-header">
+          <span class="badge majeur">MAJEUR</span>
+          <span class="bug-title">Score de récupération incohérent entre Dashboard et Coach IA</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Dashboard :</span> Score récupération = <strong>60</strong> ("PRÊT", "-4.8% vs moyenne 63%")
+          <span class="label">Coach IA :</span> "ta récupération est au <strong>Vert (75%)</strong> aujourd'hui"
+          <span class="label">Écart :</span> 60% vs 75% — 15 points d'écart sur la même donnée Whoop du même jour.
+          <span class="label">Impact :</span> Le coach peut recommander des séances intenses alors que la récupération réelle est dans la moyenne. Perte de confiance des utilisateurs dans les données affichées.
+          <span class="label">Cause probable :</span> Le coach accède à une source différente ou une date différente que le dashboard (décalage UTC vs heure locale ?).
+        </div>
+      </div>
+
+      <div class="bug-item cosmetique">
+        <div class="bug-header">
+          <span class="badge cosmetique">COSMÉTIQUE</span>
+          <span class="bug-title">Tutoiement (tu) dans le coach vs vouvoiement (vous) dans l'UI</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Observé :</span> Le coach utilise systématiquement "tu" ("ta récupération", "ton planning") tandis que toute l'interface utilise "vous" ("Connectez-vous", "votre tableau de bord").
+          <span class="label">Impact :</span> Incohérence de ton, peut paraître familier à certains utilisateurs.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">🔒 Risques sécurité</div>
+    <div class="risk-item">
+      <strong>XSS Stocké — Criticité maximale</strong>
+      Le payload <code>&lt;img src=x onerror=alert(1)&gt;</code> s'est exécuté. En environnement de production, ce vecteur peut être utilisé pour voler le token Supabase de la session (<code>localStorage</code>), permettant à un attaquant de se faire passer pour l'utilisateur victime sans connaître son mot de passe. À corriger avant tout déploiement.
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">💡 Suggestions</div>
+    <ul class="suggestion-list">
+      <li>Installer <code>dompurify</code> + <code>@types/dompurify</code> et wrapper tous les rendus HTML du chat</li>
+      <li>Investiguer <code>lib/openai/coach.ts</code> : vérifier que <code>training_load</code> (CTL/ATL/TSB) est bien inclus dans le JSON de contexte envoyé au modèle</li>
+      <li>Vérifier la source du score Whoop dans le contexte IA vs le dashboard — aligner sur la même requête/date</li>
+      <li>Harmoniser le tutoiement/vouvoiement dans le prompt système du coach</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== SECTION 4 — INTÉGRATIONS ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <div class="section-title">Intégrations Strava &amp; Whoop</div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">✅ Ce qui fonctionne</div>
+    <ul class="ok-list">
+      <li>Strava connecté et synchro fonctionnelle (200 OK en 7.4s pour 177 activités)</li>
+      <li>Whoop connecté, données HRV/sommeil/strain visibles sur le dashboard</li>
+      <li>Bouton "Synchroniser" désactivé pendant la synchro → pas de double-sync UI</li>
+      <li>Lock distribué côté serveur (sync-helpers.ts) → protection contre les requêtes simultanées</li>
+      <li>Timestamp "Dernière synchro" mis à jour après sync réussi</li>
+      <li>Priorité des sources configurable (Strava vs Whoop)</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">⚠️ UX Problématique</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <strong>Pas de feedback post-sync</strong>
+        Le bouton redevient actif mais aucun toast/message n'informe l'utilisateur du résultat : combien d'activités importées, si une erreur s'est produite, etc.
+      </div>
+      <div class="info-item">
+        <strong>Durée sync (7.4s) sans indicateur de progression</strong>
+        Pendant la synchro, l'utilisateur voit juste le bouton grisé. Un spinner ou une barre de progression rassurerait.
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">💡 Suggestions</div>
+    <ul class="suggestion-list">
+      <li>Afficher un toast avec le résultat : "177 activités vérifiées, 0 nouvelles" ou "Erreur : token expiré"</li>
+      <li>Ajouter un spinner animé sur le bouton pendant la synchro</li>
+      <li>Tester le cas où le token Strava/Whoop expire mid-session → vérifier le message d'erreur</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== SECTION 5 — SÉCURITÉ ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <div class="section-title">Sécurité &amp; Edge Cases</div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">✅ Ce qui fonctionne</div>
+    <ul class="ok-list">
+      <li>Routes protégées → redirection /login si non authentifié</li>
+      <li>UUID inexistant dans /workouts/:id → "Impossible de trouver cette séance" (pas d'info leakage)</li>
+      <li>SQL injection dans mot de passe → rejeté (Supabase ORM paramétrisé)</li>
+      <li>Injection de prompt chat → refusée par le modèle</li>
+      <li>Double sync bouton → protégé côté UI et côté serveur (lock)</li>
+      <li>RLS Supabase active → workout UUID d'un autre user → accès refusé (+ redirect login)</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">🐛 Bugs trouvés</div>
+    <div class="bug-list">
+
+      <div class="bug-item mineur">
+        <div class="bug-header">
+          <span class="badge mineur">MINEUR</span>
+          <span class="bug-title">User Enumeration via le formulaire d'inscription</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Observé :</span> Message explicite "Cette adresse e-mail est déjà utilisée." sur /register.
+          <span class="label">Impact :</span> Permet à un attaquant de confirmer si une adresse email possède un compte sur la plateforme.
+          <span class="label">Fix :</span> Afficher toujours "Si cet email est disponible, vous recevrez un lien de confirmation." et envoyer un email en arrière-plan.
+        </div>
+      </div>
+
+      <div class="bug-item mineur">
+        <div class="bug-header">
+          <span class="badge mineur">MINEUR</span>
+          <span class="bug-title">Absence de rate limiting visible sur le formulaire de login</span>
+        </div>
+        <div class="bug-body">
+          <span class="label">Observé :</span> 3 tentatives de login infructueuses successives sans blocage, CAPTCHA ou délai croissant côté UI.
+          <span class="label">Note :</span> Supabase Auth applique un rate limit serveur par défaut, mais aucun feedback visuel n'informe l'utilisateur.
+          <span class="label">Impact :</span> Attaque brute-force discrète possible si le rate limit Supabase est configuré trop permissif.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">🔒 Risques sécurité — Récapitulatif</div>
+    <div class="risk-item">
+      <strong>[CRITIQUE] XSS Stored dans le chat IA</strong>
+      Confirmé : <code>&lt;img src=x onerror=alert(1)&gt;</code> s'exécute. Fix immédiat requis : DOMPurify avant tout rendu HTML des messages.
+    </div>
+    <div class="risk-item">
+      <strong>[MINEUR] User Enumeration via /register</strong>
+      Révèle si un email est enregistré. À adresser avant la mise en production publique.
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">💡 Suggestions</div>
+    <ul class="suggestion-list">
+      <li>Installer DOMPurify : <code>npm install dompurify @types/dompurify</code></li>
+      <li>Ajouter une Content Security Policy (CSP) stricte dans next.config.ts pour limiter les vecteurs XSS</li>
+      <li>Configurer des headers de sécurité : X-Frame-Options, X-Content-Type-Options, Referrer-Policy</li>
+      <li>Auditer tous les <code>dangerouslySetInnerHTML</code> dans le codebase</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ==================== SECTION 6 — NON TESTÉ ==================== -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number">6</div>
+    <div class="section-title">Périmètre non testé (à couvrir)</div>
+  </div>
+  <div class="info-grid">
+    <div class="info-item">
+      <strong>Reset de mot de passe complet</strong>
+      La page /forgot-password est en 404 — impossible de tester le flow (lien email, token expiration, double usage).
+    </div>
+    <div class="info-item">
+      <strong>Conversations longues (30+ messages)</strong>
+      Tester si le contexte IA se dégrade ou si l'app ralentit après 30+ échanges.
+    </div>
+    <div class="info-item">
+      <strong>Strava avec 0 activités</strong>
+      Tester avec un compte Strava vide pour vérifier l'état "données manquantes".
+    </div>
+    <div class="info-item">
+      <strong>Déconnexion OAuth mid-session</strong>
+      Révoquer le token Strava/Whoop pendant une session active et observer le comportement.
+    </div>
+    <div class="info-item">
+      <strong>Vue tablette 768px</strong>
+      Tester le layout intermédiaire entre mobile et desktop.
+    </div>
+    <div class="info-item">
+      <strong>TSS aberrant manuel</strong>
+      Saisir TSS=999 pour une sortie de 30min et vérifier la cohérence des calculs CTL/ATL/TSB.
+    </div>
+    <div class="info-item">
+      <strong>TSB très négatif (-50+)</strong>
+      Vérifier si l'app affiche une alerte ou un état d'urgence dans ce cas.
+    </div>
+    <div class="info-item">
+      <strong>Demande plan IA (bouton dédié)</strong>
+      Tester le flow "Demander un plan IA" et l'acceptation via /api/plans/accept.
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Rapport généré par Claude Code (QA Agent) le 14 juin 2026 — ChatYourTraining v0.1-dev<br>
+  Tests réalisés avec Playwright CLI 0.1.14 sur Chrome 148 Headless
+</div>
+
+</body>
+</html>

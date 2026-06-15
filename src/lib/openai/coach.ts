@@ -7,6 +7,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getWeatherContext, type WeatherContext } from "@/lib/integrations/weather";
+import { calculateTrainingLoad } from "@/lib/calculations/training-load";
 
 export interface AthleteProfile {
   name: string;
@@ -123,7 +124,7 @@ export const SYSTEM_PROMPT = `Tu es un coach d'entraînement expert pour athlèt
 
 ## Personnalité et style
 - Expert en sciences du sport, méthodique et encourageant
-- Tu tutoies l'athlète et utilises un ton direct mais bienveillant
+- Tu vouvoies l'athlète et utilises un ton professionnel mais bienveillant
 - Tu justifies toujours tes conseils par les données ("Preuve par la donnée")
 - Tu utilises le **gras** pour les points clés
 - Tu es concis et actionnable
@@ -132,39 +133,39 @@ export const SYSTEM_PROMPT = `Tu es un coach d'entraînement expert pour athlèt
 Les indicateurs de récupération (Whoop, HRV, etc.) sont des **signaux**, pas des interdictions absolues.
 
 ### Si Récupération Rouge (<34%) :
-1. Vérifie le type de séance prévue
-2. Si séance intense → Demande le ressenti subjectif avant de recommander d'annuler
-3. Si récupération active/légère → Peut être maintenue, valide avec l'athlète
-4. Cherche toujours la **cause** (mauvais sommeil, maladie, stress externe)
+1. Vérifiez le type de séance prévue
+2. Si séance intense → Demandez le ressenti subjectif avant de recommander d'annuler
+3. Si récupération active/légère → Peut être maintenue, validez avec l'athlète
+4. Cherchez toujours la **cause** (mauvais sommeil, maladie, stress externe)
 
 ### Si Récupération Jaune (34-66%) :
 - Séances d'endurance OK
-- Séances intenses : propose adaptation (réduire durée ou intensité)
-- Surveille la tendance sur plusieurs jours
+- Séances intenses : proposez une adaptation (réduire durée ou intensité)
+- Surveillez la tendance sur plusieurs jours
 
 ### Si Récupération Verte (>66%) :
 - Toutes séances OK
 - C'est le moment idéal pour les séances clés de qualité
 
 ## Analyse de la charge d'entraînement
-- Compare le RPE déclaré vs le type de séance (RPE 8/10 sur un footing = **anomalie à investiguer**)
-- Séances manquées : ne culpabilise pas, mais alerte si récurrent (>2 séances/semaine)
-- TSB très négatif (<-20) : recommande allègement proactif
+- Comparez le RPE déclaré vs le type de séance (RPE 8/10 sur un footing = **anomalie à investiguer**)
+- Séances manquées : ne culpabilisez pas l'athlète, mais alertez si récurrent (>2 séances/semaine)
+- TSB très négatif (<-20) : recommandez un allègement proactif
 
 ## Règles de santé et sécurité
-- **JAMAIS** de diagnostic médical — reste toujours dans le rôle coach
+- **JAMAIS** de diagnostic médical — restez toujours dans le rôle coach
 - **Symptômes bénins** (toux légère, fatigue passagère, courbatures après séance, petit mal de tête) → conseils pratiques : repos, hydratation, sommeil. Pas de prise de panique, pas de "consultez un médecin" systématique
-- **Symptômes potentiellement sérieux** (douleur aiguë persistante, fièvre, douleur thoracique, essoufflement inhabituel, signes de surentraînement sévère comme resting HR qui monte depuis des jours + TSB très négatif + insomnie) → alors et seulement alors recommande une consultation
-- Si l'athlète mentionne un symptôme, évalue d'abord si ça semble grave avant de réagir. Le bon sens avant la prudence excessive
+- **Symptômes potentiellement sérieux** (douleur aiguë persistante, fièvre, douleur thoracique, essoufflement inhabituel, signes de surentraînement sévère comme resting HR qui monte depuis des jours + TSB très négatif + insomnie) → alors et seulement alors recommandez une consultation
+- Si l'athlète mentionne un symptôme, évaluez d'abord si cela semble grave avant de réagir. Le bon sens avant la prudence excessive
 
 ## Suggestions d'adaptation du planning
-- Quand tu proposes une adaptation (repos, changement de séance, annulation), formule-la comme une **proposition explicite** : "Je te propose de..." ou "On pourrait adapter comme ça : ..."
-- Reste encourageant : une adaptation n'est pas un échec, c'est de la stratégie
+- Quand vous proposez une adaptation (repos, changement de séance, annulation), formulez-la comme une **proposition explicite** : "Je vous propose de..." ou "On pourrait adapter comme ceci : ..."
+- Restez encourageant : une adaptation n'est pas un échec, c'est de la stratégie
 
 ## Format de réponse
-- Utilise des listes à puces pour les recommandations
-- Commence par l'essentiel (bottom line up front)
-- Termine par une question ou suggestion d'action concrète
+- Utilisez des listes à puces pour les recommandations
+- Commencez par l'essentiel (bottom line up front)
+- Terminez par une question ou suggestion d'action concrète
 
 ## Contexte athlète
 Le contexte JSON ci-dessous contient les données actuelles de l'athlète. Base toutes tes analyses sur ces données réelles.
@@ -287,8 +288,10 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       .from("daily_metrics")
       .select("*")
       .eq("user_id", userId)
-      .eq("date", today)
-      .single(),
+      .lte("date", today)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     (supabase as any)
       .from("activities")
       .select("*, sports(name, name_fr)")
@@ -303,12 +306,16 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       .order("scheduled_date", { ascending: false })
       .limit(5),
     (supabase as any)
-      .from("training_load")
-      .select("*")
+      .from("activities")
+      .select("scheduled_date, tss, status")
       .eq("user_id", userId)
-      .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .gte(
+        "scheduled_date",
+        new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0]
+      )
+      .order("scheduled_date"),
     (supabase as any)
       .from("activities")
       .select("*, sports(name, name_fr)")
@@ -335,7 +342,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
   const allObjectives = allObjectivesResult.data || [];
   const metrics = metricsResult.data;
   const activities = activitiesResult.data || [];
-  const load = loadResult.data;
+  const allActivitiesForLoad = loadResult.data || [];
   const todayWorkout = todayWorkoutResult.data;
   const upcoming = upcomingResult.data || [];
 
@@ -349,12 +356,20 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       weatherContext = null;
     }
   }
-  const atlValue =
-    typeof load?.atl === "number" ? load.atl : 0;
-  const ctlValue =
-    typeof load?.ctl === "number" ? load.ctl : 0;
-  const hasTsb = typeof load?.tsb === "number";
-  const tsbValue = hasTsb ? load.tsb : 0;
+
+  // Live CTL/ATL/TSB calculation (same as dashboard)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tssData = allActivitiesForLoad.map((a: any) => ({
+    date: a.scheduled_date,
+    tss: a.status === "completed" ? a.tss || 0 : 0,
+  }));
+  const loadData = calculateTrainingLoad(tssData);
+  const latestLoad = loadData.length > 0 ? loadData[loadData.length - 1] : null;
+
+  const atlValue = latestLoad?.atl ?? 0;
+  const ctlValue = latestLoad?.ctl ?? 0;
+  const hasTsb = latestLoad !== null;
+  const tsbValue = latestLoad?.tsb ?? 0;
   const loadContext = hasTsb
     ? tsbValue < -20
       ? "Bloc de charge - fatigue accumulée"
@@ -388,10 +403,16 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
     );
   }
 
-  // Get recovery status
-  const recoveryScore = metrics?.recovery_score || 75;
+  // Get recovery status — use actual last available value, no invented fallback
+  const recoveryScore: number | null = metrics?.recovery_score ?? null;
   const recoveryStatus: "green" | "yellow" | "red" =
-    recoveryScore >= 67 ? "green" : recoveryScore >= 34 ? "yellow" : "red";
+    recoveryScore === null
+      ? "yellow"
+      : recoveryScore >= 67
+      ? "green"
+      : recoveryScore >= 34
+      ? "yellow"
+      : "red";
 
   // Get current datetime with timezone
   const now = new Date();
@@ -570,7 +591,7 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
       ["threshold", "vo2max", "anaerobic"].includes(todayWorkout.intensity)
     ) {
       alerts.push(
-        `⚠️ **Alerte Récupération**: Ta récupération est faible (${context.physiological_status_today.recovery_score}%) et tu as une séance intense prévue (${todayWorkout.title}). Souhaites-tu qu'on adapte ?`
+        `⚠️ **Alerte Récupération**: Votre récupération est faible (${context.physiological_status_today.recovery_score}%) et vous avez une séance intense prévue (${todayWorkout.title}). Souhaitez-vous qu'on adapte ?`
       );
     }
   }
@@ -578,7 +599,7 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
   // TSB alert
   if (context.training_load_analysis.metrics.tsb < -25) {
     alerts.push(
-      `⚠️ **Alerte Charge**: Ton TSB est très bas (${context.training_load_analysis.metrics.tsb}). Tu accumules de la fatigue. On devrait prévoir un allègement.`
+      `⚠️ **Alerte Charge**: Votre TSB est très bas (${context.training_load_analysis.metrics.tsb}). Vous accumulez de la fatigue. On devrait prévoir un allègement.`
     );
   }
 
@@ -588,7 +609,7 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
     alerts.push(
       `💤 **Sommeil insuffisant**: Seulement ${sleepHours.toFixed(
         1
-      )}h cette nuit. Cela va impacter ta récupération et ta performance.`
+      )}h cette nuit. Cela va impacter votre récupération et votre performance.`
     );
   }
 
@@ -597,7 +618,7 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
     const days = context.athlete_profile.objective.days_remaining;
     if (days === 14 || days === 7 || days === 3) {
       alerts.push(
-        `🎯 **${context.athlete_profile.objective.name}**: J-${days} ! On entre dans la phase finale de préparation.`
+        `🎯 **${context.athlete_profile.objective.name}**: J-${days} ! Nous entrons dans la phase finale de préparation.`
       );
     }
   }
@@ -637,11 +658,11 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
 
         if (sportFeasibility === "deconseille") {
           alerts.push(
-            `🌧️ **Alerte Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C, vent ${weather.current.wind_speed_kmh.toFixed(0)} km/h). Ta séance **${todayWorkout.title}** est déconseillée en extérieur. Envisage une alternative indoor.`
+            `🌧️ **Alerte Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C, vent ${weather.current.wind_speed_kmh.toFixed(0)} km/h). Votre séance **${todayWorkout.title}** est déconseillée en extérieur. Envisagez une alternative indoor.`
           );
         } else if (sportFeasibility === "prudence") {
           alerts.push(
-            `⚠️ **Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C). Prudence pour ta séance **${todayWorkout.title}** en extérieur.`
+            `⚠️ **Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C). Prudence pour votre séance **${todayWorkout.title}** en extérieur.`
           );
         }
       }
@@ -649,7 +670,7 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
       // Ground conditions
       if (weather.ground_conditions.ground_assessment.includes("Neige") && isOutdoorCycling) {
         alerts.push(
-          `❄️ **Conditions au sol** : ${weather.ground_conditions.ground_assessment}. Vélo route fortement déconseillé.`
+          `❄️ **Conditions au sol** : ${weather.ground_conditions.ground_assessment}. Le vélo route est fortement déconseillé.`
         );
       }
     }

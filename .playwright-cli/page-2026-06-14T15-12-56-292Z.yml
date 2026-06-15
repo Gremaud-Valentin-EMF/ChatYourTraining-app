@@ -1,0 +1,349 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e31]
+  - generic [ref=e35]:
+    - complementary [ref=e36]:
+      - link "ChatYourTraining" [ref=e38] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e39]
+        - generic [ref=e41]: ChatYourTraining
+      - navigation [ref=e42]:
+        - link "Tableau de bord" [ref=e43] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e44]
+          - text: Tableau de bord
+        - link "Calendrier" [ref=e49] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e50]
+          - text: Calendrier
+        - link "Entraînements" [ref=e52] [cursor=pointer]:
+          - /url: /workouts
+          - img [ref=e53]
+          - text: Entraînements
+        - link "Objectifs" [ref=e54] [cursor=pointer]:
+          - /url: /objectives
+          - img [ref=e55]
+          - text: Objectifs
+        - link "Santé" [ref=e59] [cursor=pointer]:
+          - /url: /health
+          - img [ref=e60]
+          - text: Santé
+        - link "Intégrations" [ref=e62] [cursor=pointer]:
+          - /url: /integrations
+          - img [ref=e63]
+          - text: Intégrations
+    - generic [ref=e67]:
+      - banner [ref=e68]:
+        - generic [ref=e69]:
+          - heading "Tableau de bord" [level=1] [ref=e71]
+          - generic [ref=e72]:
+            - link "Coach IA" [ref=e73] [cursor=pointer]:
+              - /url: /chat
+              - img [ref=e74]
+              - generic [ref=e76]: Coach IA
+            - button [ref=e77] [cursor=pointer]:
+              - img [ref=e78]
+            - button "Avatar Valentin Gremaud Profil" [ref=e94] [cursor=pointer]:
+              - img "Avatar" [ref=e95]
+              - generic [ref=e86]:
+                - generic [ref=e87]: Valentin Gremaud
+                - generic [ref=e88]: Profil
+              - img [ref=e89]
+      - main [ref=e91]:
+        - generic [ref=e92]:
+          - generic [ref=e96]:
+            - generic [ref=e97]:
+              - generic [ref=e98]:
+                - generic [ref=e99]:
+                  - img [ref=e101]
+                  - generic [ref=e104]:
+                    - heading "Charge d'entraînement" [level=3] [ref=e105]
+                    - paragraph [ref=e106]: ATL (Fatigue) vs CTL (Forme) vs TSB (Équilibre)
+                - generic [ref=e108]:
+                  - button "7J" [ref=e109] [cursor=pointer]
+                  - button "30J" [ref=e110] [cursor=pointer]
+                  - button "90J" [ref=e111] [cursor=pointer]
+              - generic [ref=e112]:
+                - generic [ref=e113]:
+                  - generic [ref=e114]: Productif
+                  - generic [ref=e115]: Charge en hausse contrôlée.
+                - generic [ref=e118]:
+                  - generic [ref=e119]: Maintien
+                  - generic [ref=e120]: Productif
+                  - generic [ref=e121]: Surcharge
+              - generic [ref=e122]:
+                - generic [ref=e123]:
+                  - paragraph [ref=e124]: Forme (CTL)
+                  - paragraph [ref=e125]: "45"
+                - generic [ref=e126]:
+                  - paragraph [ref=e127]: Fatigue (ATL)
+                  - paragraph [ref=e128]: "43"
+                - generic [ref=e129]:
+                  - paragraph [ref=e130]: Équilibre (TSB)
+                  - paragraph [ref=e131]: "-4"
+                  - paragraph [ref=e132]: Optimal
+              - generic [ref=e135]:
+                - generic:
+                  - generic:
+                    - paragraph: 23 mai
+                    - generic:
+                      - generic:
+                        - paragraph: CTL
+                        - paragraph: "40"
+                      - generic:
+                        - paragraph: ATL
+                        - paragraph: "34"
+                      - generic:
+                        - paragraph: TSB
+                        - paragraph: "+17"
+                - list [ref=e137]:
+                  - listitem [ref=e138]:
+                    - img "ATL (Fatigue) legend icon" [ref=e139]
+                    - text: ATL (Fatigue)
+                  - listitem [ref=e141]:
+                    - img "CTL (Forme) legend icon" [ref=e142]
+                    - text: CTL (Forme)
+                  - listitem [ref=e144]:
+                    - img "TSB (Équilibre) legend icon" [ref=e145]
+                    - text: TSB (Équilibre)
+                - application [ref=e147]:
+                  - generic [ref=e166]:
+                    - generic [ref=e167]:
+                      - generic [ref=e169]: 17 mai
+                      - generic [ref=e171]: 20 mai
+                      - generic [ref=e173]: 23 mai
+                      - generic [ref=e175]: 26 mai
+                      - generic [ref=e177]: 29 mai
+                      - generic [ref=e179]: 1 juin
+                      - generic [ref=e181]: 3 juin
+                      - generic [ref=e183]: 5 juin
+                      - generic [ref=e185]: 7 juin
+                      - generic [ref=e187]: 10 juin
+                      - generic [ref=e189]: 13 juin
+                    - generic [ref=e190]:
+                      - generic [ref=e192]: "-25"
+                      - generic [ref=e194]: "0"
+                      - generic [ref=e196]: "25"
+                      - generic [ref=e198]: "50"
+                      - generic [ref=e200]: "75"
+            - generic [ref=e201]:
+              - generic [ref=e202]:
+                - generic [ref=e203]:
+                  - heading "Récupération" [level=3] [ref=e204]
+                  - paragraph [ref=e205]: Score du jour
+                - application [ref=e210]:
+                  - generic [ref=e572]: 60PRÊT
+                - generic [ref=e245]:
+                  - generic [ref=e246]:
+                    - text: Bon jour
+                    - img [ref=e247]
+                  - generic [ref=e250]: "-4.8% vs moyenne (63%)"
+                  - generic [ref=e251]: Dans la moyenne, charge nominale.
+              - generic [ref=e252]:
+                - heading "Prochain Objectif" [level=3] [ref=e253]
+                - paragraph [ref=e254]: Aucun objectif défini. Ajoutez un objectif dans votre profil !
+          - generic [ref=e255]:
+            - generic [ref=e257]:
+              - generic [ref=e258]:
+                - img [ref=e260]
+                - generic [ref=e262]:
+                  - generic [ref=e264]: Aujourd'hui
+                  - heading "Vélo - Endurance longue" [level=3] [ref=e266]
+                  - generic [ref=e267]:
+                    - generic [ref=e268]:
+                      - generic [ref=e269]:
+                        - img [ref=e271]
+                        - generic [ref=e274]: Durée prévue
+                      - generic [ref=e275]: 2h 30m
+                    - generic [ref=e276]:
+                      - generic [ref=e277]:
+                        - img [ref=e279]
+                        - generic [ref=e281]: Charge
+                      - generic [ref=e282]: 0 TSS
+                    - generic [ref=e283]:
+                      - generic [ref=e284]:
+                        - img [ref=e286]
+                        - generic [ref=e289]: Intensité
+                      - generic [ref=e290]: Endurance
+              - link "Détail" [ref=e292] [cursor=pointer]:
+                - /url: /workouts/752bdad6-983a-4ad6-b549-b7535f7de661
+                - button "Détail" [ref=e293]:
+                  - img [ref=e294]
+                  - text: Détail
+            - generic [ref=e296]:
+              - generic [ref=e297]:
+                - img [ref=e298]
+                - heading "Données de santé" [level=3] [ref=e300]
+              - generic [ref=e301]:
+                - generic [ref=e302]:
+                  - generic [ref=e303]:
+                    - img [ref=e305]
+                    - generic [ref=e307]:
+                      - paragraph [ref=e308]: VFC (HRV)
+                      - generic [ref=e309]:
+                        - generic [ref=e310]:
+                          - text: 88 ms
+                          - img [ref=e311]
+                        - generic [ref=e314]: Baseline 7j 92 ms
+                  - generic [ref=e315]:
+                    - img [ref=e316]
+                    - text: Stable
+                - generic [ref=e319]:
+                  - generic [ref=e320]:
+                    - img [ref=e322]
+                    - generic [ref=e324]:
+                      - paragraph [ref=e325]: FC au repos
+                      - generic [ref=e326]:
+                        - generic [ref=e327]:
+                          - text: 53 bpm
+                          - img [ref=e328]
+                        - generic [ref=e331]: +1 bpm vs hier
+                  - generic [ref=e332]:
+                    - img [ref=e333]
+                    - text: Stable
+                - generic [ref=e334]:
+                  - generic [ref=e335]:
+                    - img [ref=e337]
+                    - generic [ref=e339]:
+                      - paragraph [ref=e340]: Sommeil
+                      - generic [ref=e341]:
+                        - generic [ref=e342]:
+                          - text: 7h28
+                          - img [ref=e343]
+                        - generic [ref=e344]: "Dette: 0h"
+                  - generic [ref=e345]:
+                    - img [ref=e346]
+                    - text: Recharge
+                - generic [ref=e349]:
+                  - generic [ref=e350]: Strain du jour
+                  - generic [ref=e351]: "5.0"
+              - link "Aller à la page Santé" [ref=e352] [cursor=pointer]:
+                - /url: /health
+                - text: Aller à la page Santé
+                - img [ref=e353]
+          - generic [ref=e355]:
+            - generic [ref=e356]:
+              - generic [ref=e357]:
+                - img [ref=e358]
+                - heading "Calendrier de la semaine" [level=3] [ref=e360]
+              - generic [ref=e361]:
+                - generic [ref=e362]:
+                  - img [ref=e363]
+                  - generic [ref=e366]: "Heures:"
+                  - generic [ref=e367]: 5h03m
+                  - generic [ref=e368]: / 6h30m
+                - generic [ref=e369]:
+                  - img [ref=e370]
+                  - generic [ref=e372]: "Séances:"
+                  - generic [ref=e373]: "5"
+                  - generic [ref=e374]: / 4
+                - generic [ref=e375]:
+                  - img [ref=e376]
+                  - generic [ref=e378]: "TSS (semaine):"
+                  - generic [ref=e379]: "333"
+                  - generic [ref=e380]: / 0
+            - generic [ref=e381]:
+              - generic [ref=e383]:
+                - generic [ref=e384]: Volume horaire
+                - generic [ref=e385]: 78%
+              - generic [ref=e390]:
+                - generic [ref=e391]: Charge TSS
+                - generic [ref=e392]: 0%
+              - generic [ref=e397]:
+                - generic [ref=e398]: Séances
+                - generic [ref=e399]: 125%
+            - generic [ref=e404]:
+              - generic [ref=e405]:
+                - generic [ref=e406]:
+                  - paragraph [ref=e407]: Lun
+                  - paragraph [ref=e408]: "8"
+                - generic [ref=e409]:
+                  - link "Course à pied dans l'après-midi Fait" [ref=e410] [cursor=pointer]:
+                    - /url: /workouts/5a3ba4ad-76cc-4d52-80e1-f29a7843eeda
+                    - generic [ref=e412]:
+                      - generic [ref=e415]: Course à pied dans l'après-midi
+                      - generic [ref=e416]: Fait
+                  - link "Entraînement aux poids dans l'après-midi Fait" [ref=e417] [cursor=pointer]:
+                    - /url: /workouts/5c8bb454-94ce-41d6-a162-0941a957f2f9
+                    - generic [ref=e419]:
+                      - generic [ref=e422]: Entraînement aux poids dans l'après-midi
+                      - generic [ref=e423]: Fait
+              - generic [ref=e424]:
+                - generic [ref=e425]:
+                  - paragraph [ref=e426]: Mar
+                  - paragraph [ref=e427]: "9"
+                - link "Sortie vélo dans l'après-midi Fait" [ref=e429] [cursor=pointer]:
+                  - /url: /workouts/ac34135a-4fcd-4c9e-bc87-e65007bf3cec
+                  - generic [ref=e431]:
+                    - generic [ref=e434]: Sortie vélo dans l'après-midi
+                    - generic [ref=e435]: Fait
+              - generic [ref=e436]:
+                - generic [ref=e437]:
+                  - paragraph [ref=e438]: Mer
+                  - paragraph [ref=e439]: "10"
+                - generic [ref=e440]:
+                  - link "Course à pied le matin Fait" [ref=e441] [cursor=pointer]:
+                    - /url: /workouts/e55cc075-bfc5-4b90-9f67-ff4e625443bd
+                    - generic [ref=e443]:
+                      - generic [ref=e446]: Course à pied le matin
+                      - generic [ref=e447]: Fait
+                  - link "Entraînement aux poids dans l'après-midi Fait" [ref=e448] [cursor=pointer]:
+                    - /url: /workouts/aa29d88f-bd5b-4efb-9b4d-36cd039db4a7
+                    - generic [ref=e450]:
+                      - generic [ref=e453]: Entraînement aux poids dans l'après-midi
+                      - generic [ref=e454]: Fait
+              - generic [ref=e455]:
+                - generic [ref=e456]:
+                  - paragraph [ref=e457]: Jeu
+                  - paragraph [ref=e458]: "11"
+                - link "Vélo - Récupération active Planifié Z1 Récup" [ref=e460] [cursor=pointer]:
+                  - /url: /workouts/c2fb8bd6-73cc-4a7b-bd03-844d5ed6bba0
+                  - generic [ref=e461]:
+                    - generic [ref=e462]:
+                      - generic [ref=e465]: Vélo - Récupération active
+                      - generic [ref=e466]: Planifié
+                    - generic [ref=e467]:
+                      - generic [ref=e468]: Z1
+                      - generic [ref=e469]: Récup
+              - generic [ref=e470]:
+                - generic [ref=e471]:
+                  - paragraph [ref=e472]: Ven
+                  - paragraph [ref=e473]: "12"
+                - link "Vélo - Intervalles FTP Planifié Z4 Seuil" [ref=e475] [cursor=pointer]:
+                  - /url: /workouts/baf7f5c2-9ddb-4c47-b9c9-00ff85ce77a3
+                  - generic [ref=e476]:
+                    - generic [ref=e477]:
+                      - generic [ref=e480]: Vélo - Intervalles FTP
+                      - generic [ref=e481]: Planifié
+                    - generic [ref=e482]:
+                      - generic [ref=e483]: Z4
+                      - generic [ref=e484]: Seuil
+              - generic [ref=e485]:
+                - generic [ref=e486]:
+                  - paragraph [ref=e487]: Sam
+                  - paragraph [ref=e488]: "13"
+                - link "Course à pied - Endurance fondamentale Planifié Z2 Endurance" [ref=e490] [cursor=pointer]:
+                  - /url: /workouts/e3816d90-6540-4dcf-b674-d41de906f568
+                  - generic [ref=e491]:
+                    - generic [ref=e492]:
+                      - generic [ref=e495]: Course à pied - Endurance fondamentale
+                      - generic [ref=e496]: Planifié
+                    - generic [ref=e497]:
+                      - generic [ref=e498]: Z2
+                      - generic [ref=e499]: Endurance
+              - generic [ref=e500]:
+                - generic [ref=e501]:
+                  - paragraph [ref=e502]: Dim
+                  - paragraph [ref=e503]: "14"
+                  - generic [ref=e552]:
+                    - img [ref=e553]
+                    - generic [ref=e559]: 26° / 17°
+                - link "Vélo - Endurance longue Planifié Z2 Endurance" [ref=e506] [cursor=pointer]:
+                  - /url: /workouts/752bdad6-983a-4ad6-b549-b7535f7de661
+                  - generic [ref=e507]:
+                    - generic [ref=e508]:
+                      - generic [ref=e511]: Vélo - Endurance longue
+                      - generic [ref=e512]: Planifié
+                    - generic [ref=e513]:
+                      - generic [ref=e514]: Z2
+                      - generic [ref=e515]: Endurance
+  - generic [ref=e516]: "-25"
