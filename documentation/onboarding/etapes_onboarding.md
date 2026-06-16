@@ -1,6 +1,6 @@
 # Étapes d'onboarding — MVP
 
-Sports couverts : Course à pied, Vélo, Marche, Randonnée, Ski alpin, Ski de fond, Musculation, Autre
+Sports couverts : Course à pied, Vélo, VTT, Marche, Randonnée, Ski alpin, Ski de fond, Musculation, Autre
 
 ---
 
@@ -41,17 +41,18 @@ Utiles pour tous les sports sans capteur de puissance (marche, rando, ski, muscu
 
 ## Étape 3 — Sports pratiqués
 
-Sélection parmi les 8 sports MVP + niveau autodéclaré.
+Sélection parmi les 9 sports MVP + niveau autodéclaré.
 
 | Donnée              | Type                                                   | Obligatoire | Utilité                                             |
 | ------------------- | ------------------------------------------------------ | ----------- | --------------------------------------------------- |
-| Sports sélectionnés | Multi-choix (8 sports)                                 | Oui (≥ 1)   | Détermine les étapes suivantes et le contexte coach |
+| Sports sélectionnés | Multi-choix (9 sports)                                 | Oui (≥ 1)   | Détermine les étapes suivantes et le contexte coach |
 | Niveau par sport    | Découverte / Débutant / Intermédiaire / Avancé / Élite | Oui         | Personnalisation des conseils et valeurs par défaut |
 
 **Sports MVP à proposer :**
 
 - Course à pied
 - Vélo
+- VTT
 - Marche
 - Randonnée
 - Ski alpin
@@ -89,6 +90,18 @@ Les descriptions sont rédigées en "Je..." pour que l'utilisateur se reconnaiss
 | Intermédiaire | Je roule régulièrement et j'ai déjà participé à un événement cycliste. Je suis à l'aise sur de longues sorties. |
 | Avancé        | Je m'entraîne de façon structurée et je participe régulièrement à des événements cyclistes exigeants.           |
 | Élite         | Je m'entraîne quotidiennement et je participe à des compétitions de haut niveau.                                |
+
+---
+
+#### VTT
+
+| Niveau        | Description                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Découverte    | Je n'ai jamais fait de VTT ou je commence tout juste à rouler sur des chemins.                                          |
+| Débutant      | Je roule sur des sentiers faciles et balisés, j'apprends à gérer le terrain varié.                                      |
+| Intermédiaire | Je roule régulièrement sur des chemins techniques, j'ai déjà participé à une sortie ou un événement VTT.                |
+| Avancé        | Je m'entraîne avec un programme, je gère les terrains engagés et je participe à des courses ou enduro.                  |
+| Élite         | Je m'entraîne quotidiennement sur tous types de terrain et je participe à des compétitions de haut niveau (XCO, DH...). |
 
 ---
 
@@ -160,12 +173,13 @@ Pas de choix de niveau — "Autre" regroupe des activités trop diverses pour d�
 
 ## Étape 4 — Seuils de performance (conditionnel)
 
-Affiché uniquement si l'athlète a sélectionné Course à pied ou Vélo.
+Affiché uniquement si l'athlète a sélectionné Course à pied, Vélo ou VTT.
 
 **Comportement TSS pour les autres sports — confirmé dans le code :**
 
 | Sport       | Méthode prioritaire                                                           | Fallback 1     | Fallback 2 (durée fixe) |
 | ----------- | ----------------------------------------------------------------------------- | -------------- | ----------------------- |
+| VTT         | TSS puissance (si capteur de puissance + FTP)                                 | hrTSS (FC)     | RPE / 50 TSS/h          |
 | Marche      | hrTSS (FC)                                                                    | RPE            | 30 TSS/h                |
 | Randonnée   | hrTSS (FC)                                                                    | RPE            | 40 TSS/h                |
 | Ski alpin   | hrTSS (FC)                                                                    | RPE            | 45 TSS/h                |
@@ -204,11 +218,13 @@ Affiché uniquement si l'athlète a sélectionné Course à pied ou Vélo.
 
 ---
 
-### Si Vélo sélectionné
+### Si Vélo ou VTT sélectionné
 
 | Donnée      | Type          | Obligatoire | Utilité                                       |
 | ----------- | ------------- | ----------- | --------------------------------------------- |
 | FTP (watts) | Nombre entier | Non         | Calcul TSS puissance (Normalized Power / FTP) |
+
+> Pour le VTT, le FTP est utile uniquement si l'utilisateur dispose d'un capteur de puissance. Sans capteur, le hrTSS est utilisé automatiquement.
 
 > Si FTP absent : pas de TSS puissance, calcul via hrTSS + avertissement imprécision affiché.
 
@@ -309,13 +325,36 @@ Plusieurs objectifs peuvent être renseignés (ex : une compétition ET un objec
 
 L'utilisateur vise une épreuve datée. Le coach peut périodiser (build → peak → taper) et cibler des allures / puissances.
 
-**Champs communs à tous les événements :**
+**Champs toujours présents :**
 
-| Donnée              | Type  | Obligatoire | Utilité                                          |
-| ------------------- | ----- | ----------- | ------------------------------------------------ |
-| Nom de l'événement  | Texte | Non         | Affiché dans le dashboard et contexte coach      |
-| Date de l'événement | Date  | Oui         | Calcul du temps restant, périodisation           |
-| Temps objectif      | Texte | Non         | Personnalisation des allures / puissances cibles |
+| Donnée              | Type  | Obligatoire | Utilité                                     |
+| ------------------- | ----- | ----------- | ------------------------------------------- |
+| Nom de l'événement  | Texte | Non         | Affiché dans le dashboard et contexte coach |
+| Date de l'événement | Date  | Oui         | Calcul du temps restant, périodisation      |
+
+**Champs adaptatifs — apparaissent selon l'épreuve choisie :**
+
+| Épreuve(s)                                                                        | Champs supplémentaires affichés                                           |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 5 km, 10 km, Semi-marathon, Marathon                                              | Temps cible (ex : 3h30)                                                   |
+| Ultra-trail / Trail                                                               | Distance (km) · Dénivelé (m D+) · Temps cible                             |
+| Cyclosportive, Gran Fondo                                                         | Distance (km) · Dénivelé (m D+) · Temps cible                             |
+| Gravel event                                                                      | Distance (km) · Dénivelé (m D+)                                           |
+| Course sur route (vélo)                                                           | Distance (km, optionnel) · Temps cible                                    |
+| Enduro, Descente VTT                                                              | _(aucun champ supplémentaire)_                                            |
+| XCO (cross-country olympique)                                                     | Distance (km, optionnel)                                                  |
+| Marathon VTT                                                                      | Distance (km) · Dénivelé (m D+)                                           |
+| Marche nordique compétition                                                       | Distance (km) · Dénivelé (m D+)                                           |
+| Marche athlétique                                                                 | Distance (km)                                                             |
+| Randonnée sportive chronométrée, Haute randonnée, Skyrace                         | Distance (km) · Dénivelé (m D+)                                           |
+| Raid                                                                              | Distance (km) · Dénivelé (m D+) · Durée (jours, optionnel)               |
+| Trek multi-jours                                                                  | Distance (km) · Dénivelé (m D+) · Durée (jours, optionnel)               |
+| Descente chronométrée, Compétition de ski alpin                                   | _(aucun champ supplémentaire)_                                            |
+| Skiathlon, Course de ski de fond                                                  | Distance (km) · Dénivelé (m D+)                                           |
+| Marathon nordique (ex : Vasaloppet)                                               | Distance (km) · Dénivelé (m D+) · Temps cible                             |
+| Compétition de powerlifting, Haltérophilie                                        | Charge cible (kg)                                                         |
+| Compétition de force athlétique                                                   | Catégorie de poids (kg, optionnel)                                        |
+| Autre                                                                             | Distance (km) · Dénivelé (m D+) · Temps cible _(tous optionnels)_        |
 
 **Liste des épreuves proposées (filtrées selon les sports choisis à l'étape 3) :**
 
@@ -323,6 +362,7 @@ L'utilisateur vise une épreuve datée. Le coach peut périodiser (build → pea
 | ------------- | ------------------------------------------------------------------------------- |
 | Course à pied | 5 km, 10 km, Semi-marathon, Marathon, Ultra-trail / Trail                       |
 | Vélo          | Cyclosportive, Gran Fondo, Gravel event, Course sur route                       |
+| VTT           | Enduro, XCO (cross-country olympique), Marathon VTT, Descente VTT               |
 | Marche        | Marche nordique compétition, Marche athlétique, Randonnée sportive chronométrée |
 | Randonnée     | Raid, Trek multi-jours, Haute randonnée, Skyrace / Ultra-trail rando            |
 | Ski alpin     | Descente chronométrée, Compétition de ski alpin                                 |
@@ -336,26 +376,60 @@ L'utilisateur vise une épreuve datée. Le coach peut périodiser (build → pea
 
 L'utilisateur vise un cap personnel mesurable, sans compétition. Le coach structure les entraînements pour atteindre cet objectif progressivement.
 
-**Champs :**
+**Champs toujours présents :**
 
 | Donnée          | Type  | Obligatoire | Utilité                                                |
 | --------------- | ----- | ----------- | ------------------------------------------------------ |
 | Objectif choisi | Liste | Oui         | Contexte coach, choix des séances adaptées             |
-| Précision       | Texte | Non         | Détail libre (ex : "courir 5 km sous 30 min")          |
 | Date cible      | Date  | Non         | "Avant le…" — échéance souhaitée sans épreuve formelle |
+
+**Champs adaptatifs — apparaissent selon l'objectif choisi :**
+
+| Objectif                                                    | Champs supplémentaires affichés                                                          |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Courir X km sans m'arrêter                                  | Distance cible (km) — obligatoire                                                        |
+| Terminer mon premier 5 / 10 km                              | Distance (5 ou 10 km, optionnel)                                                         |
+| Améliorer mon allure sur X km                               | Distance (km) · Allure cible (min/km, ex : 5:30)                                         |
+| Courir régulièrement X fois/semaine                         | Séances par semaine — obligatoire · Durée min par séance (min, optionnel)                |
+| Faire X km d'une traite (vélo)                              | Distance cible (km) — obligatoire · Dénivelé (m D+)                                     |
+| Gravir un col / dénivelé cible                              | Dénivelé cible (m D+) · Précision : "Nom du col ou parcours"                             |
+| Améliorer mon FTP                                           | FTP cible (watts, ex : 280)                                                              |
+| Rouler en extérieur pour la 1ère fois                       | _(aucun — milestone)_                                                                    |
+| Rouler ma première sortie technique (VTT)                   | _(aucun — milestone)_                                                                    |
+| Enchaîner X km de single track                              | Distance cible (km) — obligatoire · Dénivelé (m D+)                                     |
+| Descendre une piste noire / rouge                           | _(aucun — milestone)_                                                                    |
+| Améliorer ma technique en descente (VTT)                    | _(aucun — général)_                                                                      |
+| Marcher X km d'une traite                                   | Distance cible (km) — obligatoire · Dénivelé (m D+)                                     |
+| Marcher X fois par semaine                                  | Sorties par semaine — obligatoire · Durée par sortie (min, optionnel)                    |
+| Améliorer mon endurance à la marche                         | _(aucun — général)_                                                                      |
+| Réaliser une randonnée de X km / X m de D+                  | Distance (km) · Dénivelé (m D+)                                                          |
+| Porter un sac autonome sur plusieurs jours                  | Durée (jours) — obligatoire · Poids du sac (kg, optionnel)                               |
+| Faire ma première haute randonnée                           | _(aucun — milestone)_                                                                    |
+| Passer sur des pistes noires                                | _(aucun — milestone)_                                                                    |
+| Skier hors-piste pour la 1ère fois                          | _(aucun — milestone)_                                                                    |
+| Améliorer ma technique de virage                            | _(aucun — général)_                                                                      |
+| Faire une sortie de X km (ski de fond)                      | Distance cible (km) — obligatoire · Dénivelé (m D+, optionnel)                          |
+| Maîtriser la technique skating / classique                  | _(aucun — général)_                                                                      |
+| Faire X pompes / tractions d'affilée                        | Nombre de répétitions — obligatoire · Précision : "Exercice ciblé (pompes, tractions...)" |
+| Soulever X kg (développé couché / squat / soulevé de terre) | Charge cible (kg) — obligatoire · Précision : "Exercice ciblé (ex : squat)"              |
+| Tenir une planche X secondes                                | Durée cible (secondes) — obligatoire                                                     |
+| Autre                                                       | Précision libre                                                                          |
 
 **Liste des objectifs proposés (filtrés selon les sports choisis à l'étape 3) :**
 
-| Sport         | Objectifs disponibles                                                                                                            |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Course à pied | Courir X km sans m'arrêter, Terminer mon premier 5 / 10 km, Améliorer mon allure sur X km, Courir régulièrement X fois/semaine   |
-| Vélo          | Faire X km d'une traite, Gravir un col / dénivelé cible, Améliorer mon FTP, Rouler en extérieur pour la 1ère fois                |
-| Marche        | Marcher X km d'une traite, Marcher X fois par semaine, Améliorer mon endurance à la marche                                       |
-| Randonnée     | Réaliser une randonnée de X km / X m de D+, Porter un sac autonome sur plusieurs jours, Faire ma première haute randonnée        |
-| Ski alpin     | Passer sur des pistes noires, Skier hors-piste pour la 1ère fois, Améliorer ma technique de virage                               |
-| Ski de fond   | Faire une sortie de X km, Maîtriser la technique skating, Maîtriser la technique classique                                       |
-| Musculation   | Faire X pompes / tractions d'affilée, Soulever X kg au développé couché / squat / soulevé de terre, Tenir une planche X secondes |
-| Autre         | → champ libre "Décrivez votre objectif"                                                                                          |
+| Sport         | Objectifs disponibles                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Course à pied | Courir X km sans m'arrêter, Terminer mon premier 5 / 10 km, Améliorer mon allure sur X km, Courir régulièrement X fois/semaine             |
+| Vélo          | Faire X km d'une traite, Gravir un col / dénivelé cible, Améliorer mon FTP, Rouler en extérieur pour la 1ère fois                          |
+| VTT           | Rouler ma première sortie technique, Enchaîner X km de single track, Descendre une piste noire / rouge, Améliorer ma technique en descente |
+| Marche        | Marcher X km d'une traite, Marcher X fois par semaine, Améliorer mon endurance à la marche                                                 |
+| Randonnée     | Réaliser une randonnée de X km / X m de D+, Porter un sac autonome sur plusieurs jours, Faire ma première haute randonnée                  |
+| Ski alpin     | Passer sur des pistes noires, Skier hors-piste pour la 1ère fois, Améliorer ma technique de virage                                         |
+| Ski de fond   | Faire une sortie de X km, Maîtriser la technique skating, Maîtriser la technique classique                                                 |
+| Musculation   | Faire X pompes / tractions d'affilée, Soulever X kg au développé couché / squat / soulevé de terre, Tenir une planche X secondes           |
+| Autre         | → champ libre "Décrivez votre objectif"                                                                                                    |
+
+> **Note d'implémentation :** les champs adaptatifs sont stockés dans une colonne `metadata JSONB` sur la table `objectives`. Le coach IA reçoit ces données structurées dans le prompt d'analyse (ex : distance 160 km pour une cyclosportive → récupération 14 jours vs 50 km → 7 jours).
 
 ---
 
@@ -474,14 +548,14 @@ L'utilisateur n'est jamais bloqué — il peut ignorer les alertes et continuer.
 
 ## Résumé des étapes
 
-| #   | Étape                  | Obligatoire        | Conditionnel                    |
-| --- | ---------------------- | ------------------ | ------------------------------- |
-| 1   | Profil de base         | Oui                | Non                             |
-| 2   | Données cardiaques     | Oui (FC max)       | Non                             |
-| 3   | Sports pratiqués       | Oui                | Non                             |
-| 4   | Seuils de performance  | Non                | Oui (course, vélo, ski de fond) |
-| 5   | Disponibilité & volume | Oui                | Non                             |
-| 6   | Objectif(s)            | Oui (≥ 1 objectif) | Non                             |
+| #   | Étape                  | Obligatoire        | Conditionnel            |
+| --- | ---------------------- | ------------------ | ----------------------- |
+| 1   | Profil de base         | Oui                | Non                     |
+| 2   | Données cardiaques     | Oui (FC max)       | Non                     |
+| 3   | Sports pratiqués       | Oui                | Non                     |
+| 4   | Seuils de performance  | Non                | Oui (course, vélo, VTT) |
+| 5   | Disponibilité & volume | Oui                | Non                     |
+| 6   | Objectif(s)            | Oui (≥ 1 objectif) | Non                     |
 
 ---
 

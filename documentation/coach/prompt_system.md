@@ -35,6 +35,7 @@ Deux objectifs datés dont les fenêtres de préparation se recoupent significat
 | 10 km ou moins | 1–2 semaines |
 | Cyclosportive longue (> 150 km) | 2–3 semaines |
 | Cyclosportive courte | 1 semaine |
+| Enduro VTT / Marathon VTT | 1–2 semaines |
 | Raid / Trek multi-jours | 2–4 semaines selon durée |
 | Compétition de powerlifting | 2–3 semaines |
 | Ski de fond (marathon nordique) | 1–2 semaines |
@@ -86,6 +87,7 @@ Certains objectifs impliquent un volume minimal réaliste.
 | Marathon (performance) | 10–15h |
 | Semi-marathon | 4–6h |
 | Cyclosportive longue | 6–10h |
+| Marathon VTT / Enduro | 5–8h |
 | Ultra-trail | 10h+ |
 | Powerlifting | 4–6h |
 | Objectif santé / bien-être | 2–3h |

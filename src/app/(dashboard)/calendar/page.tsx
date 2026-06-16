@@ -43,7 +43,7 @@ import { useWeatherForecast } from "@/lib/hooks/useWeatherForecast";
 interface Objective {
   id: string;
   name: string;
-  event_date: string;
+  event_date: string | null;
   priority: "A" | "B" | "C";
 }
 

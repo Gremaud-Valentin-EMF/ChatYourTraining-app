@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -61,7 +61,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
+
   const supabase = useMemo(() => createClient(), []);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileInfo, setProfileInfo] = useState<{
@@ -73,7 +73,7 @@ export default function DashboardLayout({
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push("/login");
+    window.location.assign("/login");
   };
 
   useEffect(() => {

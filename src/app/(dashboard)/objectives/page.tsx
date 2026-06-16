@@ -18,8 +18,8 @@ import { cn } from "@/lib/utils";
 interface Objective {
   id: string;
   name: string;
-  event_date: string;
-  event_type: string;
+  event_date: string | null;
+  event_type: string | null;
   priority: "A" | "B" | "C";
   target_time: string | null;
   notes: string | null;
@@ -114,8 +114,11 @@ export default function ObjectivesPage() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return [...objectives].sort((a, b) => {
-      const aDate = new Date(a.event_date);
-      const bDate = new Date(b.event_date);
+      const aDate = a.event_date ? new Date(a.event_date) : null;
+      const bDate = b.event_date ? new Date(b.event_date) : null;
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
       const aFuture = aDate >= now;
       const bFuture = bDate >= now;
       if (aFuture && !bFuture) return -1;
@@ -127,11 +130,11 @@ export default function ObjectivesPage() {
   const stats = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    const active = objectives.filter((o) => new Date(o.event_date) >= now);
+    const active = objectives.filter((o) => o.event_date && new Date(o.event_date) >= now);
     const next = active.length > 0
       ? active.reduce((closest, o) => {
-          const d = new Date(o.event_date);
-          const c = new Date(closest.event_date);
+          const d = new Date(o.event_date!);
+          const c = new Date(closest.event_date!);
           return d < c ? o : closest;
         })
       : null;
@@ -148,8 +151,8 @@ export default function ObjectivesPage() {
     setEditingId(obj.id);
     setForm({
       name: obj.name,
-      event_type: obj.event_type,
-      event_date: obj.event_date,
+      event_type: obj.event_type || "",
+      event_date: obj.event_date || "",
       priority: obj.priority,
       target_time: obj.target_time || "",
       notes: obj.notes || "",
@@ -264,7 +267,7 @@ export default function ObjectivesPage() {
             {stats.next ? (
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold truncate">{stats.next.name}</p>
-                <Badge variant="outline" size="sm">{getCountdown(stats.next.event_date)}</Badge>
+                {stats.next.event_date && <Badge variant="outline" size="sm">{getCountdown(stats.next.event_date)}</Badge>}
               </div>
             ) : (
               <p className="text-sm text-muted">Aucun objectif</p>
@@ -289,7 +292,7 @@ export default function ObjectivesPage() {
       ) : (
         <div className="space-y-3">
           {sortedObjectives.map((obj) => {
-            const countdown = getCountdown(obj.event_date);
+            const countdown = obj.event_date ? getCountdown(obj.event_date) : null;
             const isPast = countdown === "Passé";
             return (
               <Card
@@ -311,9 +314,9 @@ export default function ObjectivesPage() {
                       <Badge variant="outline" size="sm">{countdown}</Badge>
                     </div>
                     <div className="mt-1 flex items-center gap-3 text-sm text-muted">
-                      <span>{obj.event_type}</span>
-                      <span>•</span>
-                      <span>{formatDate(obj.event_date)}</span>
+                      {obj.event_type && <span>{obj.event_type}</span>}
+                      {obj.event_type && obj.event_date && <span>•</span>}
+                      {obj.event_date && <span>{formatDate(obj.event_date)}</span>}
                       {obj.target_time && (
                         <>
                           <span>•</span>

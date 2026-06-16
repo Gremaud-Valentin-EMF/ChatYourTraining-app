@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { MessageSquare, X } from "lucide-react";
 import { Spinner } from "@/components/ui";
 import {
   TrainingLoadChart,
@@ -72,6 +75,53 @@ interface DailyMetric {
   sleep_duration_minutes?: number | null;
   sleep_score?: number | null;
   strain?: number | null;
+}
+
+function WelcomeBanner({ name }: { name: string }) {
+  const searchParams = useSearchParams();
+  const [dismissed, setDismissed] = useState(false);
+
+  const showWelcome = searchParams.get("welcome") === "1";
+
+  useEffect(() => {
+    if (sessionStorage.getItem("welcome_shown")) setDismissed(true);
+  }, []);
+
+  const dismiss = () => {
+    sessionStorage.setItem("welcome_shown", "1");
+    setDismissed(true);
+  };
+
+  if (!showWelcome || dismissed) return null;
+
+  return (
+    <div className="relative flex items-center justify-between gap-4 p-4 bg-accent/10 border border-accent/30 rounded-2xl">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-accent/20 rounded-xl shrink-0">
+          <MessageSquare className="h-5 w-5 text-accent" />
+        </div>
+        <div>
+          <p className="font-semibold text-sm">
+            Bienvenue{name ? `, ${name}` : ""} !
+          </p>
+          <p className="text-xs text-muted">
+            Votre profil est prêt — votre coach IA peut maintenant personnaliser vos conseils.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Link
+          href="/chat"
+          className="text-xs font-medium px-3 py-1.5 bg-accent text-dark rounded-lg hover:bg-accent/90 transition-colors"
+        >
+          Parler à votre coach
+        </Link>
+        <button onClick={dismiss} className="p-1 text-muted hover:text-foreground transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -813,6 +863,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <Suspense fallback={null}>
+        <WelcomeBanner name={userData?.fullName?.split(" ")[0] ?? ""} />
+      </Suspense>
+
       {/* Header */}
       {/* <div className="mb-8">
         <h1 className="text-2xl font-bold mb-1">Bonjour, {firstName} 👋</h1>
