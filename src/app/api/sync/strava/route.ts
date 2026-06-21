@@ -19,6 +19,7 @@ import {
   SyncLockError,
   SyncState,
 } from "@/lib/integrations/sync-helpers";
+import { decrypt, encrypt } from "@/lib/crypto/tokens";
 
 export async function POST() {
   const supabase = await createClient();
@@ -91,21 +92,33 @@ export async function POST() {
       });
     }
 
-    let accessToken = integration.access_token;
+    // Déchiffrer le token (graceful fallback pour les tokens stockés en clair avant migration)
+    let accessToken: string;
+    try {
+      accessToken = decrypt(integration.access_token);
+    } catch {
+      accessToken = integration.access_token;
+    }
 
     // Check if token is expired and refresh if needed
     const tokenExpiry = new Date(integration.token_expires_at);
     if (tokenExpiry < new Date()) {
       try {
-        const newTokens = await refreshTokens(integration.refresh_token);
+        let refreshToken: string;
+        try {
+          refreshToken = decrypt(integration.refresh_token);
+        } catch {
+          refreshToken = integration.refresh_token;
+        }
+        const newTokens = await refreshTokens(refreshToken);
         accessToken = newTokens.access_token;
 
-        // Update tokens in database
+        // Re-chiffrer et stocker les nouveaux tokens
         await (supabase as any)
           .from("integrations")
           .update({
-            access_token: newTokens.access_token,
-            refresh_token: newTokens.refresh_token,
+            access_token: encrypt(newTokens.access_token),
+            refresh_token: encrypt(newTokens.refresh_token),
             token_expires_at: new Date(
               newTokens.expires_at * 1000
             ).toISOString(),

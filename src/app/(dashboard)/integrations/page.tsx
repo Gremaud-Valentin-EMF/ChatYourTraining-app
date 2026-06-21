@@ -165,15 +165,39 @@ function IntegrationsPageContent() {
   const [preferences, setPreferences] = useState<IntegrationPreference[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
+  const [syncNotif, setSyncNotif] = useState<{ count: number } | null>(null);
+  const [isSyncingInitial, setIsSyncingInitial] = useState(false);
 
-  // Get error from URL params
+  // Get URL params
   const urlError = searchParams.get("error");
   const urlErrorDescription = searchParams.get("error_description");
+  const urlConnected = searchParams.get("connected");
+  const urlCancelled = searchParams.get("cancelled");
 
   useEffect(() => {
-    loadIntegrations();
+    loadIntegrations().then(() => {
+      if (urlConnected === "strava") {
+        triggerInitialSync();
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const triggerInitialSync = async () => {
+    setIsSyncingInitial(true);
+    try {
+      const res = await fetch("/api/sync/strava", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setSyncNotif({ count: data.synced ?? 0 });
+        await loadIntegrations();
+      }
+    } catch {
+      // Non-bloquant : la connexion est réussie même si le sync échoue
+    } finally {
+      setIsSyncingInitial(false);
+    }
+  };
 
   const loadIntegrations = async () => {
     setIsLoading(true);
@@ -220,9 +244,11 @@ function IntegrationsPageContent() {
         alert("NEXT_PUBLIC_STRAVA_CLIENT_ID n'est pas configuré");
         return;
       }
+      // Générer un state CSRF et le stocker dans un cookie lisible par le serveur
+      const state = crypto.randomUUID();
+      document.cookie = `strava_oauth_state=${state}; SameSite=Lax; Path=/; Max-Age=600`;
       const scope = "activity:read_all,profile:read_all";
-      const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${callbackUrl}&response_type=code&scope=${scope}`;
-      console.log("Strava OAuth URL:", url);
+      const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${callbackUrl}&response_type=code&scope=${scope}&state=${state}`;
       window.location.href = url;
     } else if (provider === "whoop") {
       const clientId = process.env.NEXT_PUBLIC_WHOOP_CLIENT_ID;
@@ -406,6 +432,36 @@ function IntegrationsPageContent() {
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Connexion Strava réussie + import initial */}
+      {urlConnected === "strava" && (
+        <div className="p-4 bg-success/10 border border-success/30 rounded-xl flex items-start gap-3">
+          <Activity className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-success">Strava connecté avec succès !</p>
+            {isSyncingInitial ? (
+              <p className="text-sm text-muted mt-1 flex items-center gap-2">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Import des activités en cours…
+              </p>
+            ) : syncNotif !== null ? (
+              <p className="text-sm text-muted mt-1">
+                {syncNotif.count} activité{syncNotif.count !== 1 ? "s" : ""} importée{syncNotif.count !== 1 ? "s" : ""}.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Connexion annulée par l'utilisateur */}
+      {urlCancelled === "strava" && (
+        <div className="p-4 bg-dark-100 border border-dark-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-muted flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-muted">
+            Connexion annulée. Vous pouvez connecter Strava à tout moment.
+          </p>
         </div>
       )}
 
