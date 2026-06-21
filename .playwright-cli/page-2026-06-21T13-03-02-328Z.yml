@@ -1,0 +1,55 @@
+- generic [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - generic [ref=e11]: ChatYourTraining
+      - heading "Configuration de votre profil" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Étape 3 sur 6
+    - generic [ref=e79]:
+      - generic [ref=e80]:
+        - img [ref=e82]
+        - generic [ref=e84]:
+          - heading "Sports pratiqués" [level=2] [ref=e85]
+          - paragraph [ref=e86]: Sélectionnez vos disciplines
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - button "Sports pédestres" [ref=e89] [cursor=pointer]:
+            - generic [ref=e90]: Sports pédestres
+          - button "Sports cyclistes" [ref=e92] [cursor=pointer]:
+            - generic [ref=e93]: Sports cyclistes
+          - button "Sports d'hiver" [ref=e94] [cursor=pointer]:
+            - generic [ref=e95]: Sports d'hiver
+          - button "Salle & Fitness" [ref=e96] [cursor=pointer]:
+            - generic [ref=e97]: Salle & Fitness
+          - button "Autres sports" [ref=e98] [cursor=pointer]:
+            - generic [ref=e99]: Autres sports
+        - generic [ref=e101]:
+          - button "Course à pied Niveau Intermédiaire" [active] [ref=e129] [cursor=pointer]:
+            - generic [ref=e103]:
+              - generic [ref=e104]:
+                - img [ref=e106]
+                - generic [ref=e108]: Course à pied
+              - img [ref=e131]
+            - generic [ref=e133]:
+              - generic [ref=e134]: Niveau
+              - button "Intermédiaire" [ref=e137]:
+                - text: Intermédiaire
+                - img [ref=e138]
+          - button "Marche" [ref=e109] [cursor=pointer]:
+            - generic [ref=e111]:
+              - img [ref=e113]
+              - generic [ref=e116]: Marche
+          - button "Randonnée" [ref=e117] [cursor=pointer]:
+            - generic [ref=e119]:
+              - img [ref=e121]
+              - generic [ref=e124]: Randonnée
+    - generic [ref=e47]:
+      - button "Retour" [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+        - text: Retour
+      - button "Continuer" [ref=e51] [cursor=pointer]:
+        - text: Continuer
+        - img [ref=e52]
+    - button "Passer et configurer plus tard" [ref=e55] [cursor=pointer]
+  - alert [ref=e56]

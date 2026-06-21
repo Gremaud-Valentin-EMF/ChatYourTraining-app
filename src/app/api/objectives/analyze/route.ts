@@ -172,13 +172,13 @@ function detectRecoveryConflicts(objectives: ObjectiveItem[]): Alert[] {
           message: `Récupération insuffisante : "${first}" et "${second}" sont séparés de ${gap} jours, mais le délai minimum est de ${required} jours${crossNote}. Il manque ${missing} jour${missing > 1 ? "s" : ""}. Risque élevé de sous-performance et de blessure sur la seconde épreuve.`,
         });
       } else if (gap < required * 1.5) {
-        const missing = required - gap;
-        const crossNote = crossSport ? ` (délai réduit à 75% car sports différents)` : "";
+        const comfortable = Math.round(required * 1.5);
+        const crossNote = crossSport ? ` (sports différents — délai réduit à 75%)` : "";
         alerts.push({
           rule: "RÈGLE_1",
           level: "warning",
           events: [ra.label, rb.label],
-          message: `Délai serré : "${first}" et "${second}" sont séparés de ${gap} jours (minimum recommandé : ${required} jours${crossNote}, soit ${missing} jour${missing > 1 ? "s" : ""} manquants). La récupération sera possible mais la préparation de la seconde épreuve sera contrainte.`,
+          message: `Délai serré : "${first}" et "${second}" sont séparés de ${gap} jours${crossNote}. Le minimum requis (${required} jours) est respecté, mais la zone de confort recommandée est de ${comfortable} jours. La récupération sera possible mais la préparation de la seconde épreuve sera contrainte.`,
         });
       }
     }

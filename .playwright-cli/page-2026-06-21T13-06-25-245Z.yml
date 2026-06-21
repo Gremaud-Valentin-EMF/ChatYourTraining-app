@@ -1,0 +1,44 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - generic [ref=e11]: ChatYourTraining
+      - heading "Configuration de votre profil" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Étape 6 sur 6
+    - generic [ref=e256]:
+      - generic [ref=e257]:
+        - img [ref=e259]
+        - generic [ref=e261]:
+          - heading "Vos objectifs" [level=2] [ref=e262]
+          - paragraph [ref=e263]: Au moins un objectif pour guider votre coach
+      - generic [ref=e592]:
+        - generic [ref=e593]:
+          - generic [ref=e594]:
+            - generic [ref=e595]:
+              - generic [ref=e596]: Marathon
+              - generic [ref=e597]: Moyenne
+              - generic [ref=e598]: Compétition
+            - paragraph [ref=e599]: "Événement : 2026-08-30"
+          - button [ref=e600] [cursor=pointer]:
+            - img [ref=e601]
+        - generic [ref=e688]:
+          - generic [ref=e689]:
+            - generic [ref=e690]:
+              - generic [ref=e691]: Marathon
+              - generic [ref=e692]: Moyenne
+              - generic [ref=e693]: Compétition
+            - paragraph [ref=e694]: "Événement : 2026-09-03"
+          - button [ref=e695] [cursor=pointer]:
+            - img [ref=e696]
+      - button "Ajouter un objectif" [ref=e264] [cursor=pointer]:
+        - img [ref=e265]
+        - text: Ajouter un objectif
+    - generic [ref=e47]:
+      - button "Retour" [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+        - text: Retour
+      - button "Terminer" [disabled] [ref=e267]:
+        - img [ref=e699]
+        - text: Terminer
+  - alert [ref=e56]

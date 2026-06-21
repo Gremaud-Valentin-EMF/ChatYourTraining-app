@@ -1,0 +1,33 @@
+- generic [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - generic [ref=e11]: ChatYourTraining
+      - heading "Configuration de votre profil" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Étape 2 sur 5
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - img [ref=e60]
+        - generic [ref=e62]:
+          - heading "Données cardiaques" [level=2] [ref=e63]
+          - paragraph [ref=e64]: Pour calibrer vos zones d'entraînement
+      - generic [ref=e65]:
+        - generic [ref=e67]:
+          - generic [ref=e68]: FC max (bpm)
+          - spinbutton "FC max (bpm)" [ref=e70]
+          - paragraph [ref=e71]: Fréquence cardiaque maximale
+        - generic [ref=e73]:
+          - generic [ref=e74]: LTHR (bpm)
+          - spinbutton "LTHR (bpm)" [ref=e76]
+          - paragraph [ref=e77]: Fréquence au seuil lactique
+      - generic [ref=e78]: Vous ne connaissez pas ces valeurs ? Pas de problème — votre coach IA pourra vous proposer un test adapté pour les déterminer.
+    - generic [ref=e47]:
+      - button "Retour" [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+        - text: Retour
+      - button "Continuer" [active] [ref=e51] [cursor=pointer]:
+        - text: Continuer
+        - img [ref=e52]
+    - button "Passer et configurer plus tard" [ref=e55] [cursor=pointer]
+  - alert [ref=e56]

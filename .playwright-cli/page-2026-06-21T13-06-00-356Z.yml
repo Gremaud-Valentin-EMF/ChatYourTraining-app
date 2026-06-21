@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - generic [ref=e11]: ChatYourTraining
+      - heading "Configuration de votre profil" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Étape 6 sur 6
+    - generic [ref=e256]:
+      - generic [ref=e257]:
+        - img [ref=e259]
+        - generic [ref=e261]:
+          - heading "Vos objectifs" [level=2] [ref=e262]
+          - paragraph [ref=e263]: Au moins un objectif pour guider votre coach
+      - generic [ref=e593]:
+        - generic [ref=e594]:
+          - generic [ref=e595]:
+            - generic [ref=e596]: Marathon
+            - generic [ref=e597]: Moyenne
+            - generic [ref=e598]: Compétition
+          - paragraph [ref=e599]: "Événement : 2026-08-30"
+        - button [ref=e600] [cursor=pointer]:
+          - img [ref=e601]
+      - button "Ajouter un objectif" [ref=e264] [cursor=pointer]:
+        - img [ref=e265]
+        - text: Ajouter un objectif
+    - generic [ref=e47]:
+      - button "Retour" [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+        - text: Retour
+      - button "Terminer" [ref=e267] [cursor=pointer]:
+        - text: Terminer
+        - img [ref=e268]
+  - alert [ref=e56]
+  - generic [ref=e606]:
+    - generic [ref=e607]:
+      - heading "Détails de l'objectif" [level=2] [ref=e649]
+      - button "Fermer" [ref=e610] [cursor=pointer]
+    - generic [ref=e650]:
+      - button "Changer de type" [ref=e651] [cursor=pointer]:
+        - img [ref=e652]
+        - text: Changer de type
+      - generic [ref=e654]:
+        - generic [ref=e655]: Objectif
+        - generic [ref=e656]:
+          - button "5 km" [ref=e657] [cursor=pointer]
+          - button "10 km" [ref=e658] [cursor=pointer]
+          - button "Semi-marathon" [ref=e659] [cursor=pointer]
+          - button "Marathon" [ref=e660] [cursor=pointer]
+          - button "Ultra-trail / Trail" [ref=e661] [cursor=pointer]
+          - button "Autre (champ libre)" [ref=e662] [cursor=pointer]
+      - generic [ref=e663]:
+        - generic [ref=e664]: Précision (optionnel)
+        - textbox "Précision (optionnel)" [ref=e666]:
+          - /placeholder: Donner au coach tous les détails qui décrivent l'objectif
+      - generic [ref=e667]:
+        - generic [ref=e668]: Priorité
+        - generic [ref=e669]:
+          - button "Haute" [ref=e670] [cursor=pointer]
+          - button "Moyenne" [ref=e671] [cursor=pointer]
+          - button "Basse" [ref=e672] [cursor=pointer]
+      - button "Ajouter cet objectif" [disabled] [ref=e673]:
+        - img [ref=e674]
+        - text: Ajouter cet objectif

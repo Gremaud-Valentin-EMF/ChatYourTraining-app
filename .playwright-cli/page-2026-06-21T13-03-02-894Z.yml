@@ -1,0 +1,35 @@
+- generic [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - generic [ref=e11]: ChatYourTraining
+      - heading "Configuration de votre profil" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Étape 4 sur 6
+    - generic [ref=e140]:
+      - generic [ref=e141]:
+        - img [ref=e143]
+        - generic [ref=e147]:
+          - heading "Seuils de performance" [level=2] [ref=e148]
+          - paragraph [ref=e149]: Pour des calculs de charge précis
+      - generic [ref=e150]:
+        - paragraph [ref=e151]: Course à pied
+        - generic [ref=e153]:
+          - generic [ref=e154]: VMA (km/h)
+          - spinbutton "VMA (km/h)" [ref=e156]
+          - paragraph [ref=e157]: Vitesse Maximale Aérobie — test sur piste recommandé
+        - generic [ref=e158]:
+          - generic [ref=e159]: Allure seuil (min/km)
+          - textbox "Allure seuil (min/km)" [ref=e161]:
+            - /placeholder: 5:00
+          - paragraph [ref=e162]: "Ex : 5:00 pour 5 minutes par km"
+      - generic [ref=e163]: Vous ne connaissez pas ces valeurs ? Pas de problème — vous pourrez les renseigner plus tard ou demander à votre coach IA de vous proposer un test adapté.
+    - generic [ref=e47]:
+      - button "Retour" [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+        - text: Retour
+      - button "Continuer" [active] [ref=e51] [cursor=pointer]:
+        - text: Continuer
+        - img [ref=e52]
+    - button "Passer et configurer plus tard" [ref=e55] [cursor=pointer]
+  - alert [ref=e56]
