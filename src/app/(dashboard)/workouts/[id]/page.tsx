@@ -21,6 +21,7 @@ import { getSportIconComponent } from "@/lib/sport-icons";
 import type { Json } from "@/types/database";
 import { ActivityStreamChart } from "@/components/workouts/activity-stream-chart";
 import { FirstVisitRpeModal } from "@/components/workouts/first-visit-rpe-modal";
+import { estimateTSSFromRPE } from "@/lib/calculations/training-load";
 
 const focusByIntensity: Record<string, string> = {
   endurance: "Endurance fondamentale",
@@ -56,6 +57,7 @@ interface ActivityDetail {
   max_hr: number | null;
   avg_power_watts: number | null;
   tss: number | null;
+  tss_type: string | null;
   intensity: string | null;
   source: string;
   description: string | null;
@@ -320,6 +322,7 @@ export default function WorkoutDetailPage({
         avg_hr,
         max_hr,
         tss,
+        tss_type,
         intensity,
         rpe,
         source,
@@ -387,6 +390,7 @@ export default function WorkoutDetailPage({
         max_hr: data.max_hr,
         avg_power_watts: data.avg_power_watts ?? null,
         tss: data.tss,
+        tss_type: data.tss_type ?? null,
         intensity: data.intensity,
         source: data.source,
         rpe: data.rpe ?? null,
@@ -492,9 +496,18 @@ export default function WorkoutDetailPage({
     if (!activity) return;
     setIsSavingRpe(true);
     const nextRpe = Math.min(10, Math.max(0, Math.round(rpeInput)));
+    const updateFields: Record<string, unknown> = { rpe: nextRpe };
+
+    const canOverrideTss = !activity.tss_type || activity.tss_type === "estimated";
+    const durationSec = (activity.actual_duration_minutes ?? activity.planned_duration_minutes ?? 0) * 60;
+    if (canOverrideTss && nextRpe >= 1 && durationSec > 0) {
+      updateFields.tss = estimateTSSFromRPE({ rpe: nextRpe, durationSeconds: durationSec });
+      updateFields.tss_type = "rpe";
+    }
+
     const { error } = await supabase
       .from("activities")
-      .update({ rpe: nextRpe })
+      .update(updateFields)
       .eq("id", activity.id);
     setIsSavingRpe(false);
     if (!error) {
@@ -503,6 +516,9 @@ export default function WorkoutDetailPage({
           ? {
               ...prev,
               rpe: nextRpe,
+              ...(updateFields.tss !== undefined
+                ? { tss: updateFields.tss as number, tss_type: "rpe" }
+                : {}),
             }
           : prev
       );
@@ -516,11 +532,22 @@ export default function WorkoutDetailPage({
     if (!activity) return;
 
     try {
-      // Update RPE
+      const updateFields: Record<string, unknown> = { rpe: data.rpe };
+      const canOverrideTss = !activity.tss_type || activity.tss_type === "estimated";
+      const durationSec = (activity.actual_duration_minutes ?? activity.planned_duration_minutes ?? 0) * 60;
+      if (canOverrideTss && data.rpe >= 1 && durationSec > 0) {
+        updateFields.tss = estimateTSSFromRPE({ rpe: data.rpe, durationSeconds: durationSec });
+        updateFields.tss_type = "rpe";
+      }
+
       await supabase
         .from("activities")
-        .update({ rpe: data.rpe })
+        .update(updateFields)
         .eq("id", activity.id);
+
+      const tssOverride = updateFields.tss !== undefined
+        ? { tss: updateFields.tss as number, tss_type: "rpe" as const }
+        : {};
 
       // Append comment to description if provided
       if (data.comment.trim()) {
@@ -533,24 +560,15 @@ export default function WorkoutDetailPage({
           .update({ description: newDescription })
           .eq("id", activity.id);
 
-        // Update local state
         setActivity((prev) =>
           prev
-            ? {
-                ...prev,
-                rpe: data.rpe,
-                description: newDescription,
-              }
+            ? { ...prev, rpe: data.rpe, description: newDescription, ...tssOverride }
             : prev
         );
       } else {
-        // Update only RPE in local state
         setActivity((prev) =>
           prev
-            ? {
-                ...prev,
-                rpe: data.rpe,
-              }
+            ? { ...prev, rpe: data.rpe, ...tssOverride }
             : prev
         );
       }
@@ -1902,6 +1920,11 @@ export default function WorkoutDetailPage({
                         ) : (
                           <p className="text-lg font-semibold text-foreground">
                             {formatComparisonValue(row.actual, row.actualRaw)}
+                          </p>
+                        )}
+                        {row.label === "TSS" && activity.status === "completed" && activity.tss_type === "estimated" && (
+                          <p className="text-xs text-yellow-400 mt-1">
+                            TSS estimé — aucune donnée de puissance, allure ou FC disponible.
                           </p>
                         )}
                       </div>

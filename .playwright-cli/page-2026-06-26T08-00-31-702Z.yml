@@ -1,0 +1,190 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link "ChatYourTraining" [ref=e5] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e6]
+        - generic [ref=e8]: ChatYourTraining
+      - navigation [ref=e9]:
+        - link "Tableau de bord" [ref=e10] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e11]
+          - text: Tableau de bord
+        - link "Calendrier" [ref=e16] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e17]
+          - text: Calendrier
+        - link "Entraînements" [ref=e19] [cursor=pointer]:
+          - /url: /workouts
+          - img [ref=e20]
+          - text: Entraînements
+        - link "Objectifs" [ref=e21] [cursor=pointer]:
+          - /url: /objectives
+          - img [ref=e22]
+          - text: Objectifs
+        - link "Santé" [ref=e26] [cursor=pointer]:
+          - /url: /health
+          - img [ref=e27]
+          - text: Santé
+        - link "Intégrations" [ref=e29] [cursor=pointer]:
+          - /url: /integrations
+          - img [ref=e30]
+          - text: Intégrations
+    - generic [ref=e34]:
+      - banner [ref=e35]:
+        - generic [ref=e36]:
+          - heading "Calendrier" [level=1] [ref=e38]
+          - generic [ref=e39]:
+            - link "Coach IA" [ref=e40] [cursor=pointer]:
+              - /url: /chat
+              - img [ref=e41]
+              - generic [ref=e43]: Coach IA
+            - button [ref=e44] [cursor=pointer]:
+              - img [ref=e45]
+            - button "VG Valentin Gremaud Profil" [ref=e195] [cursor=pointer]:
+              - generic [ref=e52]: VG
+              - generic [ref=e53]:
+                - generic [ref=e54]: Valentin Gremaud
+                - generic [ref=e55]: Profil
+              - img [ref=e56]
+      - main [ref=e58]:
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - generic [ref=e62]:
+              - generic [ref=e63]:
+                - generic [ref=e64]:
+                  - heading "Juin" [level=1] [ref=e65]
+                  - heading "2026" [level=2] [ref=e66]
+                - generic [ref=e67]:
+                  - button [ref=e68] [cursor=pointer]:
+                    - img [ref=e69]
+                  - button [ref=e71] [cursor=pointer]:
+                    - img [ref=e72]
+              - generic [ref=e75]:
+                - generic [ref=e77]:
+                  - button "Semaine" [ref=e78] [cursor=pointer]
+                  - button "Mois" [ref=e79] [cursor=pointer]
+                - button "Nouvelle séance" [ref=e80] [cursor=pointer]:
+                  - img [ref=e81]
+                  - text: Nouvelle séance
+            - generic [ref=e82]:
+              - generic [ref=e83]:
+                - generic [ref=e84]:
+                  - img [ref=e85]
+                  - generic [ref=e88]:
+                    - paragraph [ref=e89]: Durée planifiée (mois)
+                    - paragraph [ref=e90]: 0h00
+                - generic [ref=e91]:
+                  - paragraph [ref=e92]: Réalisé
+                  - paragraph [ref=e93]: 2h00
+              - generic [ref=e94]:
+                - generic [ref=e95]:
+                  - img [ref=e96]
+                  - generic [ref=e98]:
+                    - paragraph [ref=e99]: Distance prévue (mois)
+                    - paragraph [ref=e100]: 0.0km
+                - generic [ref=e101]:
+                  - paragraph [ref=e102]: Complétée
+                  - paragraph [ref=e103]: 0.0 km
+              - generic [ref=e104]:
+                - generic [ref=e105]:
+                  - img [ref=e106]
+                  - generic [ref=e108]:
+                    - paragraph [ref=e109]: Charge TSS
+                    - paragraph [ref=e110]: "64"
+                - generic [ref=e111]: Objectif 0
+              - generic [ref=e112]:
+                - generic [ref=e113]:
+                  - paragraph [ref=e114]: Séances
+                  - paragraph [ref=e115]: "2"
+                - paragraph [ref=e116]: sur 0 prévues
+            - generic [ref=e119]:
+              - generic [ref=e120]:
+                - generic [ref=e121]: LUN
+                - generic [ref=e122]: MAR
+                - generic [ref=e123]: MER
+                - generic [ref=e124]: JEU
+                - generic [ref=e125]: VEN
+                - generic [ref=e126]: SAM
+                - generic [ref=e127]: DIM
+              - generic [ref=e128]:
+                - generic [ref=e130] [cursor=pointer]: "1"
+                - generic [ref=e132] [cursor=pointer]: "2"
+                - generic [ref=e134] [cursor=pointer]: "3"
+                - generic [ref=e136] [cursor=pointer]: "4"
+                - generic [ref=e138] [cursor=pointer]: "5"
+                - generic [ref=e140] [cursor=pointer]: "6"
+                - generic [ref=e142] [cursor=pointer]: "7"
+                - generic [ref=e144] [cursor=pointer]: "8"
+                - generic [ref=e146] [cursor=pointer]: "9"
+                - generic [ref=e148] [cursor=pointer]: "10"
+                - generic [ref=e150] [cursor=pointer]: "11"
+                - generic [ref=e152] [cursor=pointer]: "12"
+                - generic [ref=e154] [cursor=pointer]: "13"
+                - generic [ref=e156] [cursor=pointer]: "14"
+                - generic [ref=e158] [cursor=pointer]: "15"
+                - generic [ref=e160] [cursor=pointer]: "16"
+                - generic [ref=e162] [cursor=pointer]: "17"
+                - generic [ref=e164] [cursor=pointer]: "18"
+                - generic [ref=e166] [cursor=pointer]: "19"
+                - generic [ref=e168] [cursor=pointer]: "20"
+                - generic [ref=e170] [cursor=pointer]: "21"
+                - generic [ref=e172] [cursor=pointer]: "22"
+                - generic [ref=e174] [cursor=pointer]: "23"
+                - generic [ref=e176] [cursor=pointer]: "24"
+                - generic [ref=e178] [cursor=pointer]: "25"
+                - generic [ref=e179] [cursor=pointer]:
+                  - generic [ref=e180]: "26"
+                  - generic [ref=e462]:
+                    - generic [ref=e463]: Test vélo ...
+                    - generic [ref=e730]: Test vélo ...
+                - generic [ref=e183] [cursor=pointer]: "27"
+                - generic [ref=e185] [cursor=pointer]: "28"
+                - generic [ref=e187] [cursor=pointer]: "29"
+                - generic [ref=e189] [cursor=pointer]: "30"
+          - generic [ref=e191]:
+            - heading "Sélectionnez une date" [level=3] [ref=e192]
+            - paragraph [ref=e193]: Touchez un jour dans le calendrier pour voir les détails.
+  - alert [ref=e194]
+  - generic [ref=e733]:
+    - generic [ref=e734]:
+      - heading "Planifier une séance" [level=2] [ref=e736]
+      - button "Fermer" [ref=e737] [cursor=pointer]
+    - generic [ref=e739]:
+      - generic [ref=e740]:
+        - generic [ref=e741]: Titre
+        - textbox "Titre" [ref=e743]:
+          - /placeholder: Séance tempo, sortie longue...
+          - text: Test planifié course
+      - generic [ref=e744]:
+        - generic [ref=e745]:
+          - generic [ref=e746]: Date
+          - textbox "Date" [ref=e748]: 2026-06-26
+        - generic [ref=e749]:
+          - generic [ref=e750]: Sport
+          - button "Sport" [ref=e752] [cursor=pointer]:
+            - text: Course à pied
+            - img [ref=e753]
+      - generic [ref=e755]:
+        - generic [ref=e756]:
+          - paragraph [ref=e757]: Séance réalisée
+          - paragraph [ref=e758]: Séance planifiée — pas de TSS tant qu'elle n'est pas réalisée.
+        - checkbox [ref=e761]
+      - generic [ref=e764]:
+        - generic [ref=e765]:
+          - generic [ref=e766]: Durée prévue (minutes)
+          - spinbutton "Durée prévue (minutes)" [ref=e768]
+        - generic [ref=e962]:
+          - generic [ref=e963]: Distance (km)
+          - spinbutton "Distance (km)" [ref=e965]
+      - generic [ref=e769]:
+        - generic [ref=e770]: Intensité
+        - button "Intensité" [ref=e772] [cursor=pointer]:
+          - text: Endurance
+          - img [ref=e773]
+      - generic [ref=e775]:
+        - generic [ref=e776]: Notes
+        - textbox "Sensations, météo, exercices..." [ref=e777]
+      - generic [ref=e778]:
+        - button "Annuler" [ref=e779] [cursor=pointer]
+        - button "Ajouter" [ref=e780] [cursor=pointer]

@@ -736,23 +736,8 @@ export function calculateActivityTSS(params: {
     if (tss > 0) return capped({ tss, type: "rpe" });
   }
 
-  // Priority 6: Duration-based fallback estimation
-  const baseRates: Record<string, number> = {
-    cycling: 60,
-    running: 90,
-    swimming: 55,
-    cross_country_skiing: 70,
-    trail_running: 90,
-    hiking: 40,
-    walking: 30,
-    strength: 50,
-    other: 45,
-  };
-  const baseRate = baseRates[sport || "other"] || 45;
-  const durationHours = durationSeconds / 3600;
-  const estimatedTss = Math.round(baseRate * durationHours);
-
-  return capped({ tss: estimatedTss, type: "estimated" });
+  // Priority 6: No usable data → TSS=0, type="estimated"
+  return { tss: 0, type: "estimated" };
 }
 
 // ============================================================================

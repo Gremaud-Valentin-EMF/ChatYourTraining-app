@@ -1,0 +1,166 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - link "ChatYourTraining" [ref=e5] [cursor=pointer]:
+      - /url: /dashboard
+      - img [ref=e6]
+      - text: ChatYourTraining
+    - navigation [ref=e8]:
+      - link "Tableau de bord" [ref=e9] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e10]
+        - text: Tableau de bord
+      - link "Calendrier" [ref=e15] [cursor=pointer]:
+        - /url: /calendar
+        - img [ref=e16]
+        - text: Calendrier
+      - link "Entraînements" [ref=e18] [cursor=pointer]:
+        - /url: /workouts
+        - img [ref=e19]
+        - text: Entraînements
+      - link "Objectifs" [ref=e20] [cursor=pointer]:
+        - /url: /objectives
+        - img [ref=e21]
+        - text: Objectifs
+      - link "Santé" [ref=e25] [cursor=pointer]:
+        - /url: /health
+        - img [ref=e26]
+        - text: Santé
+      - link "Intégrations" [ref=e28] [cursor=pointer]:
+        - /url: /integrations
+        - img [ref=e29]
+        - text: Intégrations
+  - generic [ref=e32]:
+    - banner [ref=e33]:
+      - generic [ref=e34]:
+        - heading "Calendrier" [level=1] [ref=e36]
+        - generic [ref=e37]:
+          - link "Coach IA" [ref=e38] [cursor=pointer]:
+            - /url: /chat
+            - img [ref=e39]
+            - text: Coach IA
+          - button [ref=e41]:
+            - img [ref=e42]
+          - button "U AthlèteProfil" [ref=e46]:
+            - generic [ref=e47]: U
+            - generic [ref=e48]: AthlèteProfil
+            - img [ref=e49]
+    - main [ref=e51]:
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - generic [ref=e56]:
+              - generic [ref=e57]:
+                - heading "Juin" [level=1] [ref=e58]
+                - heading "2026" [level=2] [ref=e59]
+              - generic [ref=e60]:
+                - button [ref=e61]:
+                  - img [ref=e62]
+                - button [ref=e64]:
+                  - img [ref=e65]
+            - generic [ref=e67]:
+              - generic [ref=e69]:
+                - button "Semaine" [ref=e70]
+                - button "Mois" [ref=e71]
+              - button "Nouvelle séance" [ref=e72]:
+                - img [ref=e73]
+                - text: Nouvelle séance
+          - generic [ref=e74]:
+            - generic [ref=e75]:
+              - generic [ref=e76]:
+                - img [ref=e77]
+                - generic [ref=e80]:
+                  - paragraph [ref=e81]: Durée planifiée (mois)
+                  - paragraph [ref=e82]: 0h00
+              - generic [ref=e83]:
+                - paragraph [ref=e84]: Réalisé
+                - paragraph [ref=e85]: 0h00
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - img [ref=e88]
+                - generic [ref=e90]:
+                  - paragraph [ref=e91]: Distance prévue (mois)
+                  - paragraph [ref=e92]: 0.0km
+              - generic [ref=e93]:
+                - paragraph [ref=e94]: Complétée
+                - paragraph [ref=e95]: 0.0 km
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - img [ref=e98]
+                - generic [ref=e100]:
+                  - paragraph [ref=e101]: Charge TSS
+                  - paragraph [ref=e102]: "0"
+              - generic [ref=e103]: Objectif 0
+            - generic [ref=e104]:
+              - generic [ref=e105]:
+                - paragraph [ref=e106]: Séances
+                - paragraph [ref=e107]: "0"
+              - paragraph [ref=e108]: sur 0 prévues
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: LUN
+              - generic [ref=e114]: MAR
+              - generic [ref=e115]: MER
+              - generic [ref=e116]: JEU
+              - generic [ref=e117]: VEN
+              - generic [ref=e118]: SAM
+              - generic [ref=e119]: DIM
+            - generic [ref=e120]:
+              - generic [ref=e122]: "1"
+              - generic [ref=e124]: "2"
+              - generic [ref=e126]: "3"
+              - generic [ref=e128]: "4"
+              - generic [ref=e130]: "5"
+              - generic [ref=e132]: "6"
+              - generic [ref=e134]: "7"
+              - generic [ref=e136]: "8"
+              - generic [ref=e138]: "9"
+              - generic [ref=e140]: "10"
+              - generic [ref=e142]: "11"
+              - generic [ref=e144]: "12"
+              - generic [ref=e146]: "13"
+              - generic [ref=e148]: "14"
+              - generic [ref=e150]: "15"
+              - generic [ref=e152]: "16"
+              - generic [ref=e154]: "17"
+              - generic [ref=e156]: "18"
+              - generic [ref=e158]: "19"
+              - generic [ref=e160]: "20"
+              - generic [ref=e162]: "21"
+              - generic [ref=e164]: "22"
+              - generic [ref=e166]: "23"
+              - generic [ref=e168]: "24"
+              - generic [ref=e170]: "25"
+              - generic [ref=e172]: "26"
+              - generic [ref=e174]: "27"
+              - generic [ref=e176]: "28"
+              - generic [ref=e178]: "29"
+              - generic [ref=e180]: "30"
+        - generic [ref=e182]:
+          - heading "Sélectionnez une date" [level=3] [ref=e183]
+          - paragraph [ref=e184]: Touchez un jour dans le calendrier pour voir les détails.
+  - navigation [ref=e185]:
+    - generic [ref=e186]:
+      - link "Tableau" [ref=e187] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e188]
+        - text: Tableau
+      - link "Calendrier" [ref=e193] [cursor=pointer]:
+        - /url: /calendar
+        - img [ref=e194]
+        - text: Calendrier
+      - link "Entraînements" [ref=e196] [cursor=pointer]:
+        - /url: /workouts
+        - img [ref=e197]
+        - text: Entraînements
+      - link "Objectifs" [ref=e198] [cursor=pointer]:
+        - /url: /objectives
+        - img [ref=e199]
+        - text: Objectifs
+      - link "Santé" [ref=e203] [cursor=pointer]:
+        - /url: /health
+        - img [ref=e204]
+        - text: Santé
+      - link "Intégrations" [ref=e206] [cursor=pointer]:
+        - /url: /integrations
+        - img [ref=e207]
+        - text: Intégrations

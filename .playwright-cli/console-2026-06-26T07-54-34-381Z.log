@@ -1,0 +1,8 @@
+[     633ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[    1144ms] [LOG] [Fast Refresh] done in 512ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[    1293ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js:38559
+[    2309ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/weather:0
+[    2501ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/weather:0
+[  334736ms] [LOG] [NormPower] activity - Using pre-calculated NP: 200W @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:394
+[  334736ms] [LOG] [CyclingTSS] activity - duration=1.00h, NP=200W, FTP=250W, IF=0.80, TSS=64 @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:409
+[  411602ms] [LOG] [rTSS] activity - duration=0.83h, NGP=300.0s/km (5:00/km), FTPace=300s/km (5:00/km), IF=1.00, rTSS=92 (×110) @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:335

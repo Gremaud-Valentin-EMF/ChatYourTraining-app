@@ -1,0 +1,364 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link "ChatYourTraining" [ref=e5] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e6]
+        - generic [ref=e8]: ChatYourTraining
+      - navigation [ref=e9]:
+        - link "Tableau de bord" [ref=e10] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e11]
+          - text: Tableau de bord
+        - link "Calendrier" [ref=e16] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e17]
+          - text: Calendrier
+        - link "Entraînements" [ref=e19] [cursor=pointer]:
+          - /url: /workouts
+          - img [ref=e20]
+          - text: Entraînements
+        - link "Objectifs" [ref=e21] [cursor=pointer]:
+          - /url: /objectives
+          - img [ref=e22]
+          - text: Objectifs
+        - link "Santé" [ref=e26] [cursor=pointer]:
+          - /url: /health
+          - img [ref=e27]
+          - text: Santé
+        - link "Intégrations" [ref=e29] [cursor=pointer]:
+          - /url: /integrations
+          - img [ref=e30]
+          - text: Intégrations
+    - generic [ref=e34]:
+      - banner [ref=e35]:
+        - generic [ref=e36]:
+          - heading "Calendrier" [level=1] [ref=e38]
+          - generic [ref=e39]:
+            - link "Coach IA" [ref=e40] [cursor=pointer]:
+              - /url: /chat
+              - img [ref=e41]
+              - generic [ref=e43]: Coach IA
+            - button [ref=e44] [cursor=pointer]:
+              - img [ref=e45]
+            - button "VG Valentin Gremaud Profil" [ref=e195] [cursor=pointer]:
+              - generic [ref=e52]: VG
+              - generic [ref=e53]:
+                - generic [ref=e54]: Valentin Gremaud
+                - generic [ref=e55]: Profil
+              - img [ref=e56]
+      - main [ref=e58]:
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - generic [ref=e62]:
+              - generic [ref=e63]:
+                - generic [ref=e64]:
+                  - heading "Juin" [level=1] [ref=e65]
+                  - heading "2026" [level=2] [ref=e66]
+                - generic [ref=e67]:
+                  - button [ref=e68] [cursor=pointer]:
+                    - img [ref=e69]
+                  - button [ref=e71] [cursor=pointer]:
+                    - img [ref=e72]
+              - generic [ref=e75]:
+                - generic [ref=e77]:
+                  - button "Semaine" [ref=e78] [cursor=pointer]
+                  - button "Mois" [ref=e79] [cursor=pointer]
+                - button "Nouvelle séance" [ref=e80] [cursor=pointer]:
+                  - img [ref=e81]
+                  - text: Nouvelle séance
+            - generic [ref=e82]:
+              - generic [ref=e83]:
+                - generic [ref=e84]:
+                  - img [ref=e85]
+                  - generic [ref=e88]:
+                    - paragraph [ref=e89]: Durée planifiée (mois)
+                    - paragraph [ref=e90]: 0h00
+                - generic [ref=e91]:
+                  - paragraph [ref=e92]: Réalisé
+                  - paragraph [ref=e93]: 0h00
+              - generic [ref=e94]:
+                - generic [ref=e95]:
+                  - img [ref=e96]
+                  - generic [ref=e98]:
+                    - paragraph [ref=e99]: Distance prévue (mois)
+                    - paragraph [ref=e100]: 0.0km
+                - generic [ref=e101]:
+                  - paragraph [ref=e102]: Complétée
+                  - paragraph [ref=e103]: 0.0 km
+              - generic [ref=e104]:
+                - generic [ref=e105]:
+                  - img [ref=e106]
+                  - generic [ref=e108]:
+                    - paragraph [ref=e109]: Charge TSS
+                    - paragraph [ref=e110]: "0"
+                - generic [ref=e111]: Objectif 0
+              - generic [ref=e112]:
+                - generic [ref=e113]:
+                  - paragraph [ref=e114]: Séances
+                  - paragraph [ref=e115]: "0"
+                - paragraph [ref=e116]: sur 0 prévues
+            - generic [ref=e119]:
+              - generic [ref=e120]:
+                - generic [ref=e121]: LUN
+                - generic [ref=e122]: MAR
+                - generic [ref=e123]: MER
+                - generic [ref=e124]: JEU
+                - generic [ref=e125]: VEN
+                - generic [ref=e126]: SAM
+                - generic [ref=e127]: DIM
+              - generic [ref=e128]:
+                - generic [ref=e130] [cursor=pointer]: "1"
+                - generic [ref=e132] [cursor=pointer]: "2"
+                - generic [ref=e134] [cursor=pointer]: "3"
+                - generic [ref=e136] [cursor=pointer]: "4"
+                - generic [ref=e138] [cursor=pointer]: "5"
+                - generic [ref=e140] [cursor=pointer]: "6"
+                - generic [ref=e142] [cursor=pointer]: "7"
+                - generic [ref=e144] [cursor=pointer]: "8"
+                - generic [ref=e146] [cursor=pointer]: "9"
+                - generic [ref=e148] [cursor=pointer]: "10"
+                - generic [ref=e150] [cursor=pointer]: "11"
+                - generic [ref=e152] [cursor=pointer]: "12"
+                - generic [ref=e154] [cursor=pointer]: "13"
+                - generic [ref=e156] [cursor=pointer]: "14"
+                - generic [ref=e158] [cursor=pointer]: "15"
+                - generic [ref=e160] [cursor=pointer]: "16"
+                - generic [ref=e162] [cursor=pointer]: "17"
+                - generic [ref=e164] [cursor=pointer]: "18"
+                - generic [ref=e166] [cursor=pointer]: "19"
+                - generic [ref=e168] [cursor=pointer]: "20"
+                - generic [ref=e170] [cursor=pointer]: "21"
+                - generic [ref=e172] [cursor=pointer]: "22"
+                - generic [ref=e174] [cursor=pointer]: "23"
+                - generic [ref=e176] [cursor=pointer]: "24"
+                - generic [ref=e178] [cursor=pointer]: "25"
+                - generic [ref=e180] [cursor=pointer]: "26"
+                - generic [ref=e183] [cursor=pointer]: "27"
+                - generic [ref=e185] [cursor=pointer]: "28"
+                - generic [ref=e187] [cursor=pointer]: "29"
+                - generic [ref=e189] [cursor=pointer]: "30"
+          - generic [ref=e191]:
+            - heading "Sélectionnez une date" [level=3] [ref=e192]
+            - paragraph [ref=e193]: Touchez un jour dans le calendrier pour voir les détails.
+  - alert [ref=e194]
+  - generic [ref=e198]:
+    - generic [ref=e199]:
+      - heading "Planifier une séance" [level=2] [ref=e201]
+      - button "Fermer" [ref=e202] [cursor=pointer]
+    - generic [ref=e204]:
+      - generic [ref=e205]:
+        - generic [ref=e206]: Titre
+        - textbox "Titre" [ref=e208]:
+          - /placeholder: Séance tempo, sortie longue...
+          - text: Test vélo NP
+      - generic [ref=e209]:
+        - generic [ref=e210]:
+          - generic [ref=e211]: Date
+          - textbox "Date" [ref=e213]: 2026-06-26
+        - generic [ref=e214]:
+          - generic [ref=e215]: Sport
+          - generic [ref=e216]:
+            - button "Sport" [expanded] [active] [ref=e217] [cursor=pointer]:
+              - text: Choisissez un sport
+              - img [ref=e218]
+            - listbox [ref=e246]:
+              - option "Allaitement" [ref=e247] [cursor=pointer]
+              - option "Alpinisme" [ref=e248] [cursor=pointer]
+              - option "Apnée" [ref=e249] [cursor=pointer]
+              - option "Arbitrage" [ref=e250] [cursor=pointer]
+              - option "Arts du cirque" [ref=e251] [cursor=pointer]
+              - option "Arts martiaux" [ref=e252] [cursor=pointer]
+              - option "Assault Bike" [ref=e253] [cursor=pointer]
+              - option "Athlétisme" [ref=e254] [cursor=pointer]
+              - option "Attraction à sensations" [ref=e255] [cursor=pointer]
+              - option "Autre" [ref=e256] [cursor=pointer]
+              - option "Aviron" [ref=e257] [cursor=pointer]
+              - option "Badminton" [ref=e258] [cursor=pointer]
+              - option "Barmaid" [ref=e259] [cursor=pointer]
+              - option "Barre" [ref=e260] [cursor=pointer]
+              - option "Barre3" [ref=e261] [cursor=pointer]
+              - option "Barry's" [ref=e262] [cursor=pointer]
+              - option "Baseball" [ref=e263] [cursor=pointer]
+              - option "Basket-ball" [ref=e264] [cursor=pointer]
+              - option "Biathlon d'hiver" [ref=e265] [cursor=pointer]
+              - option "Bloc" [ref=e266] [cursor=pointer]
+              - option "Bowling" [ref=e267] [cursor=pointer]
+              - option "Box Fitness" [ref=e268] [cursor=pointer]
+              - option "Boxe" [ref=e269] [cursor=pointer]
+              - option "Breakdance" [ref=e270] [cursor=pointer]
+              - option "Caddie" [ref=e271] [cursor=pointer]
+              - option "Canoë" [ref=e272] [cursor=pointer]
+              - option "Cheerleading" [ref=e273] [cursor=pointer]
+              - option "Coaching" [ref=e274] [cursor=pointer]
+              - option "Conduite" [ref=e275] [cursor=pointer]
+              - option "Corde à sauter" [ref=e276] [cursor=pointer]
+              - option "Course à obstacles" [ref=e277] [cursor=pointer]
+              - option "Course à pied" [ref=e278] [cursor=pointer]
+              - option "Course à pied virtuelle" [ref=e279] [cursor=pointer]
+              - option "Course automobile" [ref=e280] [cursor=pointer]
+              - option "Course en fauteuil" [ref=e281] [cursor=pointer]
+              - option "Cricket" [ref=e282] [cursor=pointer]
+              - option "Crossfit" [ref=e283] [cursor=pointer]
+              - option "Cuisine" [ref=e284] [cursor=pointer]
+              - option "Curling" [ref=e285] [cursor=pointer]
+              - option "Cycling indoor" [ref=e286] [cursor=pointer]
+              - option "Danse" [ref=e287] [cursor=pointer]
+              - option "Déneigement" [ref=e288] [cursor=pointer]
+              - option "Disc golf" [ref=e289] [cursor=pointer]
+              - option "Duathlon" [ref=e290] [cursor=pointer]
+              - option "Échecs" [ref=e291] [cursor=pointer]
+              - option "Elliptique" [ref=e292] [cursor=pointer]
+              - option "Entraînement" [ref=e293] [cursor=pointer]
+              - option "Entraînement aux poids" [ref=e294] [cursor=pointer]
+              - option "Équitation" [ref=e295] [cursor=pointer]
+              - option "Escalade" [ref=e296] [cursor=pointer]
+              - option "Escalade (falaise)" [ref=e297] [cursor=pointer]
+              - option "Escaliers de stade" [ref=e298] [cursor=pointer]
+              - option "Escrime" [ref=e299] [cursor=pointer]
+              - option "F45 Training" [ref=e300] [cursor=pointer]
+              - option "Fauteuil poussé" [ref=e301] [cursor=pointer]
+              - option "Fléchettes" [ref=e302] [cursor=pointer]
+              - option "Football" [ref=e303] [cursor=pointer]
+              - option "Football américain" [ref=e304] [cursor=pointer]
+              - option "Football australien" [ref=e305] [cursor=pointer]
+              - option "Football gaélique" [ref=e306] [cursor=pointer]
+              - option "Functional fitness" [ref=e307] [cursor=pointer]
+              - option "Golf" [ref=e308] [cursor=pointer]
+              - option "Gymnastique" [ref=e309] [cursor=pointer]
+              - option "Haltérophilie" [ref=e310] [cursor=pointer]
+              - option "Handball" [ref=e311] [cursor=pointer]
+              - option "Handbike" [ref=e312] [cursor=pointer]
+              - option "HIIT" [ref=e313] [cursor=pointer]
+              - option "Hockey sur gazon" [ref=e314] [cursor=pointer]
+              - option "Hockey sur glace" [ref=e315] [cursor=pointer]
+              - option "Hot Yoga" [ref=e316] [cursor=pointer]
+              - option "Hurling / Camogie" [ref=e317] [cursor=pointer]
+              - option "Jardinage" [ref=e318] [cursor=pointer]
+              - option "Jeux vidéo" [ref=e319] [cursor=pointer]
+              - option "Jiu-jitsu" [ref=e320] [cursor=pointer]
+              - option "Jogging poussette" [ref=e321] [cursor=pointer]
+              - option "Judo" [ref=e322] [cursor=pointer]
+              - option "Kayak" [ref=e323] [cursor=pointer]
+              - option "Kayak" [ref=e324] [cursor=pointer]
+              - option "Kickboxing" [ref=e325] [cursor=pointer]
+              - option "Kite board" [ref=e326] [cursor=pointer]
+              - option "Kitesurf" [ref=e327] [cursor=pointer]
+              - option "Lacrosse" [ref=e328] [cursor=pointer]
+              - option "Lutte" [ref=e329] [cursor=pointer]
+              - option "Machine Climber" [ref=e330] [cursor=pointer]
+              - option "Marche" [ref=e331] [cursor=pointer]
+              - option "Marche athlétique" [ref=e332] [cursor=pointer]
+              - option "Marche nordique" [ref=e333] [cursor=pointer]
+              - option "Marche poussette" [ref=e334] [cursor=pointer]
+              - option "Ménage" [ref=e335] [cursor=pointer]
+              - option "Motocross" [ref=e336] [cursor=pointer]
+              - option "Muay-thaï" [ref=e337] [cursor=pointer]
+              - option "Musculation" [ref=e338] [cursor=pointer]
+              - option "Natation" [ref=e339] [cursor=pointer]
+              - option "Netball" [ref=e340] [cursor=pointer]
+              - option "Opérations aériennes" [ref=e341] [cursor=pointer]
+              - option "Opérations aquatiques" [ref=e342] [cursor=pointer]
+              - option "Opérations médicales" [ref=e343] [cursor=pointer]
+              - option "Opérations tactiques" [ref=e344] [cursor=pointer]
+              - option "Paddle tennis" [ref=e345] [cursor=pointer]
+              - option "Paddleboard" [ref=e346] [cursor=pointer]
+              - option "Padel" [ref=e347] [cursor=pointer]
+              - option "Paintball" [ref=e348] [cursor=pointer]
+              - option "Parachutisme" [ref=e349] [cursor=pointer]
+              - option "Parentalité" [ref=e350] [cursor=pointer]
+              - option "Parkour" [ref=e351] [cursor=pointer]
+              - option "Patin à glace" [ref=e352] [cursor=pointer]
+              - option "Pêche" [ref=e353] [cursor=pointer]
+              - option "Pêche sportive" [ref=e354] [cursor=pointer]
+              - option "Performance musicale" [ref=e355] [cursor=pointer]
+              - option "Performance scénique" [ref=e356] [cursor=pointer]
+              - option "Pickleball" [ref=e357] [cursor=pointer]
+              - option "Pilates" [ref=e358] [cursor=pointer]
+              - option "Pilates Reformer" [ref=e359] [cursor=pointer]
+              - option "Plongée" [ref=e360] [cursor=pointer]
+              - option "Polo" [ref=e361] [cursor=pointer]
+              - option "Pompiers" [ref=e362] [cursor=pointer]
+              - option "Portage bambin" [ref=e363] [cursor=pointer]
+              - option "Portage bébé" [ref=e364] [cursor=pointer]
+              - option "Powerlifting" [ref=e365] [cursor=pointer]
+              - option "Prise de parole" [ref=e366] [cursor=pointer]
+              - option "Promenade canine" [ref=e367] [cursor=pointer]
+              - option "Racquetball" [ref=e368] [cursor=pointer]
+              - option "Randonnée" [ref=e369] [cursor=pointer]
+              - option "Raquettes" [ref=e370] [cursor=pointer]
+              - option "Regarder du sport" [ref=e371] [cursor=pointer]
+              - option "Renforcement" [ref=e372] [cursor=pointer]
+              - option "Roller" [ref=e373] [cursor=pointer]
+              - option "Roller en ligne" [ref=e374] [cursor=pointer]
+              - option "Roller hockey" [ref=e375] [cursor=pointer]
+              - option "Rucking" [ref=e376] [cursor=pointer]
+              - option "Rugby" [ref=e377] [cursor=pointer]
+              - option "Sculpt Yoga" [ref=e378] [cursor=pointer]
+              - option "Simulateur d'escalier" [ref=e379] [cursor=pointer]
+              - option "Skateboard" [ref=e380] [cursor=pointer]
+              - option "Ski" [ref=e381] [cursor=pointer]
+              - option "Ski à roulettes" [ref=e382] [cursor=pointer]
+              - option "Ski alpin" [ref=e383] [cursor=pointer]
+              - option "Ski alpin" [ref=e384] [cursor=pointer]
+              - option "Ski de fond" [ref=e385] [cursor=pointer]
+              - option "Ski de fond" [ref=e386] [cursor=pointer]
+              - option "Ski de randonnée" [ref=e387] [cursor=pointer]
+              - option "Ski nautique" [ref=e388] [cursor=pointer]
+              - option "Ski nordique" [ref=e389] [cursor=pointer]
+              - option "Snowboard" [ref=e390] [cursor=pointer]
+              - option "Softball" [ref=e391] [cursor=pointer]
+              - option "Solidcore" [ref=e392] [cursor=pointer]
+              - option "Sortie à vélo électrique" [ref=e393] [cursor=pointer]
+              - option "Sortie en gravel" [ref=e394] [cursor=pointer]
+              - option "Sortie en VTT" [ref=e395] [cursor=pointer]
+              - option "Spikeball" [ref=e396] [cursor=pointer]
+              - option "Sprint" [ref=e397] [cursor=pointer]
+              - option "Squash" [ref=e398] [cursor=pointer]
+              - option "Stairmaster" [ref=e399] [cursor=pointer]
+              - option "Stand up paddle" [ref=e400] [cursor=pointer]
+              - option "Surf" [ref=e401] [cursor=pointer]
+              - option "Taekwondo" [ref=e402] [cursor=pointer]
+              - option "Tennis" [ref=e403] [cursor=pointer]
+              - option "Tennis de table" [ref=e404] [cursor=pointer]
+              - option "Tennis de table / Ping-Pong" [ref=e405] [cursor=pointer]
+              - option "Tir à l'arc" [ref=e406] [cursor=pointer]
+              - option "Tire-lait" [ref=e407] [cursor=pointer]
+              - option "Trail" [ref=e408] [cursor=pointer]
+              - option "Trajet domicile-travail" [ref=e409] [cursor=pointer]
+              - option "Travail intense" [ref=e410] [cursor=pointer]
+              - option "Travail manuel" [ref=e411] [cursor=pointer]
+              - option "Triathlon" [ref=e412] [cursor=pointer]
+              - option "Trottinette" [ref=e413] [cursor=pointer]
+              - option "Ultimate frisbee" [ref=e414] [cursor=pointer]
+              - option "Vélo" [ref=e415] [cursor=pointer]
+              - option "Vélo virtuel" [ref=e416] [cursor=pointer]
+              - option "Vélomobile" [ref=e417] [cursor=pointer]
+              - option "Voile" [ref=e418] [cursor=pointer]
+              - option "Volley-ball" [ref=e419] [cursor=pointer]
+              - option "VTT" [ref=e420] [cursor=pointer]
+              - option "VTT électrique" [ref=e421] [cursor=pointer]
+              - option "Wakeboard" [ref=e422] [cursor=pointer]
+              - option "Water-polo" [ref=e423] [cursor=pointer]
+              - option "WHOOP Labs" [ref=e424] [cursor=pointer]
+              - option "Windsurf" [ref=e425] [cursor=pointer]
+              - option "Yoga" [ref=e426] [cursor=pointer]
+      - generic [ref=e220]:
+        - generic [ref=e221]:
+          - paragraph [ref=e222]: Séance réalisée
+          - paragraph [ref=e223]: Séance planifiée — pas de TSS tant qu'elle n'est pas réalisée.
+        - checkbox [ref=e226]
+      - generic [ref=e230]:
+        - generic [ref=e231]: Durée prévue (minutes)
+        - spinbutton "Durée prévue (minutes)" [ref=e233]
+      - generic [ref=e234]:
+        - generic [ref=e235]: Intensité
+        - button "Intensité" [ref=e237] [cursor=pointer]:
+          - text: Endurance
+          - img [ref=e238]
+      - generic [ref=e240]:
+        - generic [ref=e241]: Notes
+        - textbox "Sensations, météo, exercices..." [ref=e242]
+      - generic [ref=e243]:
+        - button "Annuler" [ref=e244] [cursor=pointer]
+        - button "Ajouter" [disabled] [ref=e245]

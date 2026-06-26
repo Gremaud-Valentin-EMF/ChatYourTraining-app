@@ -5,6 +5,7 @@ import type {
   ActivityStatus,
   Json,
 } from "@/types/database";
+import type { TSSSType } from "@/lib/calculations/training-load";
 
 type DBClient = SupabaseClient<Database>;
 
@@ -95,6 +96,7 @@ export interface ImportedActivityData {
   max_hr: number | null;
   avg_power_watts: number | null;
   tss: number | null;
+  tss_type: TSSSType | null;
   source: IntegrationProvider;
   external_id: string;
   raw_data: Json;
@@ -119,7 +121,9 @@ export async function matchPlannedWorkout(
     .eq("user_id", userId)
     .eq("sport_id", sportId)
     .eq("scheduled_date", scheduledDate)
-    .in("status", ["planned", "in_progress"])
+    // "skipped" is matchable so a late import can revive a missed planned
+    // session into "completed" instead of creating a duplicate.
+    .in("status", ["planned", "in_progress", "skipped"])
     .is("external_id", null)
     .order("planned_duration_minutes", { ascending: true });
 
@@ -161,6 +165,7 @@ export async function matchPlannedWorkout(
     max_hr: data.max_hr,
     avg_power_watts: data.avg_power_watts,
     tss: data.tss,
+    tss_type: data.tss_type,
     source: data.source,
     external_id: data.external_id,
     raw_data: data.raw_data,

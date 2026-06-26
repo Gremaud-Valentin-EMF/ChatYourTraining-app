@@ -2,6 +2,7 @@ import type { Json } from "@/types/database";
 import type { ImportedActivityData } from "@/lib/integrations/sync-helpers";
 import {
   calculateActivityTSS as calculateActivityTSSOrchestrator,
+  type TSSSType,
 } from "@/lib/calculations/training-load";
 
 /**
@@ -746,6 +747,7 @@ export function convertStravaActivity(
       return w ? Math.round(w) : null;
     })(),
     tss: Math.round(tssResult.tss),
+    tss_type: tssResult.type as TSSSType,
     source: "strava" as const,
     external_id: String(stravaActivity.id),
     raw_data: enrichedRawData,

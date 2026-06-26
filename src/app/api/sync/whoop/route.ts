@@ -20,6 +20,7 @@ import {
 } from "@/lib/integrations/sync-helpers";
 import {
   calculateActivityTSS as calculateActivityTSSOrchestrator,
+  type TSSSType,
 } from "@/lib/calculations/training-load";
 import type {
   ImportedActivityData,
@@ -597,6 +598,7 @@ export async function POST() {
         const effectiveLthr = userLthr ?? Math.round(effectiveHrMax * 0.85);
 
         let tss: number;
+        let tss_type: TSSSType;
         if (avgHr && avgHr > 0 && durationSeconds > 0) {
           // Use hrTSS (TRIMP-based) for better accuracy
           const tssResult = calculateActivityTSSOrchestrator({
@@ -609,11 +611,13 @@ export async function POST() {
             gender: userGender,
           });
           tss = Math.round(tssResult.tss);
+          tss_type = tssResult.type;
         } else {
           // Fallback: estimate from strain if HR data is unavailable
           // Strain 0-21 maps roughly to 0-200+ TSS
           const strain = workout.score?.strain || 0;
           tss = Math.round(Math.pow(strain / 21, 2) * 200);
+          tss_type = "estimated";
         }
 
         const titlePrefix = sportType
@@ -643,6 +647,7 @@ export async function POST() {
             : null,
           avg_power_watts: null,
           tss,
+          tss_type,
           source: "whoop",
           external_id: String(workout.id),
           raw_data: workout as unknown as ImportedActivityData["raw_data"],

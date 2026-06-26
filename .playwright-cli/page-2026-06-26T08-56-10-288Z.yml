@@ -1,0 +1,300 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link "ChatYourTraining" [ref=e5] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e6]
+        - generic [ref=e8]: ChatYourTraining
+      - navigation [ref=e9]:
+        - link "Tableau de bord" [ref=e10] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e11]
+          - text: Tableau de bord
+        - link "Calendrier" [ref=e16] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e17]
+          - text: Calendrier
+        - link "Entraînements" [ref=e19] [cursor=pointer]:
+          - /url: /workouts
+          - img [ref=e20]
+          - text: Entraînements
+        - link "Objectifs" [ref=e21] [cursor=pointer]:
+          - /url: /objectives
+          - img [ref=e22]
+          - text: Objectifs
+        - link "Santé" [ref=e26] [cursor=pointer]:
+          - /url: /health
+          - img [ref=e27]
+          - text: Santé
+        - link "Intégrations" [ref=e29] [cursor=pointer]:
+          - /url: /integrations
+          - img [ref=e30]
+          - text: Intégrations
+    - generic [ref=e34]:
+      - banner [ref=e35]:
+        - generic [ref=e36]:
+          - heading "Entraînements" [level=1] [ref=e38]
+          - generic [ref=e39]:
+            - link "Coach IA" [ref=e40] [cursor=pointer]:
+              - /url: /chat
+              - img [ref=e41]
+              - generic [ref=e43]: Coach IA
+            - button [ref=e44] [cursor=pointer]:
+              - img [ref=e45]
+            - button "VG Valentin Gremaud Profil" [ref=e100] [cursor=pointer]:
+              - generic [ref=e52]: VG
+              - generic [ref=e53]:
+                - generic [ref=e54]: Valentin Gremaud
+                - generic [ref=e55]: Profil
+              - img [ref=e56]
+      - main [ref=e58]:
+        - generic [ref=e59]:
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - heading "Liste des Entraînements" [level=1] [ref=e62]
+              - paragraph [ref=e63]: Analysez vos performances, surveillez votre charge d'entraînement et exportez vos données brutes.
+            - generic [ref=e64]:
+              - button "Ajouter manuel" [ref=e65] [cursor=pointer]:
+                - img [ref=e66]
+                - text: Ajouter manuel
+              - button "Export CSV" [ref=e67] [cursor=pointer]:
+                - img [ref=e68]
+                - text: Export CSV
+          - generic [ref=e71]:
+            - generic [ref=e72]:
+              - generic [ref=e73]:
+                - img [ref=e74]
+                - textbox "Rechercher un titre, une description ou un objectif" [ref=e79]
+              - button "Filtres" [ref=e81] [cursor=pointer]:
+                - img [ref=e82]
+                - text: Filtres
+            - generic [ref=e84]:
+              - button "Toutes périodes" [ref=e87] [cursor=pointer]
+              - button "Tous sports" [ref=e90] [cursor=pointer]
+              - button "Toutes sources" [ref=e93] [cursor=pointer]
+              - button "Toutes intensités" [ref=e96] [cursor=pointer]
+          - generic [ref=e1880]:
+            - generic [ref=e1881]:
+              - generic [ref=e1882]: Date / Sport / Titre
+              - generic [ref=e1883]: Métriques clés
+              - generic [ref=e1884]: Source
+              - generic [ref=e1885]: Actions
+            - generic [ref=e1886]:
+              - link "JUIN 26 RPE-seuil Matin • Vélo 1h -- km --/-- bpm 80 TSS MANUEL Supprimer la séance" [ref=e1887] [cursor=pointer]:
+                - /url: /workouts/22365837-b8c0-4e7b-88ce-d1c3325834e2
+                - generic [ref=e1888]:
+                  - generic [ref=e1889]:
+                    - generic [ref=e1890]: JUIN
+                    - generic [ref=e1891]: "26"
+                  - generic [ref=e1892]:
+                    - generic [ref=e1893]:
+                      - img [ref=e1894]
+                      - heading "RPE-seuil" [level=3] [ref=e1899]
+                    - paragraph [ref=e1900]: Matin • Vélo
+                - generic [ref=e1901]:
+                  - generic [ref=e1902]:
+                    - img [ref=e1903]
+                    - generic [ref=e1906]: 1h
+                  - generic [ref=e1907]:
+                    - img [ref=e1908]
+                    - generic [ref=e1911]: "-- km"
+                  - generic [ref=e1912]:
+                    - img [ref=e1913]
+                    - generic [ref=e1915]:
+                      - text: "--"
+                      - generic [ref=e1916]: /-- bpm
+                  - generic [ref=e1917]:
+                    - img [ref=e1918]
+                    - generic [ref=e1920]: 80 TSS
+                - generic [ref=e1922]: MANUEL
+                - generic [ref=e1923]:
+                  - button "Supprimer la séance" [ref=e1924]:
+                    - img [ref=e1925]
+                  - img [ref=e1928]
+              - link "JUIN 26 RPE-tempo Matin • Vélo 1h -- km --/-- bpm 60 TSS MANUEL Supprimer la séance" [ref=e1930] [cursor=pointer]:
+                - /url: /workouts/7d95ddc3-de17-4111-9cfc-3c9c08586bd0
+                - generic [ref=e1931]:
+                  - generic [ref=e1932]:
+                    - generic [ref=e1933]: JUIN
+                    - generic [ref=e1934]: "26"
+                  - generic [ref=e1935]:
+                    - generic [ref=e1936]:
+                      - img [ref=e1937]
+                      - heading "RPE-tempo" [level=3] [ref=e1942]
+                    - paragraph [ref=e1943]: Matin • Vélo
+                - generic [ref=e1944]:
+                  - generic [ref=e1945]:
+                    - img [ref=e1946]
+                    - generic [ref=e1949]: 1h
+                  - generic [ref=e1950]:
+                    - img [ref=e1951]
+                    - generic [ref=e1954]: "-- km"
+                  - generic [ref=e1955]:
+                    - img [ref=e1956]
+                    - generic [ref=e1958]:
+                      - text: "--"
+                      - generic [ref=e1959]: /-- bpm
+                  - generic [ref=e1960]:
+                    - img [ref=e1961]
+                    - generic [ref=e1963]: 60 TSS
+                - generic [ref=e1965]: MANUEL
+                - generic [ref=e1966]:
+                  - button "Supprimer la séance" [ref=e1967]:
+                    - img [ref=e1968]
+                  - img [ref=e1971]
+              - link "JUIN 26 RPE-endurance Matin • Vélo 1h -- km --/-- bpm 50 TSS MANUEL Supprimer la séance" [ref=e1973] [cursor=pointer]:
+                - /url: /workouts/8490fd93-c416-4b8d-b603-a84d1a7eaaba
+                - generic [ref=e1974]:
+                  - generic [ref=e1975]:
+                    - generic [ref=e1976]: JUIN
+                    - generic [ref=e1977]: "26"
+                  - generic [ref=e1978]:
+                    - generic [ref=e1979]:
+                      - img [ref=e1980]
+                      - heading "RPE-endurance" [level=3] [ref=e1985]
+                    - paragraph [ref=e1986]: Matin • Vélo
+                - generic [ref=e1987]:
+                  - generic [ref=e1988]:
+                    - img [ref=e1989]
+                    - generic [ref=e1992]: 1h
+                  - generic [ref=e1993]:
+                    - img [ref=e1994]
+                    - generic [ref=e1997]: "-- km"
+                  - generic [ref=e1998]:
+                    - img [ref=e1999]
+                    - generic [ref=e2001]:
+                      - text: "--"
+                      - generic [ref=e2002]: /-- bpm
+                  - generic [ref=e2003]:
+                    - img [ref=e2004]
+                    - generic [ref=e2006]: 50 TSS
+                - generic [ref=e2008]: MANUEL
+                - generic [ref=e2009]:
+                  - button "Supprimer la séance" [ref=e2010]:
+                    - img [ref=e2011]
+                  - img [ref=e2014]
+              - link "JUIN 26 REF-seuil Matin • Vélo 1h -- km --/-- bpm 91 TSS MANUEL Supprimer la séance" [ref=e2016] [cursor=pointer]:
+                - /url: /workouts/4396dbb9-3b14-4c46-8480-c4ff4f29e958
+                - generic [ref=e2017]:
+                  - generic [ref=e2018]:
+                    - generic [ref=e2019]: JUIN
+                    - generic [ref=e2020]: "26"
+                  - generic [ref=e2021]:
+                    - generic [ref=e2022]:
+                      - img [ref=e2023]
+                      - heading "REF-seuil" [level=3] [ref=e2028]
+                    - paragraph [ref=e2029]: Matin • Vélo
+                - generic [ref=e2030]:
+                  - generic [ref=e2031]:
+                    - img [ref=e2032]
+                    - generic [ref=e2035]: 1h
+                  - generic [ref=e2036]:
+                    - img [ref=e2037]
+                    - generic [ref=e2040]: "-- km"
+                  - generic [ref=e2041]:
+                    - img [ref=e2042]
+                    - generic [ref=e2044]:
+                      - text: "--"
+                      - generic [ref=e2045]: /-- bpm
+                  - generic [ref=e2046]:
+                    - img [ref=e2047]
+                    - generic [ref=e2049]: 91 TSS
+                - generic [ref=e2051]: MANUEL
+                - generic [ref=e2052]:
+                  - button "Supprimer la séance" [ref=e2053]:
+                    - img [ref=e2054]
+                  - img [ref=e2057]
+              - link "JUIN 26 REF-tempo Matin • Vélo 1h -- km --/-- bpm 69 TSS MANUEL Supprimer la séance" [ref=e2059] [cursor=pointer]:
+                - /url: /workouts/3cec0dea-3212-4301-8eab-09357fb431f4
+                - generic [ref=e2060]:
+                  - generic [ref=e2061]:
+                    - generic [ref=e2062]: JUIN
+                    - generic [ref=e2063]: "26"
+                  - generic [ref=e2064]:
+                    - generic [ref=e2065]:
+                      - img [ref=e2066]
+                      - heading "REF-tempo" [level=3] [ref=e2071]
+                    - paragraph [ref=e2072]: Matin • Vélo
+                - generic [ref=e2073]:
+                  - generic [ref=e2074]:
+                    - img [ref=e2075]
+                    - generic [ref=e2078]: 1h
+                  - generic [ref=e2079]:
+                    - img [ref=e2080]
+                    - generic [ref=e2083]: "-- km"
+                  - generic [ref=e2084]:
+                    - img [ref=e2085]
+                    - generic [ref=e2087]:
+                      - text: "--"
+                      - generic [ref=e2088]: /-- bpm
+                  - generic [ref=e2089]:
+                    - img [ref=e2090]
+                    - generic [ref=e2092]: 69 TSS
+                - generic [ref=e2094]: MANUEL
+                - generic [ref=e2095]:
+                  - button "Supprimer la séance" [ref=e2096]:
+                    - img [ref=e2097]
+                  - img [ref=e2100]
+              - link "JUIN 26 REF-endurance Matin • Vélo 1h -- km --/-- bpm 49 TSS MANUEL Supprimer la séance" [ref=e2102] [cursor=pointer]:
+                - /url: /workouts/36cb5676-5982-4ecd-bace-c66735504dfd
+                - generic [ref=e2103]:
+                  - generic [ref=e2104]:
+                    - generic [ref=e2105]: JUIN
+                    - generic [ref=e2106]: "26"
+                  - generic [ref=e2107]:
+                    - generic [ref=e2108]:
+                      - img [ref=e2109]
+                      - heading "REF-endurance" [level=3] [ref=e2114]
+                    - paragraph [ref=e2115]: Matin • Vélo
+                - generic [ref=e2116]:
+                  - generic [ref=e2117]:
+                    - img [ref=e2118]
+                    - generic [ref=e2121]: 1h
+                  - generic [ref=e2122]:
+                    - img [ref=e2123]
+                    - generic [ref=e2126]: "-- km"
+                  - generic [ref=e2127]:
+                    - img [ref=e2128]
+                    - generic [ref=e2130]:
+                      - text: "--"
+                      - generic [ref=e2131]: /-- bpm
+                  - generic [ref=e2132]:
+                    - img [ref=e2133]
+                    - generic [ref=e2135]: 49 TSS
+                - generic [ref=e2137]: MANUEL
+                - generic [ref=e2138]:
+                  - button "Supprimer la séance" [ref=e2139]:
+                    - img [ref=e2140]
+                  - img [ref=e2143]
+              - link "JUIN 26 EST-nodata Matin • Vélo 1h -- km --/-- bpm 0 TSS MANUEL Supprimer la séance" [ref=e2145] [cursor=pointer]:
+                - /url: /workouts/0f092e8d-c724-4c68-a014-0766f3583b82
+                - generic [ref=e2146]:
+                  - generic [ref=e2147]:
+                    - generic [ref=e2148]: JUIN
+                    - generic [ref=e2149]: "26"
+                  - generic [ref=e2150]:
+                    - generic [ref=e2151]:
+                      - img [ref=e2152]
+                      - heading "EST-nodata" [level=3] [ref=e2157]
+                    - paragraph [ref=e2158]: Matin • Vélo
+                - generic [ref=e2159]:
+                  - generic [ref=e2160]:
+                    - img [ref=e2161]
+                    - generic [ref=e2164]: 1h
+                  - generic [ref=e2165]:
+                    - img [ref=e2166]
+                    - generic [ref=e2169]: "-- km"
+                  - generic [ref=e2170]:
+                    - img [ref=e2171]
+                    - generic [ref=e2173]:
+                      - text: "--"
+                      - generic [ref=e2174]: /-- bpm
+                  - generic [ref=e2175]:
+                    - img [ref=e2176]
+                    - generic [ref=e2178]: 0 TSS
+                - generic [ref=e2180]: MANUEL
+                - generic [ref=e2181]:
+                  - button "Supprimer la séance" [ref=e2182]:
+                    - img [ref=e2183]
+                  - img [ref=e2186]
+  - alert [ref=e99]

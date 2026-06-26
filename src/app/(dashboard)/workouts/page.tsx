@@ -11,8 +11,17 @@ import {
   Select,
   Spinner,
   Modal,
+  Slider,
   DeleteConfirmationModal,
 } from "@/components/ui";
+import {
+  loadUserThresholds,
+  computeManualTSS,
+  getSportFields,
+  parsePaceToSeconds,
+  isMvpSport,
+  deriveActivityStatus,
+} from "@/lib/calculations/manual-activity";
 import {
   Plus,
   Download,
@@ -105,11 +114,6 @@ const formatIntensityLabel = (value: string) => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
 
-const manualIntensityOptions = intensityOrder.map((value) => ({
-  value,
-  label: formatIntensityLabel(value),
-}));
-
 type PeriodFilter = "all" | "week" | "month" | "3months";
 type ActivityFilters = {
   period: PeriodFilter;
@@ -130,10 +134,17 @@ export default function WorkoutsPage() {
   const getDefaultSessionState = () => ({
     title: "",
     sportId: "",
-    date: toLocalDateString(new Date()),
+    plannedDate: "",
+    realizedDate: toLocalDateString(new Date()),
     duration: "",
     distance: "",
-    intensity: "endurance",
+    elevation: "",
+    pace: "",
+    normalizedPower: "",
+    avgPower: "",
+    avgHr: "",
+    maxHr: "",
+    rpe: 0,
     description: "",
   });
 
@@ -404,7 +415,14 @@ export default function WorkoutsPage() {
   };
 
   const handleCreateSession = async () => {
-    if (!newSession.title || !newSession.sportId || !newSession.date) return;
+    const { status, scheduledDate, completedDate } = deriveActivityStatus({
+      plannedDate: newSession.plannedDate,
+      realizedDate: newSession.realizedDate,
+      todayStr: toLocalDateString(new Date()),
+    });
+    const realized = status === "completed";
+    if (!newSession.title || !newSession.sportId || !scheduledDate) return;
+    if (realized && !newSession.duration) return;
     setIsSavingSession(true);
     try {
       const {
@@ -412,21 +430,82 @@ export default function WorkoutsPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      await supabase.from("activities").insert({
+      const slug =
+        sports.find((s) => s.id === newSession.sportId)?.name ?? "other";
+      const durationMin = newSession.duration
+        ? parseInt(newSession.duration, 10)
+        : null;
+      const distanceKm = newSession.distance
+        ? parseFloat(newSession.distance)
+        : null;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload: any = {
         user_id: user.id,
         title: newSession.title,
         sport_id: newSession.sportId,
-        scheduled_date: newSession.date,
-        planned_duration_minutes: newSession.duration
-          ? parseInt(newSession.duration, 10)
-          : null,
-        planned_distance_km: newSession.distance
-          ? parseFloat(newSession.distance)
-          : null,
-        intensity: newSession.intensity,
+        scheduled_date: scheduledDate,
         description: newSession.description || null,
-        status: "planned",
-      });
+        source: "manual",
+        status,
+      };
+
+      if (realized) {
+        // Realized → completed_date set, actual_* filled, TSS computed.
+        payload.completed_date = `${completedDate}T12:00:00`;
+        payload.actual_duration_minutes = durationMin;
+        payload.actual_distance_km = distanceKm;
+        payload.elevation_gain_m = newSession.elevation
+          ? parseInt(newSession.elevation, 10)
+          : null;
+        payload.avg_hr = newSession.avgHr
+          ? parseInt(newSession.avgHr, 10)
+          : null;
+        payload.max_hr = newSession.maxHr
+          ? parseInt(newSession.maxHr, 10)
+          : null;
+        payload.avg_power_watts = newSession.avgPower
+          ? parseInt(newSession.avgPower, 10)
+          : null;
+        payload.avg_pace_per_km = newSession.pace || null;
+        payload.rpe = newSession.rpe >= 1 ? newSession.rpe : null;
+
+        const np = newSession.normalizedPower
+          ? parseInt(newSession.normalizedPower, 10)
+          : undefined;
+        if (np) payload.raw_data = { _calculated: { normalized_power: np } };
+
+        // Auto-compute TSS with the athlete's profile thresholds (Étape 3).
+        if (durationMin && durationMin > 0) {
+          const thresholds = await loadUserThresholds(supabase, user.id);
+          const { tss, type } = computeManualTSS(
+            {
+              sportSlug: slug,
+              durationMinutes: durationMin,
+              distanceKm: distanceKm ?? undefined,
+              avgPaceSecondsPerKm: parsePaceToSeconds(newSession.pace),
+              normalizedPower: np,
+              avgPowerWatts: newSession.avgPower
+                ? parseInt(newSession.avgPower, 10)
+                : undefined,
+              avgHr: newSession.avgHr
+                ? parseInt(newSession.avgHr, 10)
+                : undefined,
+              rpe: newSession.rpe >= 1 ? newSession.rpe : undefined,
+            },
+            thresholds
+          );
+          payload.tss = tss;
+          payload.tss_type = type;
+        }
+      } else {
+        // Planned / skipped — only planned_* columns, no TSS until realized.
+        payload.planned_duration_minutes = durationMin;
+        payload.planned_distance_km = distanceKm;
+        payload.tss = null;
+      }
+
+      await supabase.from("activities").insert(payload);
 
       setIsModalOpen(false);
       setNewSession(getDefaultSessionState());
@@ -555,6 +634,21 @@ export default function WorkoutsPage() {
     paginationPages[paginationPages.length - 1] || paginationStart;
   const showStartEllipsis = paginationStart > 1;
   const showEndEllipsis = paginationEnd < totalPages;
+
+  const newSessionSlug =
+    sports.find((s) => s.id === newSession.sportId)?.name ?? "";
+  const newSessionFields = newSessionSlug
+    ? getSportFields(newSessionSlug)
+    : null;
+  const newSessionStatus = deriveActivityStatus({
+    plannedDate: newSession.plannedDate,
+    realizedDate: newSession.realizedDate,
+    todayStr: toLocalDateString(new Date()),
+  }).status;
+  const newSessionRealized = newSessionStatus === "completed";
+  const mvpSportOptions = sports
+    .filter((s) => isMvpSport(s.name))
+    .map((s) => ({ value: s.id, label: s.name_fr || s.name }));
 
   return (
     <div className="space-y-6">
@@ -964,7 +1058,13 @@ export default function WorkoutsPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Ajouter une séance"
+        title={
+          newSessionStatus === "completed"
+            ? "Ajouter une séance réalisée"
+            : newSessionStatus === "skipped"
+              ? "Séance manquée"
+              : "Planifier une séance"
+        }
         size="lg"
       >
         <div className="space-y-4">
@@ -976,32 +1076,59 @@ export default function WorkoutsPage() {
               setNewSession((prev) => ({ ...prev, title: e.target.value }))
             }
           />
+          <Select
+            label="Sport"
+            value={newSession.sportId}
+            onChange={(value) =>
+              setNewSession((prev) => ({ ...prev, sportId: value }))
+            }
+            placeholder="Choisissez un sport"
+            options={mvpSportOptions}
+          />
+          {/* Deux dates optionnelles — leur combinaison fixe le statut */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Date"
+              label="Date planifiée"
               type="date"
               className="w-full max-w-full"
-              value={newSession.date}
+              value={newSession.plannedDate}
               onChange={(e) =>
-                setNewSession((prev) => ({ ...prev, date: e.target.value }))
+                setNewSession((prev) => ({
+                  ...prev,
+                  plannedDate: e.target.value,
+                }))
               }
             />
-            <Select
-              label="Sport"
-              value={newSession.sportId}
-              onChange={(value) =>
-                setNewSession((prev) => ({ ...prev, sportId: value }))
+            <Input
+              label="Date réalisée"
+              type="date"
+              className="w-full max-w-full"
+              value={newSession.realizedDate}
+              onChange={(e) =>
+                setNewSession((prev) => ({
+                  ...prev,
+                  realizedDate: e.target.value,
+                }))
               }
-              placeholder="Choisissez un sport"
-              options={sports.map((sport) => ({
-                value: sport.id,
-                label: sport.name_fr || sport.name,
-              }))}
             />
           </div>
+
+          {/* Statut déduit de la combinaison des deux dates */}
+          {(newSession.plannedDate || newSession.realizedDate) && (
+            <p className="text-xs text-muted">
+              {newSessionStatus === "completed"
+                ? "Séance réalisée : le TSS sera calculé automatiquement."
+                : newSessionStatus === "skipped"
+                  ? "Date planifiée passée sans réalisation → séance manquée (skipped)."
+                  : "Séance planifiée : pas de TSS tant qu'elle n'est pas réalisée."}
+            </p>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Durée (minutes)"
+              label={
+                newSessionRealized ? "Durée (minutes) *" : "Durée prévue (minutes)"
+              }
               type="number"
               min={0}
               value={newSession.duration}
@@ -1009,25 +1136,133 @@ export default function WorkoutsPage() {
                 setNewSession((prev) => ({ ...prev, duration: e.target.value }))
               }
             />
-            <Input
-              label="Distance (km)"
-              type="number"
-              min={0}
-              step="0.1"
-              value={newSession.distance}
-              onChange={(e) =>
-                setNewSession((prev) => ({ ...prev, distance: e.target.value }))
-              }
-            />
+            {newSessionFields?.distance && (
+              <Input
+                label="Distance (km)"
+                type="number"
+                min={0}
+                step="0.1"
+                value={newSession.distance}
+                onChange={(e) =>
+                  setNewSession((prev) => ({
+                    ...prev,
+                    distance: e.target.value,
+                  }))
+                }
+              />
+            )}
           </div>
-          <Select
-            label="Intensité"
-            value={newSession.intensity}
-            onChange={(value) =>
-              setNewSession((prev) => ({ ...prev, intensity: value }))
-            }
-            options={manualIntensityOptions}
-          />
+
+          {/* Champs adaptatifs — uniquement pour une séance réalisée */}
+          {newSessionRealized && newSessionFields && (
+            <>
+              {(newSessionFields.elevation || newSessionFields.pace) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {newSessionFields.elevation && (
+                    <Input
+                      label="Dénivelé D+ (m)"
+                      type="number"
+                      min={0}
+                      value={newSession.elevation}
+                      onChange={(e) =>
+                        setNewSession((prev) => ({
+                          ...prev,
+                          elevation: e.target.value,
+                        }))
+                      }
+                    />
+                  )}
+                  {newSessionFields.pace && (
+                    <Input
+                      label="Allure moyenne (min/km)"
+                      placeholder="5:30"
+                      value={newSession.pace}
+                      onChange={(e) =>
+                        setNewSession((prev) => ({
+                          ...prev,
+                          pace: e.target.value,
+                        }))
+                      }
+                    />
+                  )}
+                </div>
+              )}
+
+              {newSessionFields.power && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Puissance normalisée (NP, W)"
+                    type="number"
+                    min={0}
+                    value={newSession.normalizedPower}
+                    onChange={(e) =>
+                      setNewSession((prev) => ({
+                        ...prev,
+                        normalizedPower: e.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    label="Puissance moyenne (W)"
+                    type="number"
+                    min={0}
+                    value={newSession.avgPower}
+                    onChange={(e) =>
+                      setNewSession((prev) => ({
+                        ...prev,
+                        avgPower: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              )}
+
+              {newSessionFields.hr && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="FC moyenne (bpm)"
+                    type="number"
+                    min={0}
+                    value={newSession.avgHr}
+                    onChange={(e) =>
+                      setNewSession((prev) => ({
+                        ...prev,
+                        avgHr: e.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    label="FC max séance (bpm)"
+                    type="number"
+                    min={0}
+                    value={newSession.maxHr}
+                    onChange={(e) =>
+                      setNewSession((prev) => ({
+                        ...prev,
+                        maxHr: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              )}
+
+              <Slider
+                label="RPE — ressenti de l'effort"
+                min={0}
+                max={10}
+                step={1}
+                value={newSession.rpe}
+                valueFormatter={(v) => (v === 0 ? "—" : `${v}/10`)}
+                onChange={(e) =>
+                  setNewSession((prev) => ({
+                    ...prev,
+                    rpe: parseInt(e.target.value, 10),
+                  }))
+                }
+              />
+            </>
+          )}
+
           <textarea
             className="w-full px-3 py-2 bg-dark-100 border border-dark-200 rounded-xl text-sm resize-none focus:border-accent focus:outline-none"
             rows={3}
@@ -1045,7 +1280,10 @@ export default function WorkoutsPage() {
               onClick={handleCreateSession}
               isLoading={isSavingSession}
               disabled={
-                !newSession.title || !newSession.date || !newSession.sportId
+                !newSession.title ||
+                !newSession.sportId ||
+                (!newSession.plannedDate && !newSession.realizedDate) ||
+                (newSessionRealized && !newSession.duration)
               }
             >
               Ajouter
