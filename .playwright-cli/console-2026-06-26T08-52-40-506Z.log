@@ -5,3 +5,19 @@
 [   55108ms] [LOG] [CyclingTSS] activity - duration=1.00h, NP=208W, FTP=250W, IF=0.83, TSS=69 @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:409
 [   74903ms] [LOG] [NormPower] activity - Using pre-calculated NP: 238W @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:394
 [   74903ms] [LOG] [CyclingTSS] activity - duration=1.00h, NP=238W, FTP=250W, IF=0.95, TSS=91 @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:409
+[42576100ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ https://bgyqogwzrozoxpzfejdr.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[42576101ms] [ERROR] TypeError: Failed to fetch
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/lib/helpers.js:120:25)
+    at _handleRequest (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/lib/fetch.js:106:24)
+    at _request (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/lib/fetch.js:96:24)
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/GoTrueClient.js:1827:82)
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/lib/helpers.js:210:42)
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/lib/helpers.js:223:11)
+    at new Promise (<anonymous>)
+    at retryable (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/lib/helpers.js:204:21)
+    at SupabaseAuthClient._refreshAccessToken (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/GoTrueClient.js:1822:81)
+    at SupabaseAuthClient._callRefreshToken (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/GoTrueClient.js:1980:48)
+    at SupabaseAuthClient.__loadSession (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/GoTrueClient.js:1238:57)
+    at async SupabaseAuthClient._useSession (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/GoTrueClient.js:1172:28)
+    at async eval (webpack-internal:///(app-pages-browser)/./node_modules/@supabase/auth-js/dist/module/GoTrueClient.js:2215:32) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-index.js:32
+[137935139ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://bgyqogwzrozoxpzfejdr.supabase.co/auth/v1/token?grant_type=refresh_token:0

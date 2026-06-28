@@ -1,0 +1,12 @@
+[     166ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[     385ms] [LOG] [Fast Refresh] done in 219ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[     599ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js:38559
+[  124438ms] [LOG] [NormPower] activity - Using pre-calculated NP: 208W @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:394
+[  124438ms] [LOG] [CyclingTSS] activity - duration=1.00h, NP=208W, FTP=250W, IF=0.83, TSS=69 @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:409
+[  187926ms] [LOG] [NormPower] activity - Using pre-calculated NP: 175W @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:394
+[  187926ms] [LOG] [CyclingTSS] activity - duration=1.00h, NP=175W, FTP=250W, IF=0.70, TSS=49 @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:409
+[  192761ms] [LOG] [NormPower] activity - Using pre-calculated NP: 238W @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:394
+[  192761ms] [LOG] [CyclingTSS] activity - duration=1.00h, NP=238W, FTP=250W, IF=0.95, TSS=91 @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:409
+[  197523ms] [LOG] [rTSS] activity - duration=1.00h, NGP=429.0s/km (7:09/km), FTPace=300s/km (5:00/km), IF=0.70, rTSS=54 (×110) @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:335
+[  202480ms] [LOG] [rTSS] activity - duration=1.00h, NGP=361.0s/km (6:01/km), FTPace=300s/km (5:00/km), IF=0.83, rTSS=76 (×110) @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:335
+[  207348ms] [LOG] [rTSS] activity - duration=1.00h, NGP=316.0s/km (5:16/km), FTPace=300s/km (5:00/km), IF=0.95, rTSS=99 (×110) @ webpack-internal:///(app-pages-browser)/./src/lib/calculations/training-load.ts:335

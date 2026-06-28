@@ -1,0 +1,110 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vérification des formules TSS par type</title>
+<style>
+:root{--bg:#0b0f14;--card:#131a22;--line:#1f2a36;--fg:#e6edf3;--muted:#8aa0b2;--accent:#00d4aa;--blue:#5b9bff;--amber:#f59e0b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 20px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:30px 0 10px;color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 24px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.kpis{display:flex;gap:14px;flex-wrap:wrap}
+.kpi{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums}
+.ok{background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55}
+.tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--muted)}
+.formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--blue);background:#0b0f14;border:1px solid var(--line);border-radius:7px;padding:6px 10px;display:inline-block;margin:2px 0 8px}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+.foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+.info{border-left:3px solid var(--blue);background:#5b9bff0d}
+.note{border-left:3px solid var(--amber);background:#f59e0b0d}
+</style></head><body><div class="wrap">
+<h1>Vérification des formules TSS — référence connue vs calcul de l'application</h1>
+<p class="sub"><b>Critère :</b> « une activité importée avec des données → le TSS utilise la formule la mieux adaptée au sport, sinon le hrTSS en dernier recours ». <b>Méthode :</b> pour chaque type, la valeur attendue est calculée à la main depuis la formule (référence connue exacte), puis les mêmes inputs sont saisis dans le formulaire réel de l'app (Playwright) et le TSS <b>écrit en base</b> est relu. L'écart mesure la fidélité de l'implémentation. • Seuils : FTP 250 W · allure seuil 5:00/km · LTHR 165 · FCrepos 50 · FCmax 190 · CSS 1:30/100m • 2026-06-28</p>
+
+<div class="kpis">
+ <div class="kpi"><div class="v" style="color:var(--accent)">15 / 15</div><div class="l">Cas testés via Playwright — correspondance exacte</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">0,00 %</div><div class="l">Écart max référence ↔ app</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">17 / 17</div><div class="l">Type de TSS correctement sélectionné</div></div>
+ <div class="kpi"><div class="v" style="color:var(--blue)">6</div><div class="l">Types de TSS couverts</div></div>
+</div>
+<p class="muted" style="margin:6px 2px 0">Note : <code>calculateActivityTSS</code> est le moteur <b>commun</b> à l'import (Strava/Whoop) et à la création manuelle ; tester via le formulaire valide donc la même logique de calcul que l'import. La sélection « bon type par sport » suit la cascade : puissance (vélo) → allure (course) → natation → <b>FC</b> → RPE → estimated.</p>
+
+<h2><span class="tag">tss</span> Puissance — cyclisme</h2>
+<div class="card">
+<div class="formula">TSS = durée_h × (NP / FTP)² × 100</div>
+<table><thead><tr><th>Cas (input)</th><th class="num">Réf. (main)</th><th class="num">App (base)</th><th>Type app</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>NP 225 W · 60 min · IF 0,90</td><td class="num">81</td><td class="num">81</td><td><span class="tag">tss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>NP 200 W · 90 min · IF 0,80</td><td class="num">96</td><td class="num">96</td><td><span class="tag">tss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>NP 250 W · 60 min · IF 1,00</td><td class="num">100</td><td class="num">100</td><td><span class="tag">tss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+</tbody></table>
+</div>
+
+<h2><span class="tag">rtss</span> Allure — course à pied</h2>
+<div class="card">
+<div class="formula">rTSS = durée_h × (allure_seuil / allure)² × 110</div>
+<table><thead><tr><th>Cas (input)</th><th class="num">Réf. (main)</th><th class="num">App (base)</th><th>Type app</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>5:00/km · 60 min · IF 1,00</td><td class="num">110</td><td class="num">110</td><td><span class="tag">rtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>6:15/km · 60 min · IF 0,80</td><td class="num">70</td><td class="num">70</td><td><span class="tag">rtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>4:00/km · 60 min · IF 1,25</td><td class="num">172</td><td class="num">172</td><td><span class="tag">rtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+</tbody></table>
+</div>
+
+<h2><span class="tag">hrtss</span> Fréquence cardiaque — marche (et 5 autres sports FC)</h2>
+<div class="card">
+<div class="formula">hrTSS = ((FCmoy − FCrepos) / (LTHR − FCrepos))² × durée_h × 100</div>
+<table><thead><tr><th>Cas (input)</th><th class="num">Réf. (main)</th><th class="num">App (base)</th><th>Type app</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>FC 165 · 60 min · IF 1,00</td><td class="num">100</td><td class="num">100</td><td><span class="tag">hrtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>FC 142 · 60 min · IF 0,80</td><td class="num">64</td><td class="num">64</td><td><span class="tag">hrtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>FC 130 · 60 min · IF 0,696</td><td class="num">48</td><td class="num">48</td><td><span class="tag">hrtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+</tbody></table>
+</div>
+
+<h2><span class="tag">hrtss</span> Repli « sinon hrTSS » — sport à méthode propre mais sans sa donnée</h2>
+<div class="card info">
+<p class="sub" style="margin:0 0 10px">Cœur du critère : quand le sport a une méthode dédiée mais que la donnée manque (vélo sans puissance, course sans allure), la cascade doit <b>retomber sur le hrTSS</b> si une FC est présente.</p>
+<table><thead><tr><th>Cas (input)</th><th class="num">Réf. (main)</th><th class="num">App (base)</th><th>Type app</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>Vélo · <b>aucune puissance</b> · FC 142 · 60 min</td><td class="num">64</td><td class="num">64</td><td><span class="tag">hrtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>Course · <b>aucune allure</b> · FC 142 · 60 min</td><td class="num">64</td><td class="num">64</td><td><span class="tag">hrtss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">✓ Le repli fonctionne : le type bascule de <code>tss</code>/<code>rtss</code> vers <code>hrtss</code> dès que la donnée propre est absente.</p>
+</div>
+
+<h2><span class="tag">rpe</span> Ressenti (table de Friel) &nbsp;·&nbsp; <span class="tag">estimated</span> Aucune donnée</h2>
+<div class="card">
+<div class="formula">RPE → TSS = Friel[RPE] × durée_h &nbsp;&nbsp;|&nbsp;&nbsp; estimated = 0</div>
+<table><thead><tr><th>Cas (input)</th><th class="num">Réf. (main)</th><th class="num">App (base)</th><th>Type app</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>RPE 3 · 60 min (Friel 40/h)</td><td class="num">40</td><td class="num">40</td><td><span class="tag">rpe</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>RPE 6 · 60 min (Friel 70/h)</td><td class="num">70</td><td class="num">70</td><td><span class="tag">rpe</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>RPE 8 · 60 min (Friel 100/h)</td><td class="num">100</td><td class="num">100</td><td><span class="tag">rpe</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>Aucune donnée (ni puissance/allure/FC/RPE)</td><td class="num">0</td><td class="num">0</td><td><span class="tag">estimated</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+</tbody></table>
+</div>
+
+<h2><span class="tag">stss</span> Natation — vérifié hors UI (sport hors MVP)</h2>
+<div class="card note">
+<div class="formula">sTSS = (NSS / CSS)³ × durée_h × 100 &nbsp;&nbsp;(NSS = distance / temps · CSS = 100 / css_100m)</div>
+<table><thead><tr><th>Cas (input)</th><th class="num">Réf. (main)</th><th class="num">Moteur</th><th>Type</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>2000 m · 30 min · CSS 1:30 · IF 1,00</td><td class="num">50</td><td class="num">50</td><td><span class="tag">stss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+<tr><td>1500 m · 30 min · CSS 1:30 · IF 0,75</td><td class="num">21</td><td class="num">21</td><td><span class="tag">stss</span></td><td class="num"><span class="badge ok">0,00 %</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">⚠️ La <b>natation ne fait pas partie des 9 sports MVP</b> du formulaire de création manuelle : <code>stss</code> n'est donc <b>pas testable via l'UI manuelle</b>. La formule a été vérifiée avec le moteur de production verbatim (<code>calculateSTSS</code>) — exacte. <code>stss</code> reste actif sur le <b>chemin d'import</b> (sync Strava/Whoop d'une activité natation). À tester en bout-en-bout lors d'un vrai import de natation.</p>
+</div>
+
+<h2>Conclusion</h2>
+<div class="card">
+<ul>
+<li><b>Critère satisfait.</b> Pour chaque sport, l'app applique la formule attendue et sélectionne le bon <code>tss_type</code> ; à défaut de donnée propre, elle retombe correctement sur le <b>hrTSS</b>.</li>
+<li><b>Fidélité parfaite :</b> <b>15/15</b> cas testés via Playwright et <b>2/2</b> cas natation (moteur) reproduisent la formule à <b>0,00 %</b> près (seul l'arrondi entier s'applique, identique au calcul manuel).</li>
+<li><b>Sélection du type :</b> 17/17 corrects — <code>tss</code> (vélo), <code>rtss</code> (course), <code>hrtss</code> (FC + replis), <code>rpe</code>, <code>estimated</code>, <code>stss</code> (natation).</li>
+<li><b>Seul point ouvert :</b> la natation étant exclue du formulaire manuel, son type <code>stss</code> n'est validable qu'à l'import — pas un bug de calcul, une couverture UI à compléter si la saisie manuelle de natation devient nécessaire.</li>
+</ul>
+</div>
+
+<p class="foot">Méthodologie : référence = formule TrainingPeaks calculée à la main avec des inputs choisis pour donner des IF « ronds » (valeurs connues exactes). Mesure = 15 séances créées dans le formulaire de création manuelle de l'app (Playwright, session réelle authentifiée), <code>tss</code> et <code>tss_type</code> relus en base — le calcul étant celui du code de production (<code>src/lib/calculations/training-load.ts</code> → <code>calculateActivityTSS</code>, commun import + manuel). La natation (<code>stss</code>) a été vérifiée via le moteur verbatim faute de sport correspondant dans le formulaire. Séances de test et seuils temporaires supprimés après mesure.</p>
+</div></body></html>

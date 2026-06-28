@@ -361,7 +361,7 @@ _afin de_ disposer d'une mesure homogène de la charge de chaque séance quelle 
 
 - Étant donné qu'une activité est saisie manuellement ou qu'elle est importé sans données avec seulement un RPE (1–10),
   quand le TSS est calculé,
-  alors il utilise la table de Friel (RPE-based TSS) et le type de calcul `rpe-based` est enregistré.
+  alors il utilise la table de Friel (RPE-based TSS) et le type de calcul `rpe` est enregistré.
 
 - Étant donné qu'une activité est importée sans aucune donnée de puissance, d'allure ni de FC,
   quand le calcul est tenté,

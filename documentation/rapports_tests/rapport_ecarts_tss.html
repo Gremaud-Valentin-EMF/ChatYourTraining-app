@@ -1,0 +1,88 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rapport — Écart TSS adapté au sport vs RPE</title>
+<style>
+:root{--bg:#0b0f14;--card:#131a22;--line:#1f2a36;--fg:#e6edf3;--muted:#8aa0b2;--accent:#00d4aa;--blue:#5b9bff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 20px}
+.wrap{max-width:960px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:32px 0 12px;color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 24px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0}
+.kpis{display:flex;gap:14px;flex-wrap:wrap}
+.kpi{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--muted)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+ul{margin:8px 0 0;padding-left:20px}li{margin:4px 0}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+.foot{color:var(--muted);font-size:12px;margin-top:28px;border-top:1px solid var(--line);padding-top:14px}
+</style></head><body><div class="wrap">
+<h1>Écart du TSS estimé par RPE vs le TSS adapté au sport</h1>
+<p class="sub">Pour chaque sport, la <b>référence</b> est le TSS calculé avec sa <b>bonne méthode</b> (puissance, allure ou FC) — pas un TSS unique. On mesure l'écart de l'estimation <code>rpe</code> (table de Friel) face à cette référence. • <b>Validé end-to-end via Playwright</b> : 12 séances réelles créées dans le formulaire de l'app, TSS relus en base. • Séances 60 min • FTP 250 W · allure seuil 5:00/km · LTHR 165 · FCrepos 50 · FCmax 190 • 2026-06-28</p>
+
+<div class="kpis">
+ <div class="kpi"><div class="v" style="color:#00d4aa">7.6 %</div><div class="l">RPE vs <code>hrtss</code> — 6 sports FC</div></div>
+ <div class="kpi"><div class="v" style="color:#f59e0b">9.1 %</div><div class="l">RPE vs <code>tss</code> — vélo / VTT</div></div>
+ <div class="kpi"><div class="v" style="color:#ef4444">15.9 %</div><div class="l">RPE vs <code>rtss</code> — course</div></div>
+</div>
+<p class="muted" style="margin:6px 2px 0">Écart absolu moyen par méthode de référence (3 intensités chacune). Le RPE est sport-agnostique : Endurance → RPE 4, Tempo → RPE 5, Seuil → RPE 7.</p>
+
+<h2>Vélo &amp; VTT — RPE vs puissance (<code>tss</code>)</h2>
+<div class="card">
+<p class="sub" style="margin:0 0 12px">Référence = TSS puissance (NP/FTP). Identique pour le VTT (mappé sur « cycling »).</p>
+<table><thead><tr><th>Intensité</th><th class="num">Réf. <span class="tag">tss</span></th><th class="num">RPE</th><th class="num">Estimation RPE</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>Endurance</td><td class="num">49</td><td class="num">4</td><td class="num">50</td><td class="num"><span class="badge" style="background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55">+2.0 %</span></td></tr>
+<tr><td>Tempo</td><td class="num">69</td><td class="num">5</td><td class="num">60</td><td class="num"><span class="badge" style="background:#f59e0b1a;color:#f59e0b;border-color:#f59e0b55">-13.0 %</span></td></tr>
+<tr><td>Seuil</td><td class="num">91</td><td class="num">7</td><td class="num">80</td><td class="num"><span class="badge" style="background:#f59e0b1a;color:#f59e0b;border-color:#f59e0b55">-12.1 %</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Écart absolu moyen <b>9.1 %</b> (max 13.0 %).</p>
+</div>
+
+<h2>Course à pied — RPE vs allure (<code>rtss</code>)</h2>
+<div class="card">
+<p class="sub" style="margin:0 0 12px">Référence = rTSS (allure normalisée / allure seuil, coefficient ×110). C'est ici que le RPE s'écarte le plus.</p>
+<table><thead><tr><th>Intensité</th><th class="num">Réf. <span class="tag">rtss</span></th><th class="num">RPE</th><th class="num">Estimation RPE</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>Endurance</td><td class="num">54</td><td class="num">4</td><td class="num">50</td><td class="num"><span class="badge" style="background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55">-7.4 %</span></td></tr>
+<tr><td>Tempo</td><td class="num">76</td><td class="num">5</td><td class="num">60</td><td class="num"><span class="badge" style="background:#ef44441a;color:#ef4444;border-color:#ef444455">-21.1 %</span></td></tr>
+<tr><td>Seuil</td><td class="num">99</td><td class="num">7</td><td class="num">80</td><td class="num"><span class="badge" style="background:#f59e0b1a;color:#f59e0b;border-color:#f59e0b55">-19.2 %</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Écart absolu moyen <b>15.9 %</b> (max 21.1 %). Le RPE (calibré ≈ ×100) <b>sous-estime systématiquement</b> la course, dont le rTSS porte le surcoût ×110. Le RPE seul n'intègre pas cette majoration → l'écart est le plus marqué de tous les sports.</p>
+</div>
+
+<h2>Marche, randonnée, ski, renforcement, autre — RPE vs FC (<code>hrtss</code>)</h2>
+<div class="card">
+<p class="sub" style="margin:0 0 12px">Référence = hrTSS (FC moy. / LTHR, Karvonen). Identique pour les 6 sports (même branche moteur).</p>
+<table><thead><tr><th>Intensité</th><th class="num">Réf. <span class="tag">hrtss</span></th><th class="num">RPE</th><th class="num">Estimation RPE</th><th class="num">Écart</th></tr></thead><tbody>
+<tr><td>Endurance</td><td class="num">50</td><td class="num">4</td><td class="num">50</td><td class="num"><span class="badge" style="background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55">0.0 %</span></td></tr>
+<tr><td>Tempo</td><td class="num">68</td><td class="num">5</td><td class="num">60</td><td class="num"><span class="badge" style="background:#f59e0b1a;color:#f59e0b;border-color:#f59e0b55">-11.8 %</span></td></tr>
+<tr><td>Seuil</td><td class="num">90</td><td class="num">7</td><td class="num">80</td><td class="num"><span class="badge" style="background:#f59e0b1a;color:#f59e0b;border-color:#f59e0b55">-11.1 %</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Écart absolu moyen <b>7.6 %</b> (max 11.8 %) — le RPE colle le mieux à la FC.</p>
+</div>
+
+<div class="legend card" style="padding:14px 18px">
+ <span><span class="dot" style="background:#00d4aa"></span>≤ 10 % (acceptable)</span>
+ <span><span class="dot" style="background:#f59e0b"></span>10–20 % (toléré pour le RPE)</span>
+ <span><span class="dot" style="background:#ef4444"></span>&gt; 20 % (à surveiller)</span>
+</div>
+
+<h2>Lecture &amp; seuils recommandés</h2>
+<div class="card">
+<ul>
+<li><b>Le RPE sous-estime presque partout</b> aux intensités tempo/seuil : le barème de Friel (entier) crédite un cran de RPE un peu moins que l'IF² réel de la méthode physiologique.</li>
+<li><b>vs hrTSS (FC) : 7.6 %</b> — meilleur accord. L'endurance tombe pile (RPE 4 ≈ IF 0,70).</li>
+<li><b>vs puissance (vélo) : 9.1 %</b> — bon accord, même profil que la FC.</li>
+<li><b>vs rTSS (course) : 15.9 %</b> — le plus mauvais, car le rTSS majore de ×110 (surcoût course) que le RPE n'intègre pas. <b>Conseil : préférer l'allure ou la FC à la course ; n'utiliser le RPE qu'en dernier recours.</b></li>
+<li><b>Seuil d'acceptation conseillé pour le RPE : ≤ 20 %.</b> Toutes les valeurs y restent (max 21.1 % en course tempo, à la limite). Au-delà, l'écart vient d'un sport mal adapté au RPE, pas d'un bug.</li>
+<li><b>Lissage :</b> ces écarts par séance sont absorbés par la <b>CTL/ATL</b> (moyennes mobiles 42 j / 7 j) — impact faible sur les tendances de charge.</li>
+</ul>
+</div>
+
+<p class="foot">Méthodologie : référence = TSS de la bonne méthode par sport (<code>tss</code> puissance, <code>rtss</code> allure, <code>hrtss</code> FC) à IF fixé (0,70 / 0,83 / 0,95) ; comparaison = <code>rpe</code> (table de Friel, RPE 4 / 5 / 7). <b>Mesure réelle end-to-end via Playwright</b> : 12 séances (3 puissance + 3 allure + 3 FC + 3 RPE) créées dans le formulaire de création manuelle de l'app, le TSS étant celui <b>écrit en base</b> par le code de production. Valeurs lues : puissance 49 / 69 / 91 (<code>tss</code>), allure 54 / 76 / 99 (<code>rtss</code>), FC 50 / 68 / 90 (<code>hrtss</code>), RPE 50 / 60 / 80 (<code>rpe</code>) — conformes au moteur. Les 6 sports FC (marche, rando, ski alpin, ski de fond, renfo, autre) partagent la branche <code>hrtss</code> : résultats identiques, la marche servant de représentant testé. Séances de test supprimées et seuils temporaires retirés après mesure.</p>
+</div></body></html>
