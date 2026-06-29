@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rapport de tests — US-30 · Construction et injection du contexte JSON</title>
+<style>
+:root{--bg:#0b0f14;--card:#131a22;--line:#1f2a36;--fg:#e6edf3;--muted:#8aa0b2;--accent:#00d4aa;--blue:#5b9bff;--amber:#f59e0b;--red:#ef4444}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 20px}
+.wrap{max-width:1080px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:34px 0 10px;color:var(--accent)}h3{font-size:14px;margin:18px 0 6px}
+.sub{color:var(--muted);margin:0 0 22px;font-size:13px}
+.row{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.kpi{flex:1;min-width:160px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13.5px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px}
+.ok{background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55}
+.warn{background:#f59e0b1a;color:#f59e0b;border-color:#f59e0b55}
+.tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--muted)}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+pre{background:#0b0f14;border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;font-size:12.5px;margin:8px 0}
+.foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+.info{border-left:3px solid var(--blue);background:#5b9bff0d}
+.quote{border-left:3px solid var(--accent);background:#00d4aa0d;padding:12px 14px;border-radius:0 10px 10px 0;margin:10px 0;font-size:13.5px;white-space:pre-wrap}
+.hl{color:var(--accent);font-weight:700}.hlb{color:var(--blue);font-weight:700}.hla{color:var(--amber);font-weight:700}
+</style></head><body><div class="wrap">
+
+<h1>US-30 — Construction et injection du contexte JSON</h1>
+<p class="sub">Rapport de tests · ChatYourTraining · 29 juin 2026 · Provider IA : <code>gemini-2.5-flash-lite</code> · Tous les sports du MVP</p>
+
+<div class="row">
+  <div class="kpi"><div class="v" style="color:var(--accent)">3 / 3</div><div class="l">Critères d'acceptation validés</div></div>
+  <div class="kpi"><div class="v" style="color:var(--accent)">8 / 8</div><div class="l">Sports du MVP testés (AC1)</div></div>
+  <div class="kpi"><div class="v" style="color:var(--blue)">10</div><div class="l">Comptes de test (8 sports + déconnecté + mutable)</div></div>
+  <div class="kpi"><div class="v" style="color:var(--accent)">100 %</div><div class="l">Contexte reconstruit & injecté à chaque message</div></div>
+</div>
+
+<h2>1. Rappel de la user story</h2>
+<div class="card">
+<p style="margin:0 0 8px"><b>En tant qu'athlète, je veux que le Coach IA dispose d'un contexte frais et complet à chaque message</b>, construit à partir de mes données réelles et injecté dans le prompt, afin que ses réponses soient personnalisées et à jour.</p>
+<ul style="margin:6px 0">
+<li><b>AC1</b> — Le contexte construit contient : date/heure courante, profil athlète (sports, seuils physio, objectif principal), état physiologique du jour (récupération, sommeil, HRV), métriques de charge (CTL/ATL/TSB) et planning (séance du jour + séances à venir).</li>
+<li><b>AC2</b> — Quand une source de données n'est pas connectée, les champs correspondants sont absents/null et le Coach s'adapte <b>sans générer d'erreur</b>.</li>
+<li><b>AC3</b> — Quand je modifie mon profil (sport, seuils, objectif), le contexte reflète les nouvelles données <b>dès le message suivant</b> et le Coach ajuste.</li>
+</ul>
+</div>
+
+<h2>2. Architecture vérifiée — « Stateful Context, Stateless Model »</h2>
+<div class="card info">
+<p style="margin:0 0 8px">À chaque <code>POST /api/chat</code>, <code>buildCoachContext(userId, timezone)</code> (<code>src/lib/openai/coach.ts</code>) reconstruit un <b>instantané JSON complet</b> à partir de la base (profil, physiologie, charge, planning, météo), puis <code>formatContextForPrompt()</code> l'injecte dans le <code>SYSTEM_PROMPT</code>. Le modèle ne conserve aucun état : <b>le contexte est neuf à chaque appel</b> → l'AC3 est satisfait par construction.</p>
+<p style="margin:0">Le contexte exact injecté est persisté dans <code>chat_messages.context_snapshot</code> <b>avant</b> l'appel au LLM (route.ts L110-116). Les instantanés ci-dessous sont lus directement en base : ils constituent la preuve déterministe, indépendante de la réponse du modèle.</p>
+</div>
+
+<h2>3. AC1 — Contexte complet sur les 8 sports du MVP</h2>
+<p class="muted">Profil commun : H, 30 ans, 70 kg / 176 cm, FC max 190, niveau avancé. Physiologie du jour (Whoop) identique : récupération <span class="hla">61 % (jaune)</span>, sommeil <b>7,2 h</b>, HRV <b>65 ms (stable)</b>. Charge : <b>CTL 50,9 / ATL 52,4 / TSB −9</b> → <span class="hla">« Légèrement fatigué »</span>. Objectif prioritaire A à <b>J-18</b>. Date courante injectée : <code>2026-06-29</code>, fuseau <code>Europe/Zurich</code>.</p>
+
+<table>
+<thead><tr><th>Sport</th><th>Seuils dans le contexte</th><th>Séance du jour (planning)</th><th>Objectif</th><th>Vocabulaire de la réponse Coach</th><th class="num">AC1</th></tr></thead>
+<tbody>
+<tr><td><b>Course à pied</b></td><td>VMA 16 km/h</td><td>Tempo 45 min</td><td>Semi de Lyon</td><td><span class="hl">allure 4:10-4:20 /km</span>, 85-90 % VMA</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>Vélo</b></td><td>FTP 250 W</td><td>Sweet spot 2×20 min</td><td>Cyclosportive des Alpes</td><td><span class="hl">Sweet Spot 220-235 W</span> (88-94 % FTP)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>VTT</b></td><td>FTP 240 W</td><td>Sortie technique 2 h</td><td>Roc d'Azur</td><td>charge gérée, intensité / technique</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>Marche</b></td><td>— (effort perçu)</td><td>Marche active 1 h</td><td>Marathon de marche</td><td><span class="hl">marche active confortable</span>, durée, ressenti</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>Randonnée</b></td><td>— (effort perçu)</td><td>Rando / D+</td><td>Trek du Mont-Blanc</td><td><span class="hl">allure / durée / ressenti</span>, D+</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>Ski alpin</b></td><td>— (effort perçu)</td><td>Ski 15 descentes</td><td>Stage ski compétition</td><td>descentes, FC, ressenti</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>Ski de fond</b></td><td>— (effort perçu)</td><td>Ski de fond endurance 1h30</td><td>Foulée Blanche</td><td>endurance, base aérobie, FC/ressenti</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>Renforcement</b></td><td>— (effort perçu)</td><td>Renfo full body 1 h</td><td>Prépa physique hivernale</td><td><span class="hl">charge / séries / répétitions</span>, technique, RIR</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody>
+</table>
+
+<h3>Exemple d'instantané injecté — Course à pied (extrait <code>context_snapshot</code>)</h3>
+<pre>{
+  "current_datetime": { "date": "2026-06-29", "time": "14:xx", "timezone": "Europe/Zurich" },
+  "athlete_profile": {
+    "age": 30, "weight_kg": 70, "height_cm": 176, "hr_max": 190, "hr_rest": 50,
+    "sports": [ { "name": "running", "level": "advanced", "vma_kmh": 16, "ftp_watts": null, "css_per_100m": null } ],
+    "objective": { "name": "Semi de Lyon", "date": "2026-07-17", "priority": "A", "days_remaining": 18 }
+  },
+  "physiological_status_today": {
+    "recovery_score": 61, "recovery_status": "yellow", "hrv_ms": 65, "hrv_trend": "stable",
+    "sleep": { "duration_hours": 7.2, "quality_score": 78 }, "source": "whoop"
+  },
+  "training_load_analysis": {
+    "metrics": { "ctl": 50.9, "atl": 52.4, "tsb": -9, "tsb_status": "Légèrement fatigué" },
+    "context": "Entraînement normal"
+  },
+  "schedule_context": {
+    "today":   { "planned_workout": { "title": "Tempo 45min", "intensity": "tempo", "duration_minutes": 60 } },
+    "upcoming": [ { "date": "2026-07-01", "title": "Sortie longue" }, { "date": "2026-07-03", "title": "Séance qualité" } ]
+  }
+}</pre>
+<div class="quote">« … Votre <b>score de récupération est de 61 % (jaune)</b> … Votre <b>TSB est de -9 (Légèrement fatigué)</b> … L'objectif est de courir à votre allure tempo, qui se situe généralement autour de 85-90% de votre VMA. <b>Avec une VMA de 16 km/h, cela correspond à une allure d'environ 4:10-4:20 min/km.</b> … »
+<span class="muted">— Coach IA, compte us30-running (séance du jour, données du contexte citées explicitement)</span></div>
+<p class="muted">Constat : les 8 sports reçoivent un contexte complet (date, profil + seuils, physiologie, CTL/ATL/TSB, planning) et le Coach <b>cite les valeurs réelles</b> avec un vocabulaire adapté — unités chiffrées (W/FTP, km/h/allure) pour les sports à seuil, effort perçu / FC / séries pour les autres. <b>AC1 : validé.</b></p>
+
+<h2>4. AC2 — Source non connectée → champs null, adaptation sans erreur</h2>
+<p class="muted">Compte <code>us30-disconnected</code> : un seul sport (course, niveau débutant), <b>aucun seuil, aucune donnée Whoop, aucun objectif, aucune activité</b>.</p>
+<div class="row">
+<div class="card" style="flex:1;min-width:320px">
+<h3 style="margin-top:0">Instantané construit (extrait)</h3>
+<pre>"athlete_profile": { "age": null, "weight_kg": null, "objective": null,
+  "sports": [ { "name":"running","level":"beginner","vma_kmh":null } ] }
+"physiological_status_today": { "recovery_score": null, "recovery_status": null,
+  "hrv_ms": null, "sleep": { "duration_hours": null }, "source": "unknown" }
+"training_load_analysis": { "metrics": { "ctl":0,"atl":0,"tsb":0,
+  "tsb_status":"Données manquantes" } }
+"schedule_context": { "today": { "planned_workout": null }, "upcoming": [] }</pre>
+</div>
+<div class="card" style="flex:1;min-width:320px">
+<h3 style="margin-top:0">Réponse du Coach</h3>
+<div class="quote" style="margin:0">« … je constate que <b>nous n'avons pas de données de récupération ni de charge d'entraînement</b> pour aujourd'hui. … <b>votre VMA n'est pas encore renseignée</b>. Sans ces informations chiffrées, il est difficile de vous donner un conseil précis… <b>Pour vous aider au mieux, j'ai besoin de quelques informations :</b> Quelle était la séance prévue ? Comment vous sentez-vous ? … »</div>
+</div>
+</div>
+<p class="muted">Constat : tous les champs des sources non connectées sont <b>null / vides</b> (et non fabriqués). Correctif clé : <code>recovery_status</code> vaut désormais <span class="hl">null</span> quand le score est absent (auparavant forcé à « yellow »). Le Coach <b>signale l'absence de données, n'invente aucune valeur, pose des questions et reste utile</b> — réponse complète, <b>aucune erreur</b>. <b>AC2 : validé.</b></p>
+
+<h2>5. AC3 — Modification du profil reflétée dès le message suivant</h2>
+<p class="muted">Compte <code>us30-mutable</code>. Modification réalisée en base entre deux messages : <b>VMA 14 → 17 km/h</b> et objectif « 10 km de printemps » (J-60) → « <b>Trail des Aravis</b> » (J-12).</p>
+<table>
+<thead><tr><th>Moment</th><th><code>context_snapshot</code> → seuils</th><th><code>context_snapshot</code> → objectif principal</th><th>Réponse Coach</th></tr></thead>
+<tbody>
+<tr><td><b>Message 1</b> (avant)</td><td><code>vma_kmh: 14</code></td><td>« 10 km de printemps », J-60</td><td>VMA 14 → allure ~6:00-6:30 /km ; objectif 10 km</td></tr>
+<tr><td><b>Message 2</b> (après modif, <span class="hl">nouvelle conversation</span>)</td><td><code>vma_kmh: 17</code></td><td>« Trail des Aravis », J-12</td><td><span class="hl">VMA 17 → allure 4'12-4'37 /km</span> ; <span class="hl">objectif « Trail des Aravis dans 12 jours »</span></td></tr>
+</tbody>
+</table>
+<div class="quote">« … Votre objectif principal est le <b>Trail des Aravis</b>, qui aura lieu <b>dans 12 jours</b>. … <b>Avec une VMA de 17 km/h</b>, cela correspond à une allure cible d'environ <b>4'12''/km à 4'37''/km</b>. … »
+<span class="muted">— Coach IA après modification du profil (contexte reconstruit, nouvelles valeurs prises en compte)</span></div>
+<p class="muted">Constat : le contexte reconstruit reflète <b>immédiatement</b> les nouvelles données (seuil et objectif) et le Coach ajuste ses recommandations en conséquence. <b>AC3 : validé.</b></p>
+<div class="card warn" style="font-size:13px">
+<b>Note (comportement LLM, hors périmètre US-30)</b> — Posé dans <i>la même conversation</i>, le message 2 a vu le modèle répéter « VMA 14 » : il s'est ancré sur l'historique de la conversation (sa réponse précédente), bien que l'instantané injecté contînt déjà <code>17</code>. La <b>construction/injection du contexte est correcte</b> ; ce biais d'ancrage disparaît en nouvelle conversation (cf. tableau ci-dessus). À surveiller côté UX si besoin.
+</div>
+
+<h2>6. Non-régression & périmètre de données</h2>
+<table>
+<thead><tr><th>Vérification</th><th>Résultat</th></tr></thead>
+<tbody>
+<tr><td><code>npx tsc --noEmit</code></td><td><span class="badge ok">0 erreur</span></td></tr>
+<tr><td><code>npm run lint</code></td><td><span class="badge ok">No ESLint warnings or errors</span></td></tr>
+<tr><td>Table <code>sports</code> alignée MVP</td><td>12 lignes = 9 MVP (UUID fixes) + 3 non-MVP conservés car référencés par des activités réelles (<code>cross_country_skiing</code>, <code>skiing</code>, <code>spin</code>)</td></tr>
+</tbody>
+</table>
+<div class="card" style="font-size:13px">
+<b>Recommandation mineure (amélioration future)</b> — Dans <code>buildCoachContext</code>, les requêtes <code>objectives</code> filtrent sur <code>event_date ≥ aujourd'hui</code> mais pas sur <code>status</code> : un objectif <i>abandonné</i> dont la date est future reste listé dans le tableau <code>objectives</code>. L'objectif <b>principal</b> reste correct (tri par date), donc le coaching n'est pas impacté ; ajouter <code>.eq("status","active")</code> fiabiliserait le contexte.
+</div>
+
+<h2>7. Verdict</h2>
+<table>
+<thead><tr><th>Critère</th><th>Constat</th><th class="num">Verdict</th></tr></thead>
+<tbody>
+<tr><td><b>AC1</b> — Contexte complet (date, profil, physio, charge, planning)</td><td>Vérifié sur les 8 sports du MVP via les <code>context_snapshot</code> + réponses Coach citant les valeurs réelles</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>AC2</b> — Source non connectée → champs null, pas d'erreur</td><td>Tous champs null/vides, <code>recovery_status:null</code>, Coach signale l'absence, n'invente rien, reste utile</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td><b>AC3</b> — Modif profil reflétée au message suivant</td><td>VMA 14→17 et objectif J-60→J-12 reflétés immédiatement dans le contexte ; Coach ajuste</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody>
+</table>
+
+<p class="foot">Méthode : 10 comptes semés via service-role ; sessions mintées par mot de passe (@supabase/ssr) puis <code>POST /api/chat</code> réel (build contexte + flux SSE Gemini). Instantanés relus directement en base (<code>chat_messages.context_snapshot</code>). Données de test et serveur de dev nettoyés en fin de campagne. Modèle IA bascule sur <code>gemini-2.5-flash-lite</code> (quota journalier distinct) pour la campagne, à re-basculer ensuite sur <code>gemini-2.5-flash</code>.</p>
+
+</div></body></html>

@@ -1,0 +1,28 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - text: ChatYourTraining
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - heading "Content de vous revoir !" [level=2] [ref=e11]
+      - paragraph [ref=e12]: Connectez-vous pour accéder à votre tableau de bord
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - text: Email
+        - generic [ref=e15]:
+          - img [ref=e17]
+          - textbox "Email" [ref=e20]:
+            - /placeholder: Votre email
+      - generic [ref=e21]:
+        - text: Mot de passe
+        - generic [ref=e22]:
+          - img [ref=e24]
+          - textbox "Mot de passe" [ref=e27]:
+            - /placeholder: Votre mot de passe
+      - link "Mot de passe oublié ?" [ref=e29] [cursor=pointer]:
+        - /url: /forgot-password
+      - button "Se connecter" [ref=e30]
+    - paragraph [ref=e31]:
+      - text: Pas encore de compte ?
+      - link "Créer un compte" [ref=e32] [cursor=pointer]:
+        - /url: /register

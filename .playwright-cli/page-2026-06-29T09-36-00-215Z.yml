@@ -1,0 +1,179 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e31]
+  - generic [ref=e32]:
+    - complementary [ref=e33]:
+      - link "ChatYourTraining" [ref=e35] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e36]
+        - generic [ref=e38]: ChatYourTraining
+      - navigation [ref=e39]:
+        - link "Tableau de bord" [ref=e40] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e41]
+          - text: Tableau de bord
+        - link "Calendrier" [ref=e46] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e47]
+          - text: Calendrier
+        - link "Entraînements" [ref=e49] [cursor=pointer]:
+          - /url: /workouts
+          - img [ref=e50]
+          - text: Entraînements
+        - link "Objectifs" [ref=e51] [cursor=pointer]:
+          - /url: /objectives
+          - img [ref=e52]
+          - text: Objectifs
+        - link "Santé" [ref=e56] [cursor=pointer]:
+          - /url: /health
+          - img [ref=e57]
+          - text: Santé
+        - link "Intégrations" [ref=e59] [cursor=pointer]:
+          - /url: /integrations
+          - img [ref=e60]
+          - text: Intégrations
+    - generic [ref=e64]:
+      - banner [ref=e65]:
+        - generic [ref=e66]:
+          - heading "Tableau de bord" [level=1] [ref=e68]
+          - generic [ref=e69]:
+            - link "Coach IA" [ref=e70] [cursor=pointer]:
+              - /url: /chat
+              - img [ref=e71]
+              - generic [ref=e73]: Coach IA
+            - button [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+            - button "UD US30 disconnected Profil" [ref=e80] [cursor=pointer]:
+              - generic [ref=e82]: UD
+              - generic [ref=e83]:
+                - generic [ref=e84]: US30 disconnected
+                - generic [ref=e85]: Profil
+              - img [ref=e86]
+      - main [ref=e88]:
+        - generic [ref=e89]:
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - generic [ref=e93]:
+                - img [ref=e95]
+                - generic [ref=e98]:
+                  - heading "Charge d'entraînement" [level=3] [ref=e99]
+                  - paragraph [ref=e100]: ATL (Fatigue) vs CTL (Forme) vs TSB (Équilibre)
+              - generic [ref=e101]:
+                - img [ref=e102]
+                - paragraph [ref=e105]: Données insuffisantes — les calculs gagnent en précision après 14 jours d'entraînement
+                - paragraph [ref=e106]: Connectez Strava ou ajoutez des activités pour suivre votre charge d'entraînement
+            - generic [ref=e107]:
+              - generic [ref=e108]:
+                - generic [ref=e109]:
+                  - img [ref=e110]
+                  - generic [ref=e112]: Récupération
+                - generic [ref=e113]:
+                  - paragraph [ref=e114]: Aucune donnée de récupération
+                  - paragraph [ref=e115]: Connectez WHOOP pour voir vos données
+              - generic [ref=e116]:
+                - heading "Prochain Objectif" [level=3] [ref=e117]
+                - paragraph [ref=e118]: Aucun objectif défini. Ajoutez un objectif dans votre profil !
+          - generic [ref=e119]:
+            - generic [ref=e120]:
+              - heading "Séance du Jour" [level=3] [ref=e121]
+              - paragraph [ref=e122]: Aucune séance prévue aujourd'hui. Profitez de ce jour de repos !
+            - generic [ref=e123]:
+              - generic [ref=e124]:
+                - img [ref=e125]
+                - heading "Données de santé" [level=3] [ref=e127]
+              - generic [ref=e128]:
+                - paragraph [ref=e129]: Consultez vos métriques détaillées de sommeil, VRC et stress.
+                - link "Connecter WHOOP" [ref=e130] [cursor=pointer]:
+                  - /url: /integrations
+                  - button "Connecter WHOOP" [ref=e131]
+              - link "Aller à la page Santé" [ref=e132] [cursor=pointer]:
+                - /url: /health
+                - text: Aller à la page Santé
+                - img [ref=e133]
+          - generic [ref=e135]:
+            - generic [ref=e136]:
+              - generic [ref=e137]:
+                - img [ref=e138]
+                - heading "Calendrier de la semaine" [level=3] [ref=e140]
+              - generic [ref=e141]:
+                - generic [ref=e142]:
+                  - img [ref=e143]
+                  - generic [ref=e146]: "Heures:"
+                  - generic [ref=e147]: 0hm
+                  - generic [ref=e148]: / 0hm
+                - generic [ref=e149]:
+                  - img [ref=e150]
+                  - generic [ref=e152]: "Séances:"
+                  - generic [ref=e153]: "0"
+                  - generic [ref=e154]: / 0
+                - generic [ref=e155]:
+                  - img [ref=e156]
+                  - generic [ref=e158]: "TSS (semaine):"
+                  - generic [ref=e159]: "0"
+                  - generic [ref=e160]: / —
+            - generic [ref=e161]:
+              - generic [ref=e163]:
+                - generic [ref=e164]: Volume horaire
+                - generic [ref=e165]: 0%
+              - generic [ref=e169]:
+                - generic [ref=e170]: Charge TSS
+                - generic [ref=e171]: —
+              - generic [ref=e175]:
+                - generic [ref=e176]: Séances
+                - generic [ref=e177]: 0%
+            - generic [ref=e181]:
+              - generic [ref=e182]:
+                - generic [ref=e183]:
+                  - paragraph [ref=e184]: Lun
+                  - paragraph [ref=e185]: "29"
+                - generic [ref=e188]: Repos
+              - generic [ref=e189]:
+                - generic [ref=e190]:
+                  - paragraph [ref=e191]: Mar
+                  - paragraph [ref=e192]: "30"
+                - generic [ref=e194]: Repos
+              - generic [ref=e195]:
+                - generic [ref=e196]:
+                  - paragraph [ref=e197]: Mer
+                  - paragraph [ref=e198]: "1"
+                - generic [ref=e200]: Repos
+              - generic [ref=e201]:
+                - generic [ref=e202]:
+                  - paragraph [ref=e203]: Jeu
+                  - paragraph [ref=e204]: "2"
+                - generic [ref=e206]: Repos
+              - generic [ref=e207]:
+                - generic [ref=e208]:
+                  - paragraph [ref=e209]: Ven
+                  - paragraph [ref=e210]: "3"
+                - generic [ref=e212]: Repos
+              - generic [ref=e213]:
+                - generic [ref=e214]:
+                  - paragraph [ref=e215]: Sam
+                  - paragraph [ref=e216]: "4"
+                - generic [ref=e218]: Repos
+              - generic [ref=e219]:
+                - generic [ref=e220]:
+                  - paragraph [ref=e221]: Dim
+                  - paragraph [ref=e222]: "5"
+                - generic [ref=e224]: Repos
+  - generic [ref=e227]:
+    - generic [ref=e228]:
+      - heading "Bonjour ! Comment vous sentez-vous aujourd'hui ?" [level=2] [ref=e230]
+      - button "Fermer" [ref=e231] [cursor=pointer]
+    - generic [ref=e233]:
+      - generic [ref=e234]:
+        - img [ref=e236]
+        - generic [ref=e238]:
+          - paragraph [ref=e239]: Niveau de fatigue
+          - paragraph [ref=e240]: Première visite de la journée
+      - generic [ref=e241]:
+        - paragraph [ref=e243]: Indiquez votre niveau de fatigue actuel pour que le coach puisse adapter ses conseils.
+        - generic [ref=e244]:
+          - slider [ref=e247] [cursor=pointer]: "5"
+          - generic [ref=e249]: 5/10 - Légèrement fatigué
+        - generic [ref=e251]:
+          - img [ref=e252]
+          - paragraph [ref=e254]: Cette information sera utilisée par l'IA coach pour personnaliser ses recommandations d'entraînement. Vous pourrez modifier cette valeur plus tard dans votre profil santé.
+      - generic [ref=e255]:
+        - button "Plus tard" [ref=e256] [cursor=pointer]
+        - button "Enregistrer" [ref=e257] [cursor=pointer]

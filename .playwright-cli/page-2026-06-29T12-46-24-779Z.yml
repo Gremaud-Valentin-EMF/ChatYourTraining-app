@@ -1,0 +1,51 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e31]
+  - generic [ref=e32]:
+    - complementary [ref=e33]:
+      - link "ChatYourTraining" [ref=e35] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e36]
+        - generic [ref=e38]: ChatYourTraining
+      - navigation [ref=e39]:
+        - link "Tableau de bord" [ref=e40] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e41]
+          - text: Tableau de bord
+        - link "Calendrier" [ref=e46] [cursor=pointer]:
+          - /url: /calendar
+          - img [ref=e47]
+          - text: Calendrier
+        - link "Entraînements" [ref=e49] [cursor=pointer]:
+          - /url: /workouts
+          - img [ref=e50]
+          - text: Entraînements
+        - link "Objectifs" [ref=e51] [cursor=pointer]:
+          - /url: /objectives
+          - img [ref=e52]
+          - text: Objectifs
+        - link "Santé" [ref=e56] [cursor=pointer]:
+          - /url: /health
+          - img [ref=e57]
+          - text: Santé
+        - link "Intégrations" [ref=e59] [cursor=pointer]:
+          - /url: /integrations
+          - img [ref=e60]
+          - text: Intégrations
+    - generic [ref=e64]:
+      - banner [ref=e65]:
+        - generic [ref=e66]:
+          - heading "Tableau de bord" [level=1] [ref=e68]
+          - generic [ref=e69]:
+            - link "Coach IA" [ref=e70] [cursor=pointer]:
+              - /url: /chat
+              - img [ref=e71]
+              - generic [ref=e73]: Coach IA
+            - button [ref=e74] [cursor=pointer]:
+              - img [ref=e75]
+            - button "U Athlète Profil" [ref=e80] [cursor=pointer]:
+              - generic [ref=e82]: U
+              - generic [ref=e83]:
+                - generic [ref=e84]: Athlète
+                - generic [ref=e85]: Profil
+              - img [ref=e86]
+      - main [ref=e88]

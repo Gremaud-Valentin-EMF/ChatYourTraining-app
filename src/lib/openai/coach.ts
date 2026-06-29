@@ -47,7 +47,7 @@ export interface PhysiologicalStatus {
   source: string;
   date: string;
   recovery_score: number | null;
-  recovery_status: "green" | "yellow" | "red";
+  recovery_status: "green" | "yellow" | "red" | null;
   sleep: {
     duration_hours: number | null;
     quality_score: number | null;
@@ -199,6 +199,12 @@ Adapte systématiquement ton vocabulaire et tes unités au sport concerné par l
 ## Contexte athlète
 Le contexte JSON ci-dessous contient les données actuelles de l'athlète. Base toutes tes analyses sur ces données réelles.
 
+## Données manquantes / sources non connectées (IMPORTANT)
+Certains champs du contexte peuvent être **null** ou absents quand une source n'est pas connectée (ex. Whoop non lié → \`recovery_score\`/\`recovery_status\` à null, \`sleep\` et \`hrv_ms\` nuls ; pas d'objectif → \`objective\` null ; charge indisponible → \`tsb_status\` = "Données manquantes").
+- **N'invente jamais** une valeur manquante (ne suppose pas une récupération, un TSB ou un sommeil).
+- Signale brièvement la donnée indisponible ("Je n'ai pas tes données de récupération aujourd'hui") et **appuie-toi sur le reste du contexte et sur le ressenti subjectif** de l'athlète.
+- Continue à donner un conseil utile malgré l'absence de données : ne bloque pas, adapte-toi.
+
 ## Conditions météo et entraînement
 
 Si le contexte JSON contient "weather_context", utilise-le pour adapter tes conseils :
@@ -303,6 +309,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       .select("*")
       .eq("user_id", userId)
       .eq("priority", "A")
+      .eq("status", "active")
       .gte("event_date", today)
       .order("event_date")
       .limit(1)
@@ -311,6 +318,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       .from("objectives")
       .select("*")
       .eq("user_id", userId)
+      .eq("status", "active")
       .gte("event_date", today)
       .order("event_date"),
     (supabase as any)
@@ -427,11 +435,13 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
     );
   }
 
-  // Get recovery status — use actual last available value, no invented fallback
+  // Get recovery status — use actual last available value, no invented fallback.
+  // US-30 AC2: when the source is not connected (no score), the status is null
+  // too — we never fabricate a "yellow" so the coach can flag the gap.
   const recoveryScore: number | null = metrics?.recovery_score ?? null;
-  const recoveryStatus: "green" | "yellow" | "red" =
+  const recoveryStatus: "green" | "yellow" | "red" | null =
     recoveryScore === null
-      ? "yellow"
+      ? null
       : recoveryScore >= 67
       ? "green"
       : recoveryScore >= 34
