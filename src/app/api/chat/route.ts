@@ -247,7 +247,24 @@ export async function POST(request: Request) {
           controller.close();
         } catch (error) {
           console.error("Streaming error:", error);
-          controller.error(error);
+          // US-23 AC4: emit a clean, recoverable error event rather than
+          // aborting the stream, so the client can show the standard message
+          // and a "Réessayer" button. The user message was already persisted
+          // above, so nothing is lost.
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  error:
+                    "Le Coach IA est momentanément indisponible. Réessaie dans un instant.",
+                  done: true,
+                })}\n\n`
+              )
+            );
+            controller.close();
+          } catch {
+            controller.error(error);
+          }
         }
       },
     });
@@ -531,8 +548,10 @@ async function streamWithGemini({ messages, onChunk }: StreamOptions) {
   const model = process.env.GOOGLE_GEMINI_MODEL || "gemini-1.5-flash";
   const payload = buildGeminiPayload(messages);
 
+  // US-23 AC3: use the SSE streaming endpoint so tokens reach the client
+  // progressively instead of in a single chunk.
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
     {
       method: "POST",
       headers: {
@@ -549,17 +568,57 @@ async function streamWithGemini({ messages, onChunk }: StreamOptions) {
     );
   }
 
-  const data = await response.json();
-  if (data?.error) {
-    throw new Error(data.error.message || "Gemini API returned an error");
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Gemini API returned no readable stream");
   }
 
-  const candidate = data?.candidates?.[0];
-  const text = extractGeminiText(candidate);
-  if (!text) {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let emitted = false;
+
+  const flushEvent = (raw: string) => {
+    // An SSE event is one or more "data:" lines; Gemini sends one JSON object.
+    const jsonText = raw
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trim())
+      .join("");
+    if (!jsonText || jsonText === "[DONE]") return;
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (parsed?.error) {
+        throw new Error(parsed.error.message || "Gemini API returned an error");
+      }
+      const text = extractGeminiText(parsed?.candidates?.[0]);
+      if (text) {
+        emitted = true;
+        onChunk(text);
+      }
+    } catch (e) {
+      // Re-throw genuine API errors; ignore partial-JSON parse hiccups.
+      if (e instanceof Error && e.message.includes("Gemini API")) throw e;
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    // Strip CR so events framed with CRLF split correctly on a blank line.
+    buffer += decoder.decode(value, { stream: true }).replace(/\r/g, "");
+    let sep;
+    // SSE events are separated by a blank line.
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const event = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      flushEvent(event);
+    }
+  }
+  if (buffer.trim()) flushEvent(buffer);
+
+  if (!emitted) {
     throw new Error("Gemini API returned no text content");
   }
-  onChunk(text);
 }
 
 function buildGeminiPayload(

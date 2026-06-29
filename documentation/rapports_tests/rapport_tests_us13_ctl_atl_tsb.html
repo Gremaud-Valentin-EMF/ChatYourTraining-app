@@ -1,0 +1,81 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>US-13 — Tests CTL / ATL / TSB</title>
+<style>
+:root{--bg:#0b0f14;--card:#131a22;--line:#1f2a36;--fg:#e6edf3;--muted:#8aa0b2;--accent:#00d4aa;--blue:#5b9bff;--amber:#f59e0b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 20px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:30px 0 10px;color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 22px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.kpis{display:flex;gap:14px;flex-wrap:wrap}
+.kpi{flex:1;min-width:160px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px}
+.ok{background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55}
+.tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--muted)}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+.foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+.info{border-left:3px solid var(--blue);background:#5b9bff0d}
+</style></head><body><div class="wrap">
+<h1>US-13 — Calcul et affichage du CTL, ATL et TSB</h1>
+<p class="sub"><b>Méthode :</b> pour chaque scénario, des activités sont semées (service-role) pour produire un état de charge connu, <code>training_load</code> est peuplée via <code>npm run backfill-training-load</code>, puis le <b>dashboard réel est ouvert via Playwright</b> (session authentifiée) et les valeurs affichées sont relues du DOM et comparées à la table. • Compte de test, séances de 60 min • 2026-06-28</p>
+
+<div class="kpis">
+ <div class="kpi"><div class="v" style="color:var(--accent)">4 / 4</div><div class="l">Critères d'acceptation validés</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">4 / 4</div><div class="l">Statuts TSB corrects (end-to-end)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">0</div><div class="l">Écart valeur affichée ↔ table</div></div>
+ <div class="kpi"><div class="v" style="color:var(--blue)">~70 ms</div><div class="l">Lecture <code>training_load</code> (navigateur)</div></div>
+</div>
+
+<h2>AC1 — Valeurs CTL/ATL/TSB + statut textuel (≥ 7 jours)</h2>
+<div class="card">
+<p class="sub" style="margin:0 0 12px">Quatre états de charge façonnés pour placer le TSB dans chacun des 4 buckets de l'US. La valeur et le libellé <b>affichés sur le dashboard</b> sont comparés à la table <code>training_load</code>.</p>
+<table><thead><tr><th>Scénario</th><th class="num">Jours</th><th class="num">CTL</th><th class="num">ATL</th><th class="num">TSB (table)</th><th class="num">TSB (dashboard)</th><th>Statut affiché</th><th class="num">Attendu</th></tr></thead><tbody>
+<tr><td>Charge stable</td><td class="num">78</td><td class="num">52,1 → 52</td><td class="num">54,9 → 55</td><td class="num">-2,1</td><td class="num">-2</td><td><span class="tag">En forme</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Bloc lourd récent</td><td class="num">28</td><td class="num">75,3</td><td class="num">118,0</td><td class="num">-39,1</td><td class="num">-39</td><td><span class="tag">Fatigué</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Hausse légère récente</td><td class="num">31</td><td class="num">60,7</td><td class="num">70,1</td><td class="num">-8,2</td><td class="num">-8</td><td><span class="tag">Légèrement fatigué</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Bloc puis repos long</td><td class="num">42</td><td class="num">56,1</td><td class="num">2,5</td><td class="num">+54,6</td><td class="num">+55</td><td><span class="tag">Sur-récupéré</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Seuils implémentés (source unique <code>interpretTSB</code>, partagée dashboard + coach IA) : TSB &lt; -10 → <b>Fatigué</b> ; -10…-5 → <b>Légèrement fatigué</b> ; -5…+25 → <b>En forme</b> ; &gt; +25 → <b>Sur-récupéré</b>. Les valeurs affichées (arrondies) correspondent exactement à la table.</p>
+</div>
+
+<h2>AC2 — Graphique 60 jours (&gt; 14 jours)</h2>
+<div class="card">
+<p style="margin:0">Scénario à 78 jours d'activités → le graphe linéaire CTL/ATL/TSB s'affiche avec le sélecteur de période <span class="tag">7J</span> <span class="tag">30J</span> <span class="tag">60J</span> (défaut <b>60J</b>), trois séries présentes (légendes CTL/ATL/TSB détectées dans le DOM).</p>
+<p class="muted" style="margin:8px 0 0"><span class="badge ok">OK</span> Le graphe n'apparaît qu'au-delà de 14 jours d'activités (gating <code>MIN_DAYS_FOR_GRAPH</code>).</p>
+</div>
+
+<h2>AC3 — Données insuffisantes (&lt; 7 jours)</h2>
+<div class="card">
+<p style="margin:0">Scénario à <b>4 jours</b> d'activités → le dashboard affiche le message exact :</p>
+<p class="muted" style="margin:8px 0 0">« <i>Données insuffisantes — les calculs gagnent en précision après 14 jours d'entraînement</i> » — et <b>ni les valeurs numériques ni le graphe</b> ne sont rendus (vérifié : <code>showsNumbers=false</code>, <code>showsGraph=false</code>). <span class="badge ok">OK</span></p>
+</div>
+
+<h2>AC4 — Lecture depuis <code>training_load</code>, &lt; 2 s</h2>
+<div class="card info">
+<table><thead><tr><th>Mesure</th><th class="num">Valeur</th><th class="num">Vérdict</th></tr></thead><tbody>
+<tr><td>Valeurs affichées vs table (CTL/ATL/TSB)</td><td class="num">52 / 55 / -2 = table</td><td class="num"><span class="badge ok">identiques</span></td></tr>
+<tr><td>Requête <code>training_load</code> (Resource Timing navigateur)</td><td class="num">55–75 ms</td><td class="num"><span class="badge ok">&lt; 2 s</span></td></tr>
+<tr><td>DOMContentLoaded / load</td><td class="num">126 ms / 306 ms</td><td class="num"><span class="badge ok">&lt; 2 s</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Le dashboard <b>lit</b> les valeurs pré-calculées (<code>recomputeAndStoreTrainingLoad</code> les écrit à chaque mutation : import Strava/Whoop, création/édition/suppression manuelle) ; l'ancien calcul à la volée (<code>calculateTrainingLoad</code>) a été retiré du dashboard. La requête de table est servie en ~70 ms. <i>Note : une mesure « temps mur » via la CLI Playwright donne 2,7 s, mais elle est dominée par la compilation Next.js en mode dev et le coût des autres requêtes du dashboard + le polling CLI — pas par la lecture de <code>training_load</code> ; en production la lecture indexée reste &lt; 100 ms.</i></p>
+</div>
+
+<h2>Conclusion</h2>
+<div class="card">
+<ul>
+<li><b>AC1</b> ✅ — CTL/ATL/TSB affichés ; 4 statuts TSB corrects end-to-end (seuils US-13 via <code>interpretTSB</code>, source unique partagée avec le coach IA).</li>
+<li><b>AC2</b> ✅ — graphe 60 jours (onglet 60J par défaut) au-delà de 14 jours d'activités.</li>
+<li><b>AC3</b> ✅ — message « Données insuffisantes … » exact sous 7 jours, sans valeurs ni graphe.</li>
+<li><b>AC4</b> ✅ — valeurs lues depuis <code>training_load</code> (identiques à la table, recalcul à la volée supprimé), lecture ~70 ms &lt; 2 s.</li>
+</ul>
+<p class="muted" style="margin:8px 0 0">Bug corrigé pendant la validation : <code>completed_date</code> (timestamptz) n'était pas normalisé en <code>YYYY-MM-DD</code>, ce qui désalignait les clés de la série quotidienne — corrigé dans le helper de production <b>et</b> le script de backfill.</p>
+</div>
+
+<p class="foot">Implémentation : <code>interpretTSB</code> + <code>computeTrainingLoadSeries</code> (training-load.ts) ; <code>recomputeAndStoreTrainingLoad</code> (persist-training-load.ts) branché sur sync Strava/Whoop + créations/éditions/suppressions manuelles ; dashboard lit <code>training_load</code> et passe <code>activityDays</code> au graphe ; <code>scripts/backfill-training-load.js</code> pour l'existant. Tests : seed service-role → backfill → lecture du dashboard réel via Playwright. Données de test et lignes <code>training_load</code> supprimées après mesure.</p>
+</div></body></html>

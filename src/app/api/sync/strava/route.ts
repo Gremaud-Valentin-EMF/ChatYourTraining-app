@@ -20,6 +20,7 @@ import {
   SyncState,
 } from "@/lib/integrations/sync-helpers";
 import { decrypt, encrypt } from "@/lib/crypto/tokens";
+import { recomputeAndStoreTrainingLoad } from "@/lib/calculations/persist-training-load";
 
 export async function POST() {
   const supabase = await createClient();
@@ -569,6 +570,10 @@ export async function POST() {
       .eq("id", integration.id);
     syncSuccess = true;
     /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    // US-13: refresh the stored CTL/ATL/TSB series from the imported activities
+    // so the dashboard reads pre-computed values from `training_load`.
+    await recomputeAndStoreTrainingLoad(supabase, user.id);
 
     return NextResponse.json({
       success: true,

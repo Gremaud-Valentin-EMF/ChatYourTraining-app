@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "generate:icons": "node scripts/generate-icons.js",
-    "recalculate-tss": "node scripts/recalculate-tss.js"
+    "recalculate-tss": "node scripts/recalculate-tss.js",
+    "backfill-training-load": "node scripts/backfill-training-load.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

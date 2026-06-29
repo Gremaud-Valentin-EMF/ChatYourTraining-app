@@ -15,7 +15,6 @@ import {
   WeekCalendar,
 } from "@/components/dashboard";
 import { DailyFatigueModal } from "@/components/dashboard/daily-fatigue-modal";
-import { calculateTrainingLoad } from "@/lib/calculations/training-load";
 import { toLocalDateString } from "@/lib/utils";
 
 interface TrainingLoadDataPoint {
@@ -149,6 +148,8 @@ export default function DashboardPage() {
   const [trainingLoadData, setTrainingLoadData] = useState<
     TrainingLoadDataPoint[]
   >([]);
+  // US-13: number of distinct days with a completed activity (gates the display).
+  const [activityDays, setActivityDays] = useState(0);
   const [weekData, setWeekData] = useState<WeekDayData[]>([]);
   const [weekStats, setWeekStats] = useState({
     completedMinutes: 0,
@@ -565,55 +566,53 @@ export default function DashboardPage() {
         // No metrics available
       }
 
-      // Load activities for training load calculation
-      const trainingLoadFallbackDays = 180; // ensure at least ~4 months of history
-      const fallbackStart = new Date();
-      fallbackStart.setDate(fallbackStart.getDate() - trainingLoadFallbackDays);
-      let trainingLoadStartDate =
-        toLocalDateString(fallbackStart) ?? undefined;
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: oldestActivity } = await (supabase as any)
-          .from("activities")
-          .select("scheduled_date")
-          .eq("user_id", user.id)
-          .order("scheduled_date", { ascending: true })
-          .limit(1);
-
-        if (oldestActivity?.[0]?.scheduled_date) {
-          trainingLoadStartDate = oldestActivity[0].scheduled_date;
-        }
-      } catch {
-        // fallback start date already defined
-      }
-
+      // US-13 / AC4: read pre-computed CTL/ATL/TSB from `training_load` (no
+      // on-the-fly recompute) so the dashboard renders fast. The series is kept
+      // up to date by recomputeAndStoreTrainingLoad on every activity mutation.
       try {
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const { data: activities } = await (
-          supabase as any
-        )
-          .from("activities")
-          .select("scheduled_date, tss, status, title")
-          .eq("user_id", user.id)
-          .gte("scheduled_date", trainingLoadStartDate)
-          .order("scheduled_date");
+        const chartWindowStart = new Date();
+        chartWindowStart.setDate(chartWindowStart.getDate() - 70);
 
-        if (activities && activities.length > 0) {
-          const tssData = activities.map(
-            (a: { scheduled_date: string; tss: number; status: string }) => ({
-              date: a.scheduled_date,
-              tss: a.status === "completed" ? a.tss || 0 : 0,
-            })
+        const { data: loadRows } = await (supabase as any)
+          .from("training_load")
+          .select("date, daily_tss, atl, ctl, tsb")
+          .eq("user_id", user.id)
+          .gte("date", toLocalDateString(chartWindowStart))
+          .order("date");
+
+        // Total distinct activity days across all history (gates the display).
+        const { count: totalActivityDays } = await (supabase as any)
+          .from("training_load")
+          .select("date", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .gt("daily_tss", 0);
+
+        setActivityDays(totalActivityDays || 0);
+
+        if (loadRows && loadRows.length > 0) {
+          setTrainingLoadData(
+            loadRows.map(
+              (r: {
+                date: string;
+                atl: number;
+                ctl: number;
+                tsb: number;
+              }) => ({
+                date: r.date,
+                atl: Number(r.atl),
+                ctl: Number(r.ctl),
+                tsb: Number(r.tsb),
+              })
+            )
           );
-          const loadData = calculateTrainingLoad(tssData);
-          setTrainingLoadData(loadData);
         } else {
           setTrainingLoadData([]);
         }
       } catch (err) {
-        console.error("Dashboard - Error loading activities:", err);
+        console.error("Dashboard - Error loading training load:", err);
         setTrainingLoadData([]);
+        setActivityDays(0);
       }
       /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -885,6 +884,7 @@ export default function DashboardPage() {
           currentAtl={latestLoad.atl}
           currentCtl={latestLoad.ctl}
           currentTsb={latestLoad.tsb}
+          activityDays={activityDays}
         />
 
         {/* Right column - Recovery and Objective */}

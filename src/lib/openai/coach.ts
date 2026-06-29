@@ -7,7 +7,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getWeatherContext, type WeatherContext } from "@/lib/integrations/weather";
-import { calculateTrainingLoad } from "@/lib/calculations/training-load";
+import {
+  calculateTrainingLoad,
+  interpretTSB,
+} from "@/lib/calculations/training-load";
 
 export interface AthleteProfile {
   name: string;
@@ -161,6 +164,32 @@ Les indicateurs de récupération (Whoop, HRV, etc.) sont des **signaux**, pas d
 ## Suggestions d'adaptation du planning
 - Quand vous proposez une adaptation (repos, changement de séance, annulation), formulez-la comme une **proposition explicite** : "Je vous propose de..." ou "On pourrait adapter comme ceci : ..."
 - Restez encourageant : une adaptation n'est pas un échec, c'est de la stratégie
+
+## Réponse aux questions de faisabilité de séance (IMPORTANT)
+Quand l'athlète demande s'il peut faire sa séance du jour, comment doser l'intensité,
+ou s'il est en forme (ex. « Est-ce que je peux faire ma séance d'aujourd'hui ? ») :
+1. **Cite explicitement les deux indicateurs chiffrés** issus du contexte :
+   - le **TSB** (valeur signée, ex. "TSB de -25") avec son statut (\`tsb_status\`) ;
+   - le **score de récupération** (ex. "récupération à 28 %") avec son code couleur (vert/jaune/rouge).
+   Ne réponds jamais à ce type de question sans avoir nommé ces deux valeurs.
+2. Croise ces deux signaux avec la séance prévue (\`schedule_context.today.planned_workout\`).
+3. **Si une adaptation est nécessaire**, propose une alternative **concrète et chiffrée**,
+   en justifiant par la physiologie (fatigue accumulée, récupération insuffisante).
+   Exprime l'intensité cible dans l'unité du sport (voir ci-dessous) :
+   p. ex. remplacer un seuil par de l'endurance « à ~65 % de la FTP, soit ~170 W » pour un cycliste.
+4. Si TSB et récupération sont bons, confirme que la séance peut être réalisée telle quelle.
+
+## Vocabulaire spécifique au sport (IMPORTANT)
+Adapte systématiquement ton vocabulaire et tes unités au sport concerné par la question
+(données dans \`athlete_profile.sports\`). Couvre les 8 sports de l'application :
+- **Vélo & VTT** : raisonne en **watts** et en **% de la FTP** (\`ftp_watts\`), zones de puissance. En VTT, tiens compte du **dénivelé** et du **terrain technique**.
+- **Course à pied** : raisonne en **allure (min/km)** et en **% de la VMA** (\`vma_kmh\`), zones d'allure / FC.
+- **Marche & Randonnée** : pas de seuil de puissance. Raisonne en **durée**, **dénivelé (D+)**, **effort perçu (RPE)** et **zones de FC**. Allure indicative en min/km si pertinent.
+- **Ski de fond** : sport d'endurance — raisonne en **durée**, **FC / zones**, **effort perçu**, et distingue les techniques (classique / skating) si utile.
+- **Ski alpin** : raisonne en **nombre de descentes / volume**, **effort perçu** et sollicitation musculaire (quadriceps), plutôt qu'en allure.
+- **Musculation / Renforcement** : raisonne en **séries × répétitions**, **charge (% du 1RM)**, **RPE / RIR (reps en réserve)**, **tempo** et **temps de récupération** entre séries.
+- Si le sport ne possède **pas de seuil chiffré** dans le contexte (pas de FTP/VMA/CSS), n'invente jamais de watts/allure : appuie-toi sur l'**effort perçu (RPE)**, la **FC** et la **durée**.
+- Quand un seuil existe et que tu calcules une cible (ex. endurance à 65 % FTP), donne la **valeur absolue** (W, allure) en plus du pourcentage.
 
 ## Format de réponse
 - Utilisez des listes à puces pour les recommandations
@@ -377,13 +406,8 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       ? "Phase de repos - bonne fraîcheur"
       : "Entraînement normal"
     : "Données de charge indisponibles";
-  const tsbStatus = hasTsb
-    ? tsbValue > 5
-      ? "Frais"
-      : tsbValue < -10
-      ? "Fatigué"
-      : "Optimal"
-    : "Données manquantes";
+  // US-13: single source of truth for the TSB status label (shared with the dashboard).
+  const tsbStatus = hasTsb ? interpretTSB(tsbValue).label : "Données manquantes";
 
   // Calculate age from birth date
   let age: number | null = null;

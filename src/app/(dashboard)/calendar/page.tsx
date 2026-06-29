@@ -25,6 +25,7 @@ import {
   isMvpSport,
   deriveActivityStatus,
 } from "@/lib/calculations/manual-activity";
+import { recomputeAndStoreTrainingLoad } from "@/lib/calculations/persist-training-load";
 import {
   ChevronLeft,
   ChevronRight,
@@ -658,6 +659,11 @@ export default function CalendarPage() {
       }
 
       await supabase.from("activities").insert(payload);
+
+      // US-13: a realized session changes the load series → refresh training_load.
+      if (realized) {
+        await recomputeAndStoreTrainingLoad(supabase, user.id);
+      }
 
       setIsModalOpen(false);
       setNewSession(defaultNewSession);

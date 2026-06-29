@@ -22,6 +22,7 @@ import {
   calculateActivityTSS as calculateActivityTSSOrchestrator,
   type TSSSType,
 } from "@/lib/calculations/training-load";
+import { recomputeAndStoreTrainingLoad } from "@/lib/calculations/persist-training-load";
 import type {
   ImportedActivityData,
   SyncState,
@@ -685,6 +686,9 @@ export async function POST() {
       .eq("id", integration.id);
     syncSuccess = true;
     /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    // US-13: refresh the stored CTL/ATL/TSB series from the imported activities.
+    await recomputeAndStoreTrainingLoad(supabase, user.id);
 
     return NextResponse.json({
       success: true,

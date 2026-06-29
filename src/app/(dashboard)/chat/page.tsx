@@ -119,6 +119,12 @@ export default function ChatPage() {
     title: string;
   } | null>(null);
   const [adaptationDetected, setAdaptationDetected] = useState<string | null>(null);
+  // US-23 AC4: when the LLM is unavailable, surface the standard message and a
+  // retry affordance without losing the user's message.
+  const [coachError, setCoachError] = useState<{
+    text: string;
+    forcePlan: boolean;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -177,6 +183,7 @@ export default function ChatPage() {
         setMessages(data.messages);
         setCurrentSession(sessionId);
         setPlanSuggestions([]);
+        setCoachError(null);
       }
     } catch (error) {
       console.error("Error loading messages:", error);
@@ -213,6 +220,7 @@ export default function ChatPage() {
     setInputValue("");
     setIsStreaming(true);
     setAdaptationDetected(null);
+    setCoachError(null);
 
     // Add user message optimistically
     const userMessage: Message = {
@@ -264,6 +272,24 @@ export default function ChatPage() {
             try {
               const data = JSON.parse(line.slice(6));
 
+              // US-23 AC4: backend signalled a recoverable failure mid-stream.
+              if (data.error) {
+                // Drop the empty assistant bubble; keep the user's message.
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastIdx = updated.length - 1;
+                  if (
+                    updated[lastIdx]?.role === "assistant" &&
+                    !updated[lastIdx]?.content
+                  ) {
+                    updated.pop();
+                  }
+                  return updated;
+                });
+                setCoachError({ text, forcePlan: shouldForcePlan });
+                continue;
+              }
+
               if (data.content) {
                 fullContent += data.content;
                 setMessages((prev) => {
@@ -310,12 +336,31 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove the assistant message on error
-      setMessages((prev) => prev.slice(0, -1));
+      // US-23 AC4: drop the empty assistant bubble (the user message stays),
+      // then surface the standard error + retry affordance.
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastIdx = updated.length - 1;
+        if (
+          updated[lastIdx]?.role === "assistant" &&
+          !updated[lastIdx]?.content
+        ) {
+          updated.pop();
+        }
+        return updated;
+      });
+      setCoachError({ text, forcePlan: shouldForcePlan });
     } finally {
       setIsStreaming(false);
       inputRef.current?.focus();
     }
+  };
+
+  const handleRetry = () => {
+    if (!coachError) return;
+    const { text, forcePlan } = coachError;
+    setCoachError(null);
+    handleSend(text, { forcePlan });
   };
 
   const handleNewChat = () => {
@@ -324,6 +369,7 @@ export default function ChatPage() {
     setPlanSuggestions([]);
     setForcePlanMode(false);
     setAdaptationDetected(null);
+    setCoachError(null);
   };
 
   const handleRenameStart = (session: ChatSession) => {
@@ -848,6 +894,22 @@ export default function ChatPage() {
                 <div className="flex items-center gap-2 text-muted text-sm">
                   <Spinner size="sm" />
                   <span>Le coach réfléchit...</span>
+                </div>
+              )}
+              {coachError && !isStreaming && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-error/30 bg-error/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-error">
+                    Le Coach IA est momentanément indisponible. Réessaie dans un
+                    instant.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleRetry}
+                    className="flex-shrink-0"
+                  >
+                    Réessayer
+                  </Button>
                 </div>
               )}
               <div ref={messagesEndRef} />

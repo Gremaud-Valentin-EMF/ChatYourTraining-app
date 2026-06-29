@@ -30,7 +30,7 @@ interface Activity {
   tss: number;
 }
 
-interface DailyLoad {
+export interface DailyLoad {
   date: string;
   dailyTss: number;
   atl: number;
@@ -781,7 +781,10 @@ export function calculateTrainingLoads(
   let previousAtl = initialAtl;
   let previousCtl = initialCtl;
 
-  // Iterate through each day from start to end
+  // Iterate through each day from start to end. Use UTC arithmetic so the
+  // day count stays aligned with the UTC date strings — mixing local setDate()
+  // with toISOString() would duplicate or skip a day across a DST transition
+  // (e.g. Europe spring-forward), which breaks the UNIQUE(user_id, date) insert.
   const currentDate = new Date(startDate);
   while (currentDate <= endDate) {
     const dateStr = currentDate.toISOString().split("T")[0];
@@ -817,7 +820,7 @@ export function calculateTrainingLoads(
     previousAtl = currentAtl;
     previousCtl = currentCtl;
 
-    currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
 
   return results;
@@ -862,47 +865,48 @@ export function calculateWeeklyDuration(
 /**
  * Interpret TSB value for UI display
  */
+/**
+ * Interpret TSB value for UI display (US-13 thresholds — single source of truth,
+ * used by the dashboard chart and the AI coach context).
+ *
+ * - TSB < -10           → Fatigué          (récupération insuffisante)
+ * - -10 ≤ TSB < -5      → Légèrement fatigué (entraînement productif possible)
+ * - -5 ≤ TSB ≤ 25       → En forme          (zone optimale)
+ * - TSB > 25            → Sur-récupéré      (risque de perte de fitness)
+ */
 export function interpretTSB(tsb: number): {
   status: "fresh" | "optimal" | "tired" | "exhausted";
   label: string;
   color: string;
   advice: string;
 } {
-  if (tsb > 25) {
-    return {
-      status: "fresh",
-      label: "Très frais",
-      color: "text-secondary",
-      advice:
-        "Vous pouvez augmenter la charge ou planifier une compétition.",
-    };
-  } else if (tsb > 5) {
-    return {
-      status: "fresh",
-      label: "Frais",
-      color: "text-success",
-      advice: "Bonne forme pour une séance intense ou une course.",
-    };
-  } else if (tsb > -10) {
-    return {
-      status: "optimal",
-      label: "Optimal",
-      color: "text-accent",
-      advice: "Équilibre idéal entre charge et récupération.",
-    };
-  } else if (tsb > -30) {
+  if (tsb < -10) {
     return {
       status: "tired",
       label: "Fatigué",
+      color: "text-error",
+      advice: "Récupération insuffisante, performance limitée.",
+    };
+  } else if (tsb < -5) {
+    return {
+      status: "tired",
+      label: "Légèrement fatigué",
       color: "text-warning",
-      advice: "Attention à la fatigue, privilégiez la récupération.",
+      advice: "Entraînement productif possible.",
+    };
+  } else if (tsb <= 25) {
+    return {
+      status: "optimal",
+      label: "En forme",
+      color: "text-accent",
+      advice: "Zone optimale de performance et de compétition.",
     };
   } else {
     return {
-      status: "exhausted",
-      label: "Épuisé",
-      color: "text-error",
-      advice: "Risque de surentraînement. Repos fortement recommandé.",
+      status: "fresh",
+      label: "Sur-récupéré",
+      color: "text-secondary",
+      advice: "Risque de perte de fitness, trop de repos.",
     };
   }
 }
@@ -941,18 +945,19 @@ export function interpretRecoveryScore(score: number): {
 }
 
 /**
- * Simple wrapper to calculate training load from TSS data
- * Returns array of { date, atl, ctl, tsb } for charting
+ * Compute the FULL daily training-load series (date, dailyTss, atl, ctl, tsb)
+ * from a list of { date, tss }. Estimates realistic initial ATL/CTL from the
+ * first window of data, then runs the TrainingPeaks EMA over the real range up
+ * to today. Shared source of truth for both the persistence layer
+ * (recomputeAndStoreTrainingLoad) and the charting wrapper below.
  */
-export function calculateTrainingLoad(
+export function computeTrainingLoadSeries(
   tssData: { date: string; tss: number }[]
-): { date: string; atl: number; ctl: number; tsb: number }[] {
+): DailyLoad[] {
   if (tssData.length === 0) return [];
 
   // Sort by date
   const sorted = [...tssData].sort((a, b) => a.date.localeCompare(b.date));
-
-  const DISPLAY_WINDOW_DAYS = 90;
   const endDate = new Date();
 
   // Aggregate daily TSS to estimate realistic initial ATL/CTL values
@@ -983,7 +988,7 @@ export function calculateTrainingLoad(
     const windowDays = Math.min(timeConstant, totalAvailableDays);
     const cursor = new Date(startDate);
     const windowEnd = new Date(startDate);
-    windowEnd.setDate(windowEnd.getDate() + windowDays - 1);
+    windowEnd.setUTCDate(windowEnd.getUTCDate() + windowDays - 1);
 
     let sum = 0;
     let days = 0;
@@ -991,7 +996,7 @@ export function calculateTrainingLoad(
       const dateStr = cursor.toISOString().split("T")[0];
       sum += tssByDate.get(dateStr) || 0;
       days += 1;
-      cursor.setDate(cursor.getDate() + 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
 
     return days === 0 ? 0 : sum / days;
@@ -1000,28 +1005,35 @@ export function calculateTrainingLoad(
   const initialAtl = computeInitialValue(ATL_TIME_CONSTANT);
   const initialCtl = computeInitialValue(CTL_TIME_CONSTANT);
 
-  // Calculate loads using real data range with estimated initial values
-  const loads = calculateTrainingLoads(
+  return calculateTrainingLoads(
     sorted,
     startDate,
     endDate,
     initialAtl,
     initialCtl
   );
+}
 
-  // Keep display window
-  const displayStart = new Date(endDate);
+/**
+ * Simple wrapper to calculate training load from TSS data
+ * Returns array of { date, atl, ctl, tsb } for charting (last 90 days)
+ */
+export function calculateTrainingLoad(
+  tssData: { date: string; tss: number }[]
+): { date: string; atl: number; ctl: number; tsb: number }[] {
+  const loads = computeTrainingLoadSeries(tssData);
+  if (loads.length === 0) return [];
+
+  const DISPLAY_WINDOW_DAYS = 90;
+  const displayStart = new Date();
   displayStart.setDate(displayStart.getDate() - DISPLAY_WINDOW_DAYS);
-  const filteredLoads = loads.filter((load) => {
-    const loadDate = new Date(load.date);
-    return loadDate >= displayStart;
-  });
 
-  // Return simplified format for charting
-  return filteredLoads.map((l) => ({
-    date: l.date,
-    atl: l.atl,
-    ctl: l.ctl,
-    tsb: l.tsb,
-  }));
+  return loads
+    .filter((load) => new Date(load.date) >= displayStart)
+    .map((l) => ({
+      date: l.date,
+      atl: l.atl,
+      ctl: l.ctl,
+      tsb: l.tsb,
+    }));
 }

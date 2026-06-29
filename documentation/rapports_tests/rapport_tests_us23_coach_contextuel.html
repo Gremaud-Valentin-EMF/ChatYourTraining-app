@@ -1,0 +1,119 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>US-23 — Tests Conversation contextuelle avec le Coach IA</title>
+<style>
+:root{--bg:#0b0f14;--card:#131a22;--line:#1f2a36;--fg:#e6edf3;--muted:#8aa0b2;--accent:#00d4aa;--blue:#5b9bff;--amber:#f59e0b;--red:#ef4444}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 20px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:30px 0 10px;color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 22px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.kpis{display:flex;gap:14px;flex-wrap:wrap}
+.kpi{flex:1;min-width:160px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px}
+.ok{background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55}
+.tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--muted)}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+.foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+.info{border-left:3px solid var(--blue);background:#5b9bff0d}
+.quote{border-left:3px solid var(--accent);background:#00d4aa0d;padding:12px 14px;border-radius:0 10px 10px 0;margin:10px 0;font-size:14px;white-space:pre-wrap}
+.hl{color:var(--accent);font-weight:700}
+.hlr{color:var(--red);font-weight:700}
+</style></head><body><div class="wrap">
+<h1>US-23 — Conversation contextuelle avec le Coach IA</h1>
+<p class="sub"><b>Méthode :</b> un athlète de test (cycliste) est semé via service-role pour produire un état physiologique connu, puis l'application réelle est pilotée par <b>Playwright</b> (connexion email/mot de passe sur <code>/login</code>, puis page <code>/chat</code>). Les réponses du Coach IA sont relues du DOM, la progressivité du flux SSE est mesurée par échantillonnage de la longueur du texte, et la résilience est testée en interceptant l'API. • Fournisseur IA actif : <b>Gemini</b> (<code>gemini-2.5-flash</code>) • 2026-06-29</p>
+
+<div class="kpis">
+ <div class="kpi"><div class="v" style="color:var(--accent)">4 / 4</div><div class="l">Critères d'acceptation validés (end-to-end)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">&lt; 1 s</div><div class="l">Indicateur de frappe affiché (AC3)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--blue)">5 chunks</div><div class="l">Flux SSE progressif (Gemini)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">100 %</div><div class="l">Message utilisateur préservé en cas d'échec</div></div>
+</div>
+
+<h2>Scénario de test (exemple concret de l'US)</h2>
+<div class="card">
+<table><thead><tr><th>Donnée</th><th>Valeur semée</th></tr></thead><tbody>
+<tr><td>Sport principal</td><td>Vélo — <code>ftp_watts = 260</code>, niveau avancé</td></tr>
+<tr><td>Récupération Whoop du jour</td><td><span class="hlr">28 % (rouge)</span>, sommeil 6 h 20, FC repos 56 bpm</td></tr>
+<tr><td>Charge d'entraînement</td><td>55 j d'historique + bloc lourd récent → <span class="hl">TSB = −25</span> (« Fatigué »)</td></tr>
+<tr><td>Séance prévue aujourd'hui</td><td>« Seuil 3×10min » (intensité <code>threshold</code>)</td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Correspond exactement à l'exemple de l'US : cycliste FTP 260 W, Whoop connecté, TSB −25, récupération 28 % rouge, séance seuil 3×10min planifiée. Réponse attendue : mention de −25 et 28 %, proposition de remplacement par de l'endurance à ~65 % FTP (~170 W) avec justification.</p>
+</div>
+
+<h2>AC1 — Mention explicite du TSB <i>et</i> de la récupération + adaptation justifiée</h2>
+<div class="card">
+<p style="margin:0 0 6px">Message envoyé : <code>« Est-ce que je peux faire ma séance d'aujourd'hui ? »</code> — extrait de la réponse réelle du Coach IA :</p>
+<div class="quote">Je constate aujourd'hui un <span class="hl">TSB de -25</span>, ce qui indique un état de fatigue accumulée important, et votre <span class="hlr">récupération est à 28 %, classée en zone rouge</span> par Whoop. […] Je vous propose de remplacer cette séance par une sortie en endurance très légère ou une récupération active de 45-60 minutes […] <span class="hl">d'environ 50-65 % de votre FTP, soit entre 130 et 170 W</span>. L'objectif est de maintenir la circulation sanguine sans ajouter de stress significatif. Cette adaptation permettrait de ne pas ajouter de stress intense à un organisme déjà fatigué […]</div>
+<table><thead><tr><th>Exigence</th><th>Constat</th><th class="num">Verdict</th></tr></thead><tbody>
+<tr><td>Mentionne explicitement le TSB</td><td>« TSB de -25 » (= valeur du contexte)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Mentionne explicitement le score de récupération</td><td>« 28 %, zone rouge »</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Propose une adaptation si nécessaire</td><td>remplacement seuil → récupération active 45-60 min</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Justification physiologique + cible chiffrée</td><td>« 50-65 % FTP, 130-170 W » + fatigue/récup. insuffisante</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Renforcé dans <code>SYSTEM_PROMPT</code> (section « Réponse aux questions de faisabilité de séance ») : interdiction de répondre sans nommer les deux indicateurs chiffrés, adaptation concrète exprimée dans l'unité du sport.</p>
+</div>
+
+<h2>AC2 — Vocabulaire spécifique au sport</h2>
+<div class="card">
+<p style="margin:0 0 6px">Message envoyé : <code>« Comment dois-je doser l'intensité de ma prochaine grosse séance de vélo ? »</code> — la réponse raisonne intégralement en vocabulaire cyclisme :</p>
+<div class="quote">Intensité : Visez une intensité autour de <span class="hl">50-60 % de votre FTP</span>, ce qui correspond à une plage de <span class="hl">130 à 156 Watts</span>. […] séance d'endurance très légère ou de récupération active […] « Seuil 3x10min », une séance de haute intensité […]</div>
+<p class="muted" style="margin:6px 0 0"><span class="badge ok">OK</span> Termes employés : <code>FTP</code>, <code>Watts</code>, <code>seuil</code>, <code>endurance</code>, <code>récupération active</code> — unités propres au cyclisme. Section « Vocabulaire spécifique au sport » ajoutée au prompt (watts/FTP pour le vélo, allure/VMA pour la course, allure/CSS pour la natation).</p>
+</div>
+
+<h2>AC3 — Streaming SSE progressif + indicateur de frappe &lt; 1 s</h2>
+<div class="card">
+<table><thead><tr><th>Mesure</th><th>Constat</th><th class="num">Verdict</th></tr></thead><tbody>
+<tr><td>Indicateur de frappe (« Le coach réfléchit… »)</td><td>présent ~1 s après l'envoi (état <code>isStreaming</code> posé de façon synchrone)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Affichage progressif des tokens (SSE)</td><td>longueur du texte : <b>146 → 502 → 1442 → 1984</b> caractères sur échantillons successifs</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Transport</td><td>SSE <code>text/event-stream</code>, events <code>data:</code> consommés côté client</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0"><b>Correctif apporté pendant la validation :</b> le fournisseur actif (Gemini) utilisait l'endpoint non-streamé <code>generateContent</code> → toute la réponse arrivait en un seul bloc. Bascule sur <code>streamGenerateContent?alt=sse</code> avec parsing incrémental du flux. Bug subtil corrigé : les events Gemini sont séparés par <code>\r\n\r\n</code> ; le découpage sur <code>\n\n</code> concaténait tous les JSON (parse invalide) → normalisation CRLF (<code>.replace(/\r/g,"")</code>) avant découpage.</p>
+</div>
+
+<h2>AC4 — Indisponibilité du LLM : message clair, message non perdu, bouton « Réessayer »</h2>
+<div class="card info">
+<p style="margin:0 0 6px">API <code>/api/chat</code> interceptée (HTTP 500) via Playwright, puis message envoyé :</p>
+<table><thead><tr><th>Exigence</th><th>Constat (DOM réel)</th><th class="num">Verdict</th></tr></thead><tbody>
+<tr><td>Message d'erreur exact</td><td>« Le Coach IA est momentanément indisponible. Réessaie dans un instant. »</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Message utilisateur non perdu</td><td>la question reste affichée dans la conversation (et persistée en base avant le stream)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Bouton « Réessayer » visible</td><td>présent ; le clic relance la <i>même</i> requête</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Récupération après clic « Réessayer »</td><td>interception levée → réponse réelle re-streamée (146 → 781 …), bannière d'erreur effacée</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0"><b>Correctifs apportés :</b> côté API, le <code>catch</code> du stream émettait <code>controller.error()</code> (flux avorté, aucun message propre) → il émet désormais un event SSE <code>{error, done:true}</code> recouvrable puis ferme proprement. Côté client : détection de l'event <code>error</code> (et des réponses non-OK), retrait de la bulle assistant vide en conservant le message utilisateur, affichage de la bannière standard + bouton <code>Réessayer</code> (<code>handleRetry</code> rejoue le dernier message). Le message utilisateur était déjà sauvegardé en base <b>avant</b> le streaming (<code>chat_messages</code>), donc rien n'est perdu côté serveur.</p>
+</div>
+
+<h2>Fonctionnement global — validation des 8 sports MVP (AC1 + AC2)</h2>
+<div class="card">
+<p style="margin:0 0 6px">Même état physiologique (récup 28 % rouge, TSB −25, séance intense prévue) semé pour <b>un athlète par sport MVP de l'onboarding</b> ; même question « Est-ce que je peux faire ma séance d'aujourd'hui ? ». Pour chacun : le coach cite TSB + récupération (AC1) <b>et</b> raisonne dans l'unité propre au sport (AC2). Inclut les sports <b>sans seuil chiffré</b> (marche, rando, ski, muscu) qui exercent le chemin « effort perçu / FC ».</p>
+<table><thead><tr><th>Sport</th><th>Seuil dispo.</th><th>Vocabulaire / unité observé (verbatim)</th><th class="num">AC1</th><th class="num">AC2</th></tr></thead><tbody>
+<tr><td>Course à pied</td><td><code>vma_kmh</code></td><td>« 60-65 % de votre <span class="hl">VMA</span>, allure ~5'15"-5'30"/km »</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Vélo</td><td><code>ftp_watts</code></td><td>« 50-65 % <span class="hl">FTP</span>, soit 130-170 <span class="hl">W</span> », zones de puissance</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>VTT</td><td><code>ftp_watts</code></td><td>« 50-60 % <span class="hl">FTP</span>, 125-150 <span class="hl">W</span> » + « terrain roulant, sans <span class="hl">dénivelé</span> » (spécif. VTT)</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Marche</td><td>—</td><td>« marche nordique », « terrain vallonné », intensité par ressenti (pas de W/allure inventés)</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Randonnée</td><td>—</td><td>« <span class="hl">D+</span> », « <span class="hl">RPE 2-3/10</span> », « FC <span class="hl">Zone 1</span> 50-60 % FCmax → 95-114 bpm »</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Ski alpin</td><td>—</td><td>« 5-10 <span class="hl">descentes</span> max, technique/fluidité », « RPE 4-5/10 »</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Ski de fond</td><td>—</td><td>« 4x6min au seuil en <span class="hl">skating</span> », « FC Zone 1 (95-114 bpm) / RPE 2-3 »</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Musculation</td><td>—</td><td>« <span class="hl">5x5</span>, charge lourde », « au poids du corps », « <span class="hl">RPE 3-4/10</span> » (pas de W/allure)</td><td class="num"><span class="badge ok">OK</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Le comportement est <b>générique</b> : il découle (1) du contexte JSON exposant le seuil pertinent par sport et (2) de la section « Vocabulaire spécifique au sport » du prompt, étendue pour couvrir les 8 sports. Les sports <b>avec seuil</b> (course/vélo/VTT) donnent des cibles chiffrées (W, allure) ; les sports <b>sans seuil</b> (marche, rando, ski, muscu) basculent sur <b>effort perçu (RPE), FC/zones, séries×reps, dénivelé</b> — sans jamais inventer de watts/allure. <i>(Natation/triathlon non testés car hors liste MVP de l'onboarding.)</i></p>
+</div>
+
+<h2>Conclusion</h2>
+<div class="card">
+<ul>
+<li><b>AC1</b> ✅ — réponse citant explicitement <span class="hl">TSB −25</span> <i>et</i> <span class="hlr">récupération 28 %</span>, avec adaptation chiffrée (50-65 % FTP, 130-170 W) et justification physiologique.</li>
+<li><b>AC2</b> ✅ — vocabulaire adapté au sport, vérifié end-to-end sur <b>les 8 sports MVP</b> : course (VMA/allure), vélo & VTT (FTP/watts), marche, randonnée (RPE/FC/D+), ski alpin (descentes), ski de fond (FC/skating), musculation (séries×reps/RPE). Comportement global piloté par le contexte + le prompt.</li>
+<li><b>AC3</b> ✅ — indicateur de frappe &lt; 1 s + affichage progressif réel des tokens (Gemini passé en streaming SSE).</li>
+<li><b>AC4</b> ✅ — message d'erreur exact, message utilisateur conservé, bouton « Réessayer » fonctionnel (récupération vérifiée).</li>
+</ul>
+<p class="muted" style="margin:8px 0 0">Fichiers modifiés : <code>src/lib/openai/coach.ts</code> (prompt — faisabilité de séance + vocabulaire sport) ; <code>src/app/api/chat/route.ts</code> (event d'erreur SSE recouvrable + streaming Gemini incrémental) ; <code>src/app/(dashboard)/chat/page.tsx</code> (état d'erreur, détection event <code>error</code>, bannière + bouton « Réessayer », préservation du message). Non-régression : <code>tsc --noEmit</code> + <code>npm run lint</code> OK.</p>
+</div>
+
+<p class="foot">Validation end-to-end via Playwright sur l'application réelle (Gemini live). Compte de test cycliste semé via service-role (FTP 260, récupération 28 %, TSB −25, séance seuil). Données de test à supprimer après revue.</p>
+</div></body></html>

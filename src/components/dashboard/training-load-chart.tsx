@@ -13,6 +13,12 @@ import {
 } from "recharts";
 import { Card, Tabs, TabsList, TabsTrigger } from "@/components/ui";
 import { TrendingUp } from "lucide-react";
+import { interpretTSB } from "@/lib/calculations/training-load";
+
+// US-13 gating thresholds (number of distinct days with a completed activity).
+const MIN_DAYS_FOR_METRICS = 7; // < 7 → "données insuffisantes"
+const MIN_DAYS_FOR_GRAPH = 14; // > 14 → show the 60-day line chart
+const GRAPH_WINDOW_DAYS = 60;
 
 interface ChartTooltipProps {
   active?: boolean;
@@ -73,6 +79,8 @@ interface TrainingLoadChartProps {
   currentAtl: number;
   currentCtl: number;
   currentTsb: number;
+  /** Distinct days with a completed activity — gates the display (US-13). */
+  activityDays: number;
 }
 
 export function TrainingLoadChart({
@@ -80,8 +88,11 @@ export function TrainingLoadChart({
   currentAtl,
   currentCtl,
   currentTsb,
+  activityDays,
 }: TrainingLoadChartProps) {
-  const [period, setPeriod] = useState<"7" | "30" | "90">("30");
+  const [period, setPeriod] = useState<"7" | "30" | "60">(
+    String(GRAPH_WINDOW_DAYS) as "60"
+  );
   const [isMounted, setIsMounted] = useState(false);
 
   // Ensure component is mounted before rendering chart (fixes hydration issues)
@@ -97,45 +108,10 @@ export function TrainingLoadChart({
     return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
   };
 
-  const getTrainingStatus = (ratio: number) => {
-    if (ratio >= 1.2) {
-      return {
-        label: "Surcharge",
-        color: "text-error",
-        barColor: "var(--error)",
-        description: "Charge trop haute, risque de blessure.",
-      };
-    }
-    if (ratio >= 0.95) {
-      return {
-        label: "Productif",
-        color: "text-success",
-        barColor: "var(--success)",
-        description: "Charge en hausse contrôlée.",
-      };
-    }
-    return {
-      label: "Maintien",
-      color: "text-muted",
-      barColor: "#3a3a4a",
-      description: "Charge stable, focus technique.",
-    };
-  };
-
-  const getTsbStatus = (tsb: number) => {
-    if (tsb > 25) return { label: "Très frais", color: "text-secondary" };
-    if (tsb > 5) return { label: "Frais", color: "text-success" };
-    if (tsb > -10) return { label: "Optimal", color: "text-warning" };
-    if (tsb > -30) return { label: "Fatigué", color: "text-error" };
-    return { label: "Attention", color: "text-error" };
-  };
-
-  const tsbStatus = getTsbStatus(currentTsb);
-  const hasData = data.length > 0;
-  const loadRatio = currentCtl > 0 ? currentAtl / Math.max(currentCtl, 1) : 1;
-  const clampedRatio = Math.min(1.5, Math.max(0.5, loadRatio));
-  const trainingProgress = ((clampedRatio - 0.5) / 1) * 100;
-  const trainingStatus = getTrainingStatus(loadRatio);
+  // US-13: TSB status comes from the shared interpretTSB (same thresholds as the AI coach).
+  const tsbStatus = interpretTSB(currentTsb);
+  const showMetrics = activityDays >= MIN_DAYS_FOR_METRICS;
+  const showGraph = activityDays > MIN_DAYS_FOR_GRAPH && data.length > 0;
 
   return (
     <Card className="col-span-full lg:col-span-2">
@@ -152,63 +128,35 @@ export function TrainingLoadChart({
           </div>
         </div>
 
-        {hasData && (
+        {showGraph && (
           <Tabs
-            defaultValue="30"
-            onValueChange={(v) => setPeriod(v as "7" | "30" | "90")}
+            defaultValue={String(GRAPH_WINDOW_DAYS)}
+            onValueChange={(v) => setPeriod(v as "7" | "30" | "60")}
             className="w-full md:w-auto"
           >
             <TabsList className="w-full md:w-auto justify-between">
               <TabsTrigger value="7">7J</TabsTrigger>
               <TabsTrigger value="30">30J</TabsTrigger>
-              <TabsTrigger value="90">90J</TabsTrigger>
+              <TabsTrigger value="60">60J</TabsTrigger>
             </TabsList>
           </Tabs>
         )}
       </div>
 
-      {!hasData ? (
+      {!showMetrics ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <TrendingUp className="h-12 w-12 text-muted mb-4 opacity-50" />
-          <p className="text-muted mb-2">Aucune donnée d&apos;entraînement</p>
+          <p className="text-muted mb-2">
+            Données insuffisantes — les calculs gagnent en précision après 14
+            jours d&apos;entraînement
+          </p>
           <p className="text-sm text-muted opacity-75">
-            Connectez Strava ou ajoutez des activités pour voir votre charge
+            Connectez Strava ou ajoutez des activités pour suivre votre charge
             d&apos;entraînement
           </p>
         </div>
       ) : (
         <>
-          <div className="mb-6">
-            {/* <div className="flex items-center justify-between text-xs text-muted uppercase tracking-wide mb-2">
-              <span>Statut d&apos;entraînement</span>
-              <span>
-                ATL/CTL {Math.round(currentAtl)} / {Math.round(currentCtl)}
-              </span>
-            </div> */}
-            <div className="flex flex-col gap-1 mb-2">
-              <span className={`text-sm font-semibold ${trainingStatus.color}`}>
-                {trainingStatus.label}
-              </span>
-              <span className="text-xs text-muted">
-                {trainingStatus.description}
-              </span>
-            </div>
-            <div className="h-2 w-full bg-dark-200 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{
-                  width: `${trainingProgress}%`,
-                  backgroundColor: trainingStatus.barColor,
-                }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-muted uppercase mt-1">
-              <span>Maintien</span>
-              <span>Productif</span>
-              <span>Surcharge</span>
-            </div>
-          </div>
-
           {/* Current values */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="p-4 bg-dark-100 rounded-xl">
@@ -241,6 +189,7 @@ export function TrainingLoadChart({
             </div>
           </div>
 
+          {showGraph && (
           <div className="h-64 min-h-[256px] px-1 sm:px-0">
             {isMounted && (
               <ResponsiveContainer width="100%" height={256}>
@@ -290,6 +239,7 @@ export function TrainingLoadChart({
               </ResponsiveContainer>
             )}
           </div>
+          )}
         </>
       )}
     </Card>

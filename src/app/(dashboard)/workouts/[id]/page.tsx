@@ -22,6 +22,7 @@ import type { Json } from "@/types/database";
 import { ActivityStreamChart } from "@/components/workouts/activity-stream-chart";
 import { FirstVisitRpeModal } from "@/components/workouts/first-visit-rpe-modal";
 import { estimateTSSFromRPE } from "@/lib/calculations/training-load";
+import { recomputeAndStoreTrainingLoad } from "@/lib/calculations/persist-training-load";
 
 const focusByIntensity: Record<string, string> = {
   endurance: "Endurance fondamentale",
@@ -78,6 +79,15 @@ export default function WorkoutDetailPage({
 }) {
   const supabase = createClient();
   const router = useRouter();
+
+  // US-13: keep the stored CTL/ATL/TSB series in sync after any mutation that
+  // changes a completed activity's TSS, status or date.
+  const refreshTrainingLoad = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) await recomputeAndStoreTrainingLoad(supabase, user.id);
+  };
   const [activity, setActivity] = useState<ActivityDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [ftpWatts, setFtpWatts] = useState<number | null>(null);
@@ -483,6 +493,7 @@ export default function WorkoutDetailPage({
             }
           : prev
       );
+      await refreshTrainingLoad();
     } catch (error) {
       console.error("Error marking activity as done:", error);
     } finally {
@@ -522,6 +533,7 @@ export default function WorkoutDetailPage({
             }
           : prev
       );
+      if (updateFields.tss !== undefined) await refreshTrainingLoad();
     }
   };
 
@@ -574,6 +586,7 @@ export default function WorkoutDetailPage({
       }
 
       setRpeInput(data.rpe);
+      if (updateFields.tss !== undefined) await refreshTrainingLoad();
     } catch (error) {
       console.error("Error saving first visit RPE:", error);
       throw error;
@@ -594,6 +607,8 @@ export default function WorkoutDetailPage({
         .delete()
         .eq("id", activity.id)
         .eq("user_id", user.id);
+
+      await recomputeAndStoreTrainingLoad(supabase, user.id);
 
       setIsDeleteModalOpen(false);
       router.push("/workouts");
@@ -879,6 +894,7 @@ export default function WorkoutDetailPage({
         setIsTitleInlineEditing(false);
         setIsIntensityInlineEditing(false);
         setIsEditing(false);
+        await refreshTrainingLoad();
       }
     } catch (error) {
       console.error("Error updating activity:", error);
