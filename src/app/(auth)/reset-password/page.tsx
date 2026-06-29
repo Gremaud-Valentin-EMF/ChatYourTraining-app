@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input } from "@/components/ui";
-import { Lock, CheckCircle2, XCircle } from "lucide-react";
+import { Lock, CheckCircle2, XCircle, AlertTriangle, ArrowLeft } from "lucide-react";
 
 interface PasswordCriteria {
   minLength: boolean;
@@ -35,21 +36,81 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
+  const [status, setStatus] = useState<"verifying" | "ready" | "invalid">(
+    "verifying"
+  );
 
   const criteria = checkPassword(password);
   const passwordValid = isPasswordValid(criteria);
   const canSubmit = passwordValid && confirmPassword === password;
 
-  // Supabase sends the session via the URL hash after the user clicks the email link.
-  // onAuthStateChange picks it up and exchanges it for a session automatically.
+  // Establish the recovery session from the password-reset link before showing the form.
+  // The link lands here either with the session tokens in the URL hash (implicit flow,
+  // e.g. #access_token=…&type=recovery) or with a ?code= to exchange (PKCE flow). The
+  // @supabase/ssr browser client does NOT auto-detect implicit-hash sessions, so we set
+  // it explicitly. An expired / invalid / already-used link instead carries an `error`
+  // in the hash (e.g. #error=access_denied&error_code=otp_expired); if no recovery
+  // session can be established, the link is treated as invalid.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setSessionReady(true);
-      }
+    let active = true;
+    const markReady = () => {
+      if (active) setStatus("ready");
+    };
+    const markInvalid = () => {
+      if (active) setStatus("invalid");
+    };
+    // Strip the tokens from the URL once consumed so they don't linger in history.
+    const clearHash = () => {
+      window.history.replaceState(null, "", window.location.pathname);
+    };
+
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    if (hash.get("error") || hash.get("error_code")) {
+      markInvalid();
+      return;
+    }
+
+    const accessToken = hash.get("access_token");
+    const refreshToken = hash.get("refresh_token");
+
+    if (accessToken && refreshToken) {
+      supabase.auth
+        .setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => {
+          clearHash();
+          if (error) markInvalid();
+          else markReady();
+        });
+      return () => {
+        active = false;
+      };
+    }
+
+    // PKCE / already-established session: the client auto-exchanges ?code= on init.
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) markReady();
     });
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (
+          event === "PASSWORD_RECOVERY" ||
+          ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session)
+        ) {
+          markReady();
+        }
+      }
+    );
+
+    // Fallback: if no recovery session (and no error) arrives, the link is unusable.
+    const timeout = setTimeout(() => {
+      if (active) setStatus((prev) => (prev === "verifying" ? "invalid" : prev));
+    }, 8000);
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,6 +126,9 @@ export default function ResetPasswordPage() {
         setError(error.message);
         return;
       }
+      // Invalidate every active session (this device + any other) so the old
+      // password can no longer be used anywhere (AC2).
+      await supabase.auth.signOut({ scope: "global" });
       router.push("/login?reset=success");
     } catch {
       setError("Une erreur est survenue. Veuillez réessayer.");
@@ -73,7 +137,7 @@ export default function ResetPasswordPage() {
     }
   };
 
-  if (!sessionReady) {
+  if (status === "verifying") {
     return (
       <div className="text-center max-w-md mx-auto">
         <p className="text-muted">
@@ -82,6 +146,34 @@ export default function ResetPasswordPage() {
         <p className="text-sm text-muted mt-4">
           Si vous arrivez sur cette page directement, utilisez le lien reçu par
           e-mail pour réinitialiser votre mot de passe.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "invalid") {
+    return (
+      <div className="text-center max-w-md mx-auto">
+        <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertTriangle className="h-8 w-8 text-error" />
+        </div>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Lien invalide</h2>
+        <div className="p-3 bg-error/10 border border-error/20 rounded-xl text-error text-sm mb-8">
+          Ce lien est expiré ou invalide
+        </div>
+        <Link href="/forgot-password">
+          <Button variant="primary" size="lg" className="w-full">
+            Faire une nouvelle demande
+          </Button>
+        </Link>
+        <p className="mt-6 text-center text-muted">
+          <Link
+            href="/login"
+            className="text-accent hover:text-accent-400 font-medium transition-[color] flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Retour à la connexion
+          </Link>
         </p>
       </div>
     );

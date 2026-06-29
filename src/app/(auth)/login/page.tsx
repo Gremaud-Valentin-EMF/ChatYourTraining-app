@@ -50,6 +50,16 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [lockRemaining, setLockRemaining] = useState<number>(0);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Surface the success message after a password reset (redirect from /reset-password).
+  // Read from window.location to avoid a Suspense boundary that useSearchParams requires.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reset") === "success") {
+      setResetSuccess(true);
+    }
+  }, []);
 
   // Tick countdown when account is locked
   useEffect(() => {
@@ -141,6 +151,13 @@ export default function LoginPage() {
           Connectez-vous pour accéder à votre tableau de bord
         </p>
       </div>
+
+      {resetSuccess && (
+        <div className="mb-6 p-3 bg-success/10 border border-success/20 rounded-xl text-success text-sm">
+          Votre mot de passe a été réinitialisé. Connectez-vous avec votre
+          nouveau mot de passe.
+        </div>
+      )}
 
       <form onSubmit={handleEmailLogin} className="space-y-4">
         <Input

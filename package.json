@@ -9,7 +9,9 @@
     "lint": "next lint",
     "generate:icons": "node scripts/generate-icons.js",
     "recalculate-tss": "node scripts/recalculate-tss.js",
-    "backfill-training-load": "node scripts/backfill-training-load.js"
+    "backfill-training-load": "node scripts/backfill-training-load.js",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -28,9 +30,11 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "dotenv": "^17.4.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",
