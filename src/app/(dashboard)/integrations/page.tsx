@@ -174,6 +174,7 @@ function IntegrationsPageContent() {
   const [preferences, setPreferences] = useState<IntegrationPreference[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [syncNotif, setSyncNotif] = useState<{ count: number } | null>(null);
   const [isSyncingInitial, setIsSyncingInitial] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -217,8 +218,10 @@ function IntegrationsPageContent() {
     }
   };
 
-  const loadIntegrations = async () => {
-    setIsLoading(true);
+  const loadIntegrations = async (opts?: { silent?: boolean }) => {
+    // Silent refreshes (after a sync) avoid the full-page spinner swap that feels
+    // like a jarring reload — they just update the data in the background.
+    if (!opts?.silent) setIsLoading(true);
     try {
       const {
         data: { user },
@@ -248,7 +251,7 @@ function IntegrationsPageContent() {
       }
       if (preferencesResult.data) setPreferences(preferencesResult.data);
     } finally {
-      setIsLoading(false);
+      if (!opts?.silent) setIsLoading(false);
     }
   };
 
@@ -326,39 +329,33 @@ function IntegrationsPageContent() {
     return data?.synced ?? 0;
   };
 
-  const handleSync = async (provider: IntegrationProvider) => {
-    setIsSyncing(provider);
+  // Side-effect-free sync: performs the request and returns a structured result.
+  // The only state it updates is the per-provider reconnect flag / last-sync
+  // override, so both the single and the "sync all" flows can compose the UI.
+  type SyncStatus = "ok" | "reconnect" | "busy" | "error";
+  interface SyncResult {
+    provider: IntegrationProvider;
+    status: SyncStatus;
+    count: number;
+  }
+
+  const performSync = async (
+    provider: IntegrationProvider
+  ): Promise<SyncResult> => {
     setReconnectNeeded((prev) => ({ ...prev, [provider]: false }));
     try {
       const response = await fetch(`/api/sync/${provider}`, { method: "POST" });
 
-      // Token refresh failed server-side → invite the athlete to reconnect (CA3).
       if (response.status === 401) {
+        // Token refresh failed server-side → invite the athlete to reconnect.
         setReconnectNeeded((prev) => ({ ...prev, [provider]: true }));
-        setToast({
-          type: "error",
-          message: `La connexion ${providerLabel(
-            provider
-          )} a expiré. Veuillez reconnecter votre compte.`,
-        });
-        return;
+        return { provider, status: "reconnect", count: 0 };
       }
-
-      // A sync is already running for this integration.
       if (response.status === 429) {
-        setToast({
-          type: "info",
-          message: "Synchronisation déjà en cours. Réessayez dans un instant.",
-        });
-        return;
+        return { provider, status: "busy", count: 0 };
       }
-
       if (!response.ok) {
-        setToast({
-          type: "error",
-          message: "La synchronisation a échoué. Veuillez réessayer.",
-        });
-        return;
+        return { provider, status: "error", count: 0 };
       }
 
       const data = await response.json().catch(() => ({}));
@@ -367,22 +364,93 @@ function IntegrationsPageContent() {
         ...prev,
         [provider]: new Date().toISOString(),
       }));
-      setToast({
-        type: "success",
-        message: `${count} nouvelle${count !== 1 ? "s" : ""} donnée${
-          count !== 1 ? "s" : ""
-        } importée${count !== 1 ? "s" : ""}.`,
-      });
-      await loadIntegrations();
+      return { provider, status: "ok", count };
     } catch (error) {
       console.error("Sync error:", error);
-      setToast({
-        type: "error",
-        message: "La synchronisation a échoué. Veuillez réessayer.",
-      });
+      return { provider, status: "error", count: 0 };
+    }
+  };
+
+  const importedLabel = (count: number) =>
+    `${count} nouvelle${count !== 1 ? "s" : ""} donnée${
+      count !== 1 ? "s" : ""
+    } importée${count !== 1 ? "s" : ""}`;
+
+  const handleSync = async (provider: IntegrationProvider) => {
+    setIsSyncing(provider);
+    try {
+      const result = await performSync(provider);
+      if (result.status === "reconnect") {
+        setToast({
+          type: "error",
+          message: `La connexion ${providerLabel(
+            provider
+          )} a expiré. Veuillez reconnecter votre compte.`,
+        });
+      } else if (result.status === "busy") {
+        setToast({
+          type: "info",
+          message: "Synchronisation déjà en cours. Réessayez dans un instant.",
+        });
+      } else if (result.status === "error") {
+        setToast({
+          type: "error",
+          message: "La synchronisation a échoué. Veuillez réessayer.",
+        });
+      } else {
+        setToast({
+          type: "success",
+          message: `${importedLabel(result.count)}.`,
+        });
+        await loadIntegrations({ silent: true });
+      }
     } finally {
       setIsSyncing(null);
     }
+  };
+
+  // Sequential "sync all": each integration syncs one after another (its card
+  // spinner is visible in turn), then a single recap toast is shown. The refresh
+  // is silent so the page never flashes the full-screen loader.
+  const handleSyncAll = async () => {
+    const active = integrations.filter((i) => i.is_active);
+    if (active.length === 0) {
+      setToast({
+        type: "info",
+        message: "Aucune intégration active à synchroniser.",
+      });
+      return;
+    }
+
+    setIsSyncingAll(true);
+    const results: SyncResult[] = [];
+    try {
+      for (const integration of active) {
+        setIsSyncing(integration.provider);
+        results.push(await performSync(integration.provider));
+      }
+    } finally {
+      setIsSyncing(null);
+    }
+
+    const segments = results.map((r) => {
+      const label = providerLabel(r.provider);
+      if (r.status === "ok") return `${label} : ${r.count} importée${r.count !== 1 ? "s" : ""}`;
+      if (r.status === "reconnect") return `${label} : reconnexion requise`;
+      if (r.status === "busy") return `${label} : déjà en cours`;
+      return `${label} : échec`;
+    });
+    const allOk = results.every((r) => r.status === "ok");
+    const anyFailure = results.some(
+      (r) => r.status === "reconnect" || r.status === "error"
+    );
+    setToast({
+      type: allOk ? "success" : anyFailure ? "error" : "info",
+      message: segments.join(" · "),
+    });
+
+    await loadIntegrations({ silent: true });
+    setIsSyncingAll(false);
   };
 
   const handleToggle = async (
@@ -552,14 +620,12 @@ function IntegrationsPageContent() {
         </p>
         <Button
           className="w-full sm:w-auto"
-          onClick={() => {
-            integrations
-              .filter((i) => i.is_active)
-              .forEach((i) => handleSync(i.provider));
-          }}
+          onClick={handleSyncAll}
+          isLoading={isSyncingAll}
+          disabled={isSyncingAll}
           leftIcon={<RefreshCw className="h-4 w-4" />}
         >
-          Tout synchroniser
+          {isSyncingAll ? "Synchronisation…" : "Tout synchroniser"}
         </Button>
       </div>
 
