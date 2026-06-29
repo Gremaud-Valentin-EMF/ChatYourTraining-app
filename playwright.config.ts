@@ -17,7 +17,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: [
-    ["html", { outputFolder: "playwright-report", open: "never" }],
+    ["html", { outputFolder: "rapport-de-test", open: "never" }],
     ["list"],
   ],
   use: {

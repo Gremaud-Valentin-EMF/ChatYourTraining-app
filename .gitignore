@@ -11,8 +11,10 @@
 
 # playwright
 /playwright-report
+/rapport-de-test
 /test-results
 /e2e/.artifacts
+/playwright/.cache
 /playwright/.cache
 
 # next.js

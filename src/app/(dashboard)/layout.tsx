@@ -17,7 +17,6 @@ import {
   List,
   MessageSquare,
   LogOut,
-  Bell,
   ChevronDown,
   Target,
 } from "lucide-react";
@@ -176,12 +175,6 @@ export default function DashboardLayout({
                   Coach IA
                 </span>
               </Link>
-
-              {/* Notifications */}
-              <button className="relative p-2 text-muted hover:text-foreground hover:bg-dark-100 rounded-xl transition-colors">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 h-2 w-2 bg-accent rounded-full" />
-              </button>
 
               <div
                 className="relative"

@@ -3,7 +3,15 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Card, Button, Toggle, Badge, Select } from "@/components/ui";
+import {
+  Card,
+  Button,
+  Toggle,
+  Badge,
+  Select,
+  Toast,
+  type ToastData,
+} from "@/components/ui";
 import {
   RefreshCw,
   ExternalLink,
@@ -11,6 +19,7 @@ import {
   Activity,
   Moon,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import type { Tables, IntegrationProvider } from "@/types/database";
 
@@ -167,6 +176,15 @@ function IntegrationsPageContent() {
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
   const [syncNotif, setSyncNotif] = useState<{ count: number } | null>(null);
   const [isSyncingInitial, setIsSyncingInitial] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const [reconnectNeeded, setReconnectNeeded] = useState<
+    Record<string, boolean>
+  >({});
+  // Optimistic last-sync timestamp per provider (the real backend also updates
+  // integrations.last_sync_at, this makes the UI react immediately on success).
+  const [lastSyncOverride, setLastSyncOverride] = useState<
+    Record<string, string>
+  >({});
 
   // Get URL params
   const urlError = searchParams.get("error");
@@ -293,14 +311,75 @@ function IntegrationsPageContent() {
     loadIntegrations();
   };
 
+  const providerLabel = (provider: IntegrationProvider) =>
+    provider === "strava" ? "Strava" : provider === "whoop" ? "Whoop" : provider;
+
+  // Number of newly imported records reported by the sync route.
+  const countImported = (
+    provider: IntegrationProvider,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: any
+  ): number => {
+    if (provider === "whoop") {
+      return (data?.synced ?? 0) + (data?.workoutsSynced ?? 0);
+    }
+    return data?.synced ?? 0;
+  };
+
   const handleSync = async (provider: IntegrationProvider) => {
     setIsSyncing(provider);
+    setReconnectNeeded((prev) => ({ ...prev, [provider]: false }));
     try {
       const response = await fetch(`/api/sync/${provider}`, { method: "POST" });
-      if (!response.ok) throw new Error("Sync failed");
+
+      // Token refresh failed server-side → invite the athlete to reconnect (CA3).
+      if (response.status === 401) {
+        setReconnectNeeded((prev) => ({ ...prev, [provider]: true }));
+        setToast({
+          type: "error",
+          message: `La connexion ${providerLabel(
+            provider
+          )} a expiré. Veuillez reconnecter votre compte.`,
+        });
+        return;
+      }
+
+      // A sync is already running for this integration.
+      if (response.status === 429) {
+        setToast({
+          type: "info",
+          message: "Synchronisation déjà en cours. Réessayez dans un instant.",
+        });
+        return;
+      }
+
+      if (!response.ok) {
+        setToast({
+          type: "error",
+          message: "La synchronisation a échoué. Veuillez réessayer.",
+        });
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      const count = countImported(provider, data);
+      setLastSyncOverride((prev) => ({
+        ...prev,
+        [provider]: new Date().toISOString(),
+      }));
+      setToast({
+        type: "success",
+        message: `${count} nouvelle${count !== 1 ? "s" : ""} donnée${
+          count !== 1 ? "s" : ""
+        } importée${count !== 1 ? "s" : ""}.`,
+      });
       await loadIntegrations();
     } catch (error) {
       console.error("Sync error:", error);
+      setToast({
+        type: "error",
+        message: "La synchronisation a échoué. Veuillez réessayer.",
+      });
     } finally {
       setIsSyncing(null);
     }
@@ -585,9 +664,36 @@ function IntegrationsPageContent() {
                       <Clock className="h-4 w-4" />
                       <span>
                         Dernière synchro:{" "}
-                        {formatLastSync(integration?.last_sync_at ?? null)}
+                        {formatLastSync(
+                          lastSyncOverride[provider.id] ??
+                            integration?.last_sync_at ??
+                            null
+                        )}
                       </span>
+                      {lastSyncOverride[provider.id] && (
+                        <CheckCircle2
+                          aria-label="Synchronisé"
+                          className="h-4 w-4 text-success"
+                        />
+                      )}
                     </div>
+
+                    {/* Token expired → invite to reconnect (CA3) */}
+                    {reconnectNeeded[provider.id] && (
+                      <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <span>
+                          La connexion a expiré. Veuillez reconnecter votre
+                          compte pour synchroniser.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleConnect(provider.id)}
+                          className="font-medium underline shrink-0 text-left"
+                        >
+                          Reconnecter
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -603,7 +709,7 @@ function IntegrationsPageContent() {
                         {isSyncing === provider.id ? (
                           <RefreshCw className="h-4 w-4 animate-spin inline mr-1" />
                         ) : null}
-                        Synchroniser
+                        Synchroniser maintenant
                       </button>
                       <span className="text-dark-300">•</span>
                       <button
@@ -699,6 +805,8 @@ function IntegrationsPageContent() {
           </div>
         </Card>
       </div>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
