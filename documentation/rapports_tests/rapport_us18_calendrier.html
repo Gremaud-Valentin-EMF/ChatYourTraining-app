@@ -1,0 +1,91 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>US-18 — Visualisation du calendrier d'entraînement</title>
+<style>
+:root{--bg:#0b0f14;--card:#131a22;--line:#1f2a36;--fg:#e6edf3;--muted:#8aa0b2;--accent:#00d4aa;--blue:#5b9bff;--amber:#f59e0b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 20px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:30px 0 10px;color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 24px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.kpis{display:flex;gap:14px;flex-wrap:wrap}
+.kpi{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px}
+.ok{background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55}
+.tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--muted)}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+.foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+.info{border-left:3px solid var(--blue);background:#5b9bff0d}
+.note{border-left:3px solid var(--amber);background:#f59e0b0d}
+.crit{font-style:italic;color:var(--muted);margin:0 0 10px}
+</style></head><body><div class="wrap">
+<h1>US-18 — Visualisation du calendrier d'entraînement</h1>
+<p class="sub"><b>Objectif :</b> l'athlète consulte un calendrier mensuel/hebdomadaire de ses séances planifiées et réalisées. <b>Méthode :</b> 3 séances du jour seedées en base via le client service-role (planifiée / faite / manquée), puis chaque critère d'acceptation est rejoué de bout en bout dans l'app réelle (Playwright, session authentifiée) sur <code>/calendar</code>. • Utilisateur de test : <code>e2e-calendar@chatyourtraining.test</code> • Chromium • 2026-06-30</p>
+
+<div class="kpis">
+ <div class="kpi"><div class="v" style="color:var(--accent)">4 / 4</div><div class="l">Critères d'acceptation validés (Playwright)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">4 / 4</div><div class="l">Tests passés</div></div>
+ <div class="kpi"><div class="v" style="color:var(--blue)">3</div><div class="l">Statuts couverts (planifiée · faite · manquée)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">0</div><div class="l">Régression tsc / lint</div></div>
+</div>
+<p class="muted" style="margin:6px 2px 0">Note : les séances planifiées et réalisées vivent dans la même table <code>activities</code> (différenciées par <code>status</code>). Le détail d'une séance réutilise la page <code>/workouts/[id]</code> (description, données, « Marquer comme fait » conditionné à <code>status = planned &amp;&amp; date ≤ aujourd'hui</code>).</p>
+
+<h2><span class="tag">CA1</span> Affichage des séances sur leur date</h2>
+<div class="card">
+<p class="crit">« chaque séance est affichée sur sa date avec : titre, sport (icône), durée et statut (planifiée, faite, manquée) ».</p>
+<p class="muted" style="margin:0 0 8px">Chaque pastille (vues mois &amp; semaine) rend l'icône du sport + le titre + la durée, avec un style par statut, et expose le tout via <code>aria-label</code> « titre — sport — durée — statut ».</p>
+<table><thead><tr><th>Séance (seed)</th><th>Sport / icône</th><th class="num">Durée</th><th>Statut affiché</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>Vélo du jour</td><td>Vélo <span class="muted">(icône)</span></td><td class="num">1h</td><td><span class="tag">planifiée</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Footing matin</td><td>Course à pied <span class="muted">(icône)</span></td><td class="num">45m</td><td><span class="tag">faite</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Fractionné raté</td><td>Course à pied <span class="muted">(icône)</span></td><td class="num">40m</td><td><span class="tag">manquée</span></td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">✓ Présence de l'icône (<code>svg</code>) vérifiée sur la pastille. Statut « manquée » rendu barré/erreur, « faite » avec bordure pleine.</p>
+</div>
+
+<h2><span class="tag">CA2</span> Détail d'une journée</h2>
+<div class="card">
+<p class="crit">« je vois le détail complet de la journée, avec le ou les entraînements du jour, la météo, une fatigue du jour, des commentaires ».</p>
+<table><thead><tr><th>Élément du panneau jour</th><th>Vérification Playwright</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>Entraînement(s) du jour</td><td>cartes séance « PRÉVU / RÉALISÉ » visibles</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Météo</td><td>carte météo affichée (<code>Météo non disponible</code> sans géoloc en test)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Fatigue du jour</td><td>« Journal du jour » + « Fatigue ressentie » (slider 1–10)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Commentaires</td><td>zone de notes (textarea) éditable du jour</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Le clic sur une pastille sélectionne sa journée et ouvre le panneau de détail (séances + météo + journal fatigue/notes).</p>
+</div>
+
+<h2><span class="tag">CA3</span> Détail d'une séance + « Marquer comme faite »</h2>
+<div class="card info">
+<p class="crit">« je vois la description complète avec les données et un bouton "Marquer comme faite" si la séance est passée ou d'aujourd'hui ».</p>
+<table><thead><tr><th>Cas</th><th>Action</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>Séance « Vélo du jour » (planifiée, aujourd'hui)</td><td>clic depuis le panneau jour → ouverture de <code>/workouts/[id]</code></td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Bouton d'action</td><td>« Marquer comme fait » visible (séance d'aujourd'hui)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">La page détail réutilisée affiche description + métriques ; le bouton est conditionné à <code>status = planned</code> et date ≤ aujourd'hui.</p>
+</div>
+
+<h2><span class="tag">CA4</span> Semaine sans séance</h2>
+<div class="card">
+<p class="crit">« les jours apparaissent vides avec un message "Aucune séance planifiée — demande un plan au Coach IA" ».</p>
+<table><thead><tr><th>Cas</th><th>Action</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>Semaine sans séance</td><td>vue « Semaine » → période suivante (aucune séance) → message exact affiché</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Message rendu au mot près : « Aucune séance planifiée — demande un plan au Coach IA ».</p>
+</div>
+
+<h2>Conclusion</h2>
+<div class="card">
+<ul>
+<li><b>Critères satisfaits : 4/4.</b> CA1 (pastilles enrichies : titre + icône + durée + statut), CA2 (détail journée : séances + météo + fatigue + notes), CA3 (séance → détail + « Marquer comme fait » si passée/aujourd'hui), CA4 (message exact pour une semaine vide).</li>
+<li><b>Implémentation :</b> composant <code>SessionChip</code> piloté par le statut, ajout de l'icône du sport au chargement, bannière de semaine vide et libellés d'accessibilité sur la navigation. CA2/CA3 déjà couverts par l'existant (panneau jour + <code>/workouts/[id]</code>).</li>
+<li><b>Qualité :</b> <code>tsc --noEmit</code> et <code>eslint</code> sans erreur ; aucune modification backend.</li>
+</ul>
+</div>
+
+<p class="foot">Méthodologie : 3 séances du jour (planifiée / faite / manquée) créées en base via le client service-role, puis 4 tests Playwright sur une session réelle authentifiée valident chaque critère sur <code>/calendar</code> et <code>/workouts/[id]</code> (<code>e2e/calendar.spec.ts</code>). Météo non disponible en test faute de géolocalisation — l'app affiche le repli prévu. Données de test re-seedées à chaque exécution.</p>
+</div></body></html>

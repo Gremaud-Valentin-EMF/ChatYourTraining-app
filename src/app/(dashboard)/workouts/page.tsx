@@ -139,7 +139,7 @@ export default function WorkoutsPage() {
     title: "",
     sportId: "",
     plannedDate: "",
-    realizedDate: toLocalDateString(new Date()),
+    realizedDate: "",
     duration: "",
     distance: "",
     elevation: "",
@@ -505,10 +505,47 @@ export default function WorkoutsPage() {
           payload.tss_type = type;
         }
       } else {
-        // Planned / skipped — only planned_* columns, no TSS until realized.
+        // Planned / skipped — planned_* columns plus planned targets (precise
+        // planning); no realized TSS until the session is actually done.
         payload.planned_duration_minutes = durationMin;
         payload.planned_distance_km = distanceKm;
         payload.tss = null;
+
+        const manual: Record<string, number> = {};
+        if (newSession.elevation) {
+          manual.planned_elevation_m = parseInt(newSession.elevation, 10);
+        }
+        const plannedPaceSeconds = parsePaceToSeconds(newSession.pace);
+        if (plannedPaceSeconds) manual.planned_pace_seconds = plannedPaceSeconds;
+
+        // Target load from the planned metrics (RPE excluded — realized only).
+        if (durationMin && durationMin > 0) {
+          const thresholds = await loadUserThresholds(supabase, user.id);
+          const np = newSession.normalizedPower
+            ? parseInt(newSession.normalizedPower, 10)
+            : undefined;
+          const { tss } = computeManualTSS(
+            {
+              sportSlug: slug,
+              durationMinutes: durationMin,
+              distanceKm: distanceKm ?? undefined,
+              avgPaceSecondsPerKm: plannedPaceSeconds,
+              normalizedPower: np,
+              avgPowerWatts: newSession.avgPower
+                ? parseInt(newSession.avgPower, 10)
+                : undefined,
+              avgHr: newSession.avgHr
+                ? parseInt(newSession.avgHr, 10)
+                : undefined,
+            },
+            thresholds
+          );
+          if (tss > 0) manual.planned_tss = tss;
+        }
+
+        if (Object.keys(manual).length > 0) {
+          payload.raw_data = { _manual: manual };
+        }
       }
 
       await supabase.from("activities").insert(payload);
@@ -1159,13 +1196,12 @@ export default function WorkoutsPage() {
           </div>
 
           {/* Statut déduit de la combinaison des deux dates */}
-          {(newSession.plannedDate || newSession.realizedDate) && (
+          {(newSessionStatus === "completed" ||
+            newSessionStatus === "skipped") && (
             <p className="text-xs text-muted">
               {newSessionStatus === "completed"
                 ? "Séance réalisée : le TSS sera calculé automatiquement."
-                : newSessionStatus === "skipped"
-                  ? "Date planifiée passée sans réalisation → séance manquée (skipped)."
-                  : "Séance planifiée : pas de TSS tant qu'elle n'est pas réalisée."}
+                : "Date planifiée passée sans réalisation → séance manquée (skipped)."}
             </p>
           )}
 
@@ -1198,8 +1234,8 @@ export default function WorkoutsPage() {
             )}
           </div>
 
-          {/* Champs adaptatifs — uniquement pour une séance réalisée */}
-          {newSessionRealized && newSessionFields && (
+          {/* Champs de métriques — disponibles aussi pour planifier (RPE excepté) */}
+          {newSessionFields && (
             <>
               {(newSessionFields.elevation || newSessionFields.pace) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1291,20 +1327,23 @@ export default function WorkoutsPage() {
                 </div>
               )}
 
-              <Slider
-                label="RPE — ressenti de l'effort"
-                min={0}
-                max={10}
-                step={1}
-                value={newSession.rpe}
-                valueFormatter={(v) => (v === 0 ? "—" : `${v}/10`)}
-                onChange={(e) =>
-                  setNewSession((prev) => ({
-                    ...prev,
-                    rpe: parseInt(e.target.value, 10),
-                  }))
-                }
-              />
+              {/* RPE — ressenti, à renseigner uniquement pour une séance réalisée */}
+              {newSessionRealized && (
+                <Slider
+                  label="RPE — ressenti de l'effort"
+                  min={0}
+                  max={10}
+                  step={1}
+                  value={newSession.rpe}
+                  valueFormatter={(v) => (v === 0 ? "—" : `${v}/10`)}
+                  onChange={(e) =>
+                    setNewSession((prev) => ({
+                      ...prev,
+                      rpe: parseInt(e.target.value, 10),
+                    }))
+                  }
+                />
+              )}
             </>
           )}
 

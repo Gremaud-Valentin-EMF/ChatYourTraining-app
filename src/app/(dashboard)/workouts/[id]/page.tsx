@@ -20,6 +20,7 @@ import {
 import { getSportIconComponent } from "@/lib/sport-icons";
 import type { Json } from "@/types/database";
 import { ActivityStreamChart } from "@/components/workouts/activity-stream-chart";
+import { ActivityNotes } from "@/components/workouts/activity-notes";
 import { FirstVisitRpeModal } from "@/components/workouts/first-visit-rpe-modal";
 import { estimateTSSFromRPE } from "@/lib/calculations/training-load";
 import { getSportFields } from "@/lib/calculations/manual-activity";
@@ -553,6 +554,18 @@ export default function WorkoutDetailPage({
     }
   };
 
+  const saveNotes = async (value: string) => {
+    if (!activity) return;
+    const next = value.trim() ? value : null;
+    const { error } = await supabase
+      .from("activities")
+      .update({ description: next })
+      .eq("id", activity.id);
+    if (!error) {
+      setActivity((prev) => (prev ? { ...prev, description: next } : prev));
+    }
+  };
+
   const handleFirstVisitRpeSave = async (data: {
     rpe: number;
     comment: string;
@@ -846,7 +859,6 @@ export default function WorkoutDetailPage({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatePayload: any = {
         title: editForm.title,
-        description: editForm.description || null,
         intensity: editForm.intensity,
         planned_duration_minutes:
           parsedPlannedDuration !== null && Number.isFinite(parsedPlannedDuration)
@@ -878,7 +890,6 @@ export default function WorkoutDetailPage({
             ? {
                 ...prev,
                 title: editForm.title,
-                description: editForm.description || null,
                 intensity: editForm.intensity,
                 planned_duration_minutes:
                   parsedPlannedDuration !== null &&
@@ -1582,37 +1593,6 @@ export default function WorkoutDetailPage({
                 </div>
               </div>
             </div>
-            {(activity.description || isEditing) && (
-              <section className="space-y-3 border-t border-dark-200 pt-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    Description
-                  </h3>
-                  <span className="text-xs uppercase text-foreground/60">
-                    Notes de contexte
-                  </span>
-                </div>
-                {isEditing ? (
-                  <textarea
-                    value={editForm.description}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-2xl border border-dark-200 bg-dark-100/50 px-4 py-3 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent"
-                    rows={3}
-                    placeholder="Description de la séance (optionnel)"
-                  />
-                ) : (
-                  <div className="rounded-2xl border border-dark-200 bg-dark-100/50 px-4 py-3 text-sm text-foreground/70">
-                    {activity.description}
-                  </div>
-                )}
-              </section>
-            )}
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 pt-2">
               {isEditing ? (
                 <>
@@ -2019,6 +1999,22 @@ export default function WorkoutDetailPage({
                 séance.
               </p>
             )}
+          </section>
+
+          <section className="space-y-3 border-t border-dark-200 pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Notes &amp; commentaires
+              </h3>
+              <span className="text-xs uppercase text-foreground/60">
+                Liées à cette séance
+              </span>
+            </div>
+            <ActivityNotes
+              initialValue={activity.description ?? ""}
+              onSave={saveNotes}
+            />
           </section>
 
           <section className="space-y-3 border-t border-dark-200 pt-4">

@@ -48,6 +48,7 @@ import {
 } from "@/lib/utils";
 import { WeatherIcon } from "@/components/weather/weather-icon";
 import { useWeatherForecast } from "@/lib/hooks/useWeatherForecast";
+import { getSportIconComponent } from "@/lib/sport-icons";
 
 interface Objective {
   id: string;
@@ -63,6 +64,7 @@ interface Activity {
   sport_name: string;
   sport_name_fr: string;
   sport_color?: string;
+  sport_icon?: string | null;
   scheduled_date: string;
   status: "planned" | "completed" | "skipped" | "in_progress";
   planned_duration_minutes: number | null;
@@ -84,6 +86,137 @@ interface DailyMetrics {
 }
 
 type ViewMode = "week" | "month";
+
+const STATUS_LABELS: Record<Activity["status"], string> = {
+  planned: "planifiée",
+  completed: "faite",
+  skipped: "manquée",
+  in_progress: "en cours",
+};
+
+const STATUS_BADGE_VARIANT: Record<
+  Activity["status"],
+  "success" | "error" | "warning" | "info"
+> = {
+  completed: "success",
+  skipped: "error",
+  in_progress: "warning",
+  planned: "info",
+};
+
+function sessionDurationLabel(activity: Activity): string {
+  const mins =
+    activity.actual_duration_minutes ?? activity.planned_duration_minutes;
+  return mins ? formatDuration(mins) : "";
+}
+
+/**
+ * A session as shown on a calendar date: sport icon + title + duration, styled by
+ * status (faite = filled border, manquée = struck/error, planifiée = plain). The
+ * full title/sport/duration/status is exposed via aria-label (CA1).
+ */
+function SessionChip({
+  activity,
+  variant,
+}: {
+  activity: Activity;
+  variant: "month" | "week";
+}) {
+  const Icon = getSportIconComponent(activity.sport_icon ?? undefined);
+  const color = activity.sport_color || getSportColor(activity.sport_name);
+  const duration = sessionDurationLabel(activity);
+  const status = activity.status;
+  const ariaLabel = `${activity.title} — ${activity.sport_name_fr} — ${
+    duration || "durée n.c."
+  } — ${STATUS_LABELS[status]}`;
+
+  if (variant === "week") {
+    return (
+      <div
+        aria-label={ariaLabel}
+        className={cn(
+          "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium",
+          status === "skipped" && "bg-error/20 text-error line-through"
+        )}
+        style={
+          status !== "skipped"
+            ? { backgroundColor: `${color}20`, color }
+            : undefined
+        }
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span className="truncate max-w-[10rem]">{activity.title}</span>
+        {duration && <span className="opacity-80">· {duration}</span>}
+        <Badge variant={STATUS_BADGE_VARIANT[status]} size="sm">
+          {STATUS_LABELS[status]}
+        </Badge>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      aria-label={ariaLabel}
+      className={cn(
+        "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium",
+        status === "skipped" && "bg-error/20 text-error line-through"
+      )}
+      style={
+        status !== "skipped"
+          ? {
+              backgroundColor: `${color}20`,
+              color,
+              border:
+                status === "completed"
+                  ? `1px solid ${color}`
+                  : "1px solid transparent",
+            }
+          : undefined
+      }
+    >
+      <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+      <span className="truncate">{activity.title}</span>
+      {duration && (
+        <span className="ml-auto shrink-0 opacity-80">{duration}</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Uniform monthly-stat card: stat name on top, then "Prévu" / "Réalisé" side by
+ * side (same height), with each value below its label.
+ */
+function MonthStatCard({
+  icon,
+  label,
+  planned,
+  realized,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  planned: React.ReactNode;
+  realized: React.ReactNode;
+}) {
+  return (
+    <Card padding="sm">
+      <div className="flex items-center gap-2 mb-3">
+        {icon}
+        <p className="text-xs text-muted uppercase">{label}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-muted">Prévu</p>
+          <p className="text-xl font-bold">{planned}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted">Réalisé</p>
+          <p className="text-xl font-bold">{realized}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function CalendarPage() {
   const router = useRouter();
@@ -261,6 +394,22 @@ export default function CalendarPage() {
     return stats;
   }, [activities, weekRange]);
 
+  // The header stat cards follow the active view: weekly stats in week view,
+  // monthly stats in month view.
+  const displayStats =
+    viewMode === "week"
+      ? {
+          plannedDuration: weeklyStats.plannedMinutes,
+          actualDuration: weeklyStats.actualMinutes,
+          plannedDistance: weeklyStats.plannedDistance,
+          actualDistance: weeklyStats.actualDistance,
+          plannedTss: weeklyStats.plannedTss,
+          actualTss: weeklyStats.actualTss,
+          sessions: weeklyStats.sessions,
+          completedSessions: weeklyStats.completedSessions,
+        }
+      : monthStats;
+
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }).map((_, index) => {
       const date = new Date(weekRange.start);
@@ -319,7 +468,7 @@ export default function CalendarPage() {
           tss,
           intensity,
           rpe,
-          sports (name, name_fr, color)
+          sports (name, name_fr, color, icon)
         `
         )
         .eq("user_id", user.id)
@@ -345,6 +494,7 @@ export default function CalendarPage() {
             sport_name: a.sports?.name || "other",
             sport_name_fr: a.sports?.name_fr || "Autre",
             sport_color: a.sports?.color,
+            sport_icon: a.sports?.icon,
           }))
         );
       }
@@ -652,10 +802,47 @@ export default function CalendarPage() {
           payload.tss_type = type;
         }
       } else {
-        // Planned / skipped — only planned_* columns, no TSS until realized.
+        // Planned / skipped — planned_* columns plus planned targets (precise
+        // planning); no realized TSS until the session is actually done.
         payload.planned_duration_minutes = durationMin;
         payload.planned_distance_km = distanceKm;
         payload.tss = null;
+
+        const manual: Record<string, number> = {};
+        if (newSession.elevation) {
+          manual.planned_elevation_m = parseInt(newSession.elevation, 10);
+        }
+        const plannedPaceSeconds = parsePaceToSeconds(newSession.pace);
+        if (plannedPaceSeconds) manual.planned_pace_seconds = plannedPaceSeconds;
+
+        // Target load from the planned metrics (RPE excluded — realized only).
+        if (durationMin && durationMin > 0) {
+          const thresholds = await loadUserThresholds(supabase, user.id);
+          const np = newSession.normalizedPower
+            ? parseInt(newSession.normalizedPower, 10)
+            : undefined;
+          const { tss } = computeManualTSS(
+            {
+              sportSlug: slug,
+              durationMinutes: durationMin,
+              distanceKm: distanceKm ?? undefined,
+              avgPaceSecondsPerKm: plannedPaceSeconds,
+              normalizedPower: np,
+              avgPowerWatts: newSession.avgPower
+                ? parseInt(newSession.avgPower, 10)
+                : undefined,
+              avgHr: newSession.avgHr
+                ? parseInt(newSession.avgHr, 10)
+                : undefined,
+            },
+            thresholds
+          );
+          if (tss > 0) manual.planned_tss = tss;
+        }
+
+        if (Object.keys(manual).length > 0) {
+          payload.raw_data = { _manual: manual };
+        }
       }
 
       await supabase.from("activities").insert(payload);
@@ -667,10 +854,12 @@ export default function CalendarPage() {
 
       setIsModalOpen(false);
       setNewSession(defaultNewSession);
-      await loadActivities();
-      if (selectedDate && toLocalDateString(selectedDate) === scheduledDate) {
-        await loadDayDetails(selectedDate);
-      }
+      // Jump the calendar to the new activity's date so it shows up immediately,
+      // even when it lands in another month/week. Changing currentDate/selectedDate
+      // triggers the effects that reload the grid and the day panel.
+      const createdDate = new Date(`${scheduledDate}T00:00:00`);
+      setSelectedDate(createdDate);
+      setCurrentDate(createdDate);
     } finally {
       setIsSavingSession(false);
     }
@@ -679,12 +868,13 @@ export default function CalendarPage() {
   const handleOpenModal = () => {
     const baseDate = selectedDate || currentDate;
     const baseStr = toLocalDateString(baseDate);
-    // Pre-fill the relevant date: past/today → réalisée, future → planifiée.
+    // Pre-fill only the planned date for a future day. The realized date stays
+    // empty by default — the athlete fills it in explicitly.
     const isPastOrToday = baseStr <= toLocalDateString(today);
     setNewSession({
       ...defaultNewSession,
       plannedDate: isPastOrToday ? "" : baseStr,
-      realizedDate: isPastOrToday ? baseStr : "",
+      realizedDate: "",
     });
     setIsModalOpen(true);
   };
@@ -763,6 +953,7 @@ export default function CalendarPage() {
                   variant="secondary"
                   onClick={() => navigateDate(-1)}
                   className="gap-2"
+                  aria-label="Période précédente"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
@@ -770,6 +961,7 @@ export default function CalendarPage() {
                   variant="secondary"
                   onClick={() => navigateDate(1)}
                   className="gap-2"
+                  aria-label="Période suivante"
                 >
                   <ChevronRight className="h-5 w-5" />
                 </Button>
@@ -800,83 +992,42 @@ export default function CalendarPage() {
 
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <Card
-              padding="sm"
-              className="flex items-center justify-between gap-3"
-            >
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-secondary" />
-                <div>
-                  <p className="text-xs text-muted uppercase">
-                    Durée planifiée (mois)
-                  </p>
-                  <p className="text-xl font-bold">
-                    {formatHoursFromMinutes(monthStats.plannedDuration)}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted">Réalisé</p>
-                <p className="text-sm font-semibold">
-                  {formatHoursFromMinutes(monthStats.actualDuration)}
-                </p>
-              </div>
-            </Card>
+            <MonthStatCard
+              icon={<Clock className="h-5 w-5 text-secondary" />}
+              label="Durée"
+              planned={formatHoursFromMinutes(displayStats.plannedDuration)}
+              realized={formatHoursFromMinutes(displayStats.actualDuration)}
+            />
 
-            <Card
-              padding="sm"
-              className="flex items-center justify-between gap-3"
-            >
-              <div className={cn("flex items-center gap-2")}>
-                <Activity className="h-5 w-5 text-accent" />
-                <div>
-                  <p className="text-xs text-muted uppercase">
-                    Distance prévue (mois)
-                  </p>
-                  <p className="text-xl font-bold">
-                    {monthStats.plannedDistance.toFixed(1)}
-                    <span className="text-sm text-muted ml-1">km</span>
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted">Complétée</p>
-                <p className="text-sm font-semibold">
-                  {monthStats.actualDistance.toFixed(1)} km
-                </p>
-              </div>
-            </Card>
+            <MonthStatCard
+              icon={<Activity className="h-5 w-5 text-accent" />}
+              label="Distance"
+              planned={
+                <>
+                  {displayStats.plannedDistance.toFixed(1)}
+                  <span className="text-sm text-muted ml-1">km</span>
+                </>
+              }
+              realized={
+                <>
+                  {displayStats.actualDistance.toFixed(1)}
+                  <span className="text-sm text-muted ml-1">km</span>
+                </>
+              }
+            />
 
-            <Card
-              padding="sm"
-              className="flex items-center justify-between gap-3"
-            >
-              <div className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-warning" />
-                <div>
-                  <p className="text-xs text-muted uppercase">Charge TSS</p>
-                  <p className="text-xl font-bold">{monthStats.actualTss}</p>
-                </div>
-              </div>
-              <Badge variant="outline" size="sm">
-                Objectif {monthStats.plannedTss}
-              </Badge>
-            </Card>
+            <MonthStatCard
+              icon={<Zap className="h-5 w-5 text-warning" />}
+              label="Charge TSS"
+              planned={displayStats.plannedTss}
+              realized={displayStats.actualTss}
+            />
 
-            <Card
-              padding="sm"
-              className="flex items-center justify-between gap-3"
-            >
-              <div>
-                <p className="text-xs text-muted uppercase">Séances</p>
-                <p className="text-xl font-bold">
-                  {monthStats.completedSessions}
-                </p>
-              </div>
-              <p className="text-sm text-muted">
-                sur {monthStats.sessions} prévues
-              </p>
-            </Card>
+            <MonthStatCard
+              label="Séances"
+              planned={displayStats.sessions}
+              realized={displayStats.completedSessions}
+            />
           </div>
 
           {/* Calendar View */}
@@ -979,42 +1130,11 @@ export default function CalendarPage() {
                           {/* Desktop: Full List */}
                           <div className="hidden md:block space-y-1">
                             {dayActivities.slice(0, 3).map((activity) => (
-                              <div
+                              <SessionChip
                                 key={activity.id}
-                                className={cn(
-                                  "px-2 py-1 rounded text-xs font-medium truncate",
-                                  activity.status === "skipped"
-                                    ? "bg-error/20 text-error"
-                                    : ""
-                                )}
-                                style={
-                                  activity.status !== "skipped"
-                                    ? {
-                                        backgroundColor: activity.sport_color
-                                          ? `${activity.sport_color}20`
-                                          : `${getSportColor(
-                                              activity.sport_name
-                                            )}20`,
-                                        color:
-                                          activity.sport_color ||
-                                          getSportColor(activity.sport_name),
-                                        border:
-                                          activity.status === "completed"
-                                            ? `1px solid ${
-                                                activity.sport_color ||
-                                                getSportColor(
-                                                  activity.sport_name
-                                                )
-                                              }`
-                                            : "1px solid transparent",
-                                      }
-                                    : undefined
-                                }
-                              >
-                                {activity.title.length > 10
-                                  ? `${activity.title.substring(0, 10)}...`
-                                  : activity.title}
-                              </div>
+                                activity={activity}
+                                variant="month"
+                              />
                             ))}
                             {dayActivities.length > 3 && (
                               <div className="text-xs text-muted">
@@ -1055,34 +1175,11 @@ export default function CalendarPage() {
             </Card>
           ) : (
             <Card>
-              <div className="flex flex-wrap gap-4 mb-4 text-sm">
-                <div>
-                  <p className="text-xs text-muted uppercase">
-                    Durée planifiée
-                  </p>
-                  <p className="font-semibold">
-                    {formatHoursFromMinutes(weeklyStats.plannedMinutes)}
-                  </p>
+              {weekDays.every((day) => day.activities.length === 0) && (
+                <div className="text-center py-8 px-4 mb-2 rounded-xl border border-dashed border-dark-200 text-sm text-muted">
+                  Aucune séance planifiée — demande un plan au Coach IA
                 </div>
-                <div>
-                  <p className="text-xs text-muted uppercase">Durée réalisée</p>
-                  <p className="font-semibold">
-                    {formatHoursFromMinutes(weeklyStats.actualMinutes)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted uppercase">Charge TSS</p>
-                  <p className="font-semibold">
-                    {weeklyStats.actualTss}/{weeklyStats.plannedTss}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted uppercase">Séances</p>
-                  <p className="font-semibold">
-                    {weeklyStats.completedSessions}/{weeklyStats.sessions}
-                  </p>
-                </div>
-              </div>
+              )}
 
               <div className="space-y-2">
                 {weekDays.map((day) => {
@@ -1141,25 +1238,14 @@ export default function CalendarPage() {
                       <div className="flex flex-wrap gap-2">
                         {day.activities.length > 0 ? (
                           day.activities.map((activity) => (
-                            <div
+                            <SessionChip
                               key={activity.id}
-                              className="px-3 py-1 rounded-full text-xs font-medium"
-                              style={{
-                                backgroundColor: activity.sport_color
-                                  ? `${activity.sport_color}20`
-                                  : `${getSportColor(activity.sport_name)}20`,
-                                color:
-                                  activity.sport_color ||
-                                  getSportColor(activity.sport_name),
-                              }}
-                            >
-                              {activity.title}
-                            </div>
+                              activity={activity}
+                              variant="week"
+                            />
                           ))
                         ) : (
-                          <span className="text-xs text-muted">
-                            Aucune séance planifiée
-                          </span>
+                          <span className="text-xs text-muted">Repos</span>
                         )}
                       </div>
                     </button>
@@ -1493,13 +1579,18 @@ export default function CalendarPage() {
           {/* Notes */}
           {selectedDate && (
             <Card>
-              <h4 className="font-medium flex items-center gap-2 mb-4">
-                <NotebookPen className="h-4 w-4 text-muted" />
-                Notes
-              </h4>
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-medium flex items-center gap-2">
+                  <NotebookPen className="h-4 w-4 text-muted" />
+                  Notes du jour
+                </h4>
+              </div>
+              <p className="text-xs text-muted mb-3">
+                Liées à la journée, pas à une séance.
+              </p>
               <textarea
                 className="w-full h-24 bg-dark-100 rounded-xl p-3 text-sm resize-none border border-dark-200 focus:border-accent focus:outline-none"
-                placeholder="Commentaire sur la séance, sensation particulière..."
+                placeholder="Note sur la journée (forme générale, sommeil, événement…)"
                 value={notesValue}
                 onChange={(e) => setNotesValue(e.target.value)}
                 disabled={isFutureSelection}
@@ -1584,13 +1675,12 @@ export default function CalendarPage() {
           </div>
 
           {/* Statut déduit de la combinaison des deux dates */}
-          {(newSession.plannedDate || newSession.realizedDate) && (
+          {(newSessionStatus === "completed" ||
+            newSessionStatus === "skipped") && (
             <p className="text-xs text-muted">
               {newSessionStatus === "completed"
                 ? "Séance réalisée : le TSS sera calculé automatiquement."
-                : newSessionStatus === "skipped"
-                  ? "Date planifiée passée sans réalisation → séance manquée (skipped)."
-                  : "Séance planifiée : pas de TSS tant qu'elle n'est pas réalisée."}
+                : "Date planifiée passée sans réalisation → séance manquée (skipped)."}
             </p>
           )}
 
@@ -1623,8 +1713,8 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* Champs adaptatifs — uniquement pour une séance réalisée */}
-          {newSessionRealized && newSessionFields && (
+          {/* Champs de métriques — disponibles aussi pour planifier (RPE excepté) */}
+          {newSessionFields && (
             <>
               {(newSessionFields.elevation || newSessionFields.pace) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1716,20 +1806,23 @@ export default function CalendarPage() {
                 </div>
               )}
 
-              <Slider
-                label="RPE — ressenti de l'effort"
-                min={0}
-                max={10}
-                step={1}
-                value={newSession.rpe}
-                valueFormatter={(v) => (v === 0 ? "—" : `${v}/10`)}
-                onChange={(e) =>
-                  setNewSession((prev) => ({
-                    ...prev,
-                    rpe: parseInt(e.target.value, 10),
-                  }))
-                }
-              />
+              {/* RPE — ressenti, à renseigner uniquement pour une séance réalisée */}
+              {newSessionRealized && (
+                <Slider
+                  label="RPE — ressenti de l'effort"
+                  min={0}
+                  max={10}
+                  step={1}
+                  value={newSession.rpe}
+                  valueFormatter={(v) => (v === 0 ? "—" : `${v}/10`)}
+                  onChange={(e) =>
+                    setNewSession((prev) => ({
+                      ...prev,
+                      rpe: parseInt(e.target.value, 10),
+                    }))
+                  }
+                />
+              )}
             </>
           )}
 
