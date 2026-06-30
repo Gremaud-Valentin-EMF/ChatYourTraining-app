@@ -80,15 +80,17 @@ export async function POST(request: Request) {
       alerts.length > 0 ? alerts.join("\n\n") + "\n\n---\n\n" : "";
 
     type ChatHistoryEntry = Pick<Tables<"chat_messages">, "role" | "content">;
-    // Get recent messages for conversation context
+    // Conversation context: only the 20 most recent messages are sent to the LLM
+    // (the full history stays visible in the UI). Fetch the last 20 (desc) then
+    // restore chronological order.
     const { data: recentMessages } = await supabase
       .from("chat_messages")
       .select("role, content")
       .eq("session_id", currentSessionId)
-      .order("created_at", { ascending: true })
-      .limit(10);
-    const typedRecentMessages = (recentMessages ??
-      []) as ChatHistoryEntry[];
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const typedRecentMessages = ((recentMessages ??
+      []) as ChatHistoryEntry[]).reverse();
 
     // Build messages array for AI provider
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -114,6 +116,13 @@ export async function POST(request: Request) {
       context_snapshot: context as unknown as Json,
     };
     await supabase.from("chat_messages").insert(userMessagePayload);
+
+    // Bump the session's last-activity timestamp so the sidebar (ordered by
+    // updated_at desc) reflects the latest message, not just renames/archives.
+    await supabase
+      .from("chat_sessions")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", currentSessionId);
 
     const provider = getChatProvider();
     const planRequested = forcePlanMode || isPlanRequest(message);

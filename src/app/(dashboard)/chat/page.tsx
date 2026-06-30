@@ -26,6 +26,9 @@ import {
   Pencil,
   Trash2,
   Archive,
+  ArchiveRestore,
+  Search,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +114,7 @@ export default function ChatPage() {
   const [planSuggestions, setPlanSuggestions] = useState<PlanSuggestion[]>([]);
   const [forcePlanMode, setForcePlanMode] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<string | null>(null);
   const [renamingSession, setRenamingSession] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -428,6 +432,21 @@ export default function ChatPage() {
     setContextMenu(null);
   };
 
+  const handleUnarchiveSession = async (sessionId: string) => {
+    try {
+      await fetch("/api/chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, is_archived: false }),
+      });
+      // It leaves the trash view (which only lists archived sessions).
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch (error) {
+      console.error("Error restoring session:", error);
+    }
+    setContextMenu(null);
+  };
+
   // Load sessions on mount and when showArchived changes
   useEffect(() => {
     loadSessions();
@@ -671,6 +690,10 @@ export default function ChatPage() {
     );
   };
 
+  const visibleSessions = sessions.filter((s) =>
+    (s.title ?? "").toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
+
   return (
     <div className="relative flex flex-col lg:flex-row h-[calc(100vh-8rem)] gap-4">
       {sidebarOpen && !isDesktop && (
@@ -683,11 +706,11 @@ export default function ChatPage() {
       <div className={cn("flex-shrink-0", isDesktop ? "w-64" : "w-0")}>
         <div
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 border-r border-dark-200 flex flex-col bg-dark-50 transform transition-transform duration-200 lg:static lg:translate-x-0",
+            "fixed inset-y-0 left-0 z-50 w-64 border-r border-dark-200 flex flex-col bg-dark-50 transform transition-transform duration-200 lg:static lg:translate-x-0 lg:h-full",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <div className="p-4 border-b border-dark-200">
+          <div className="p-4 border-b border-dark-200 space-y-3">
             <Button
               variant="primary"
               className="w-full"
@@ -696,16 +719,60 @@ export default function ChatPage() {
             >
               Nouvelle conversation
             </Button>
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher"
+              leftIcon={<Search className="h-4 w-4" />}
+            />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2">
-            {sessions.length === 0 ? (
+          <div className="flex-1 min-h-0 p-2 flex flex-col">
+            {/* Scope header: conversations ↔ archives — stays fixed */}
+            <div className="flex items-center justify-between px-2 py-1 mb-1 flex-shrink-0">
+              {showArchived ? (
+                <button
+                  onClick={() => setShowArchived(false)}
+                  className="flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Conversations
+                </button>
+              ) : (
+                <span className="text-xs uppercase tracking-wide text-muted">
+                  Conversations
+                </span>
+              )}
+              {showArchived ? (
+                <span className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted">
+                  <Archive className="h-3.5 w-3.5" />
+                  Archives
+                </span>
+              ) : (
+                <button
+                  onClick={() => setShowArchived(true)}
+                  aria-label="Archives"
+                  title="Sessions archivées"
+                  className="p-1 rounded-lg text-muted hover:text-foreground hover:bg-dark-100 transition-colors"
+                >
+                  <Archive className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Scrollable list; the spacer below makes it stop at the chat-input level */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+            {visibleSessions.length === 0 ? (
               <p className="text-sm text-muted text-center py-8">
-                Aucune conversation
+                {searchQuery.trim()
+                  ? "Aucun résultat"
+                  : showArchived
+                    ? "Aucune session archivée"
+                    : "Aucune conversation"}
               </p>
             ) : (
               <div className="space-y-1">
-                {sessions.map((session) => (
+                {visibleSessions.map((session) => (
                   <div
                     key={session.id}
                     className={cn(
@@ -780,16 +847,29 @@ export default function ChatPage() {
                               <Pencil className="h-3.5 w-3.5" />
                               Renommer
                             </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleArchiveSession(session.id);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted hover:text-foreground hover:bg-dark-100"
-                            >
-                              <Archive className="h-3.5 w-3.5" />
-                              Archiver
-                            </button>
+                            {showArchived ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnarchiveSession(session.id);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted hover:text-foreground hover:bg-dark-100"
+                              >
+                                <ArchiveRestore className="h-3.5 w-3.5" />
+                                Restaurer
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleArchiveSession(session.id);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted hover:text-foreground hover:bg-dark-100"
+                              >
+                                <Archive className="h-3.5 w-3.5" />
+                                Archiver
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -809,13 +889,7 @@ export default function ChatPage() {
                 ))}
               </div>
             )}
-
-            <button
-              onClick={() => setShowArchived((prev) => !prev)}
-              className="w-full mt-3 text-xs text-muted hover:text-foreground text-center py-2 transition-colors"
-            >
-              {showArchived ? "Masquer archivées" : "Montrer archivées"}
-            </button>
+            </div>
           </div>
         </div>
       </div>

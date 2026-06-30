@@ -37,6 +37,7 @@ import {
   Trash,
   Plug,
   Gauge,
+  X,
 } from "lucide-react";
 import {
   cn,
@@ -90,40 +91,12 @@ const sourceLabels: Record<IntegrationProvider, string> = {
   manual: "MANUEL",
 };
 
-const intensityLabels: Record<string, string> = {
-  recovery: "Récupération",
-  endurance: "Endurance",
-  tempo: "Tempo",
-  threshold: "Seuil",
-  vo2max: "VO2Max",
-  anaerobic: "Anaérobie",
-};
-
-const intensityOrder = [
-  "recovery",
-  "endurance",
-  "tempo",
-  "threshold",
-  "vo2max",
-  "anaerobic",
-];
-
-const formatIntensityLabel = (value: string) => {
-  const normalized = value.replace(/_/g, " ");
-  const label = intensityLabels[value];
-  if (label) {
-    return label;
-  }
-
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-};
 
 type PeriodFilter = "all" | "week" | "month" | "3months";
 type ActivityFilters = {
   period: PeriodFilter;
   sport: string;
   source: "all" | IntegrationProvider;
-  intensity: string;
 };
 
 export default function WorkoutsPage() {
@@ -169,7 +142,6 @@ export default function WorkoutsPage() {
     period: "all",
     sport: "all",
     source: "all",
-    intensity: "all",
   });
 
   const pageSize = 20;
@@ -219,38 +191,6 @@ export default function WorkoutsPage() {
     ];
   }, [activities]);
 
-  const intensityOptions = useMemo(() => {
-    const intensities = Array.from(
-      new Set(
-        activities
-          .map((activity) => activity.intensity)
-          .filter(Boolean) as string[]
-      )
-    );
-
-    const sortedIntensities = intensities.sort((a, b) => {
-      const aIndex = intensityOrder.indexOf(a);
-      const bIndex = intensityOrder.indexOf(b);
-      if (aIndex === bIndex) {
-        return a.localeCompare(b, "fr");
-      }
-      if (aIndex === -1) {
-        return 1;
-      }
-      if (bIndex === -1) {
-        return -1;
-      }
-      return aIndex - bIndex;
-    });
-
-    return [
-      { value: "all", label: "Toutes intensités" },
-      ...sortedIntensities.map((value) => ({
-        value,
-        label: formatIntensityLabel(value),
-      })),
-    ];
-  }, [activities]);
 
   useEffect(() => {
     loadActivities();
@@ -327,10 +267,6 @@ export default function WorkoutsPage() {
 
       if (filters.source !== "all") {
         query = query.eq("source", filters.source);
-      }
-
-      if (filters.intensity !== "all") {
-        query = query.eq("intensity", filters.intensity);
       }
 
       const trimmedSearch = searchQuery.trim();
@@ -657,7 +593,6 @@ export default function WorkoutsPage() {
       period: "all",
       sport: "all",
       source: "all",
-      intensity: "all",
     });
     setCurrentPage(1);
   };
@@ -731,9 +666,10 @@ export default function WorkoutsPage() {
       </div>
 
       {/* Filters */}
-      <div className="space-y-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+        {/* Search + the 3 filters share one column, so the filters span the search width */}
+        <div className="flex-1 space-y-3">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
             <Input
               placeholder="Rechercher un titre, une description ou un objectif"
@@ -745,30 +681,7 @@ export default function WorkoutsPage() {
               className="pl-10"
             />
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(activeFiltersCount > 0 && "text-accent")}
-            >
-              <Filter className="h-4 w-4 mr-1" />
-              Filtres
-              {activeFiltersCount > 0 && (
-                <Badge variant="success" size="sm" className="ml-2">
-                  {activeFiltersCount}
-                </Badge>
-              )}
-            </Button>
-
-            {activeFiltersCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Réinitialiser
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
             {
               key: "period",
@@ -800,13 +713,6 @@ export default function WorkoutsPage() {
                   source: value as "all" | IntegrationProvider,
                 }),
             },
-            {
-              key: "intensity",
-              options: intensityOptions,
-              value: filters.intensity,
-              onChange: (value: string) =>
-                applyFilterChanges({ intensity: value }),
-            },
           ].map((config) => (
             <Select
               key={config.key}
@@ -817,6 +723,49 @@ export default function WorkoutsPage() {
               hideChevron
             />
           ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(activeFiltersCount > 0 && "text-accent")}
+          >
+            <Filter className="h-4 w-4 mr-1" />
+            Filtres
+            {/* Always reserve the badge + clear space so the button keeps a
+                constant width regardless of filter state. */}
+            <span
+              className={cn(
+                "ml-2 inline-flex items-center gap-2",
+                activeFiltersCount === 0 && "invisible pointer-events-none"
+              )}
+            >
+              <Badge variant="success" size="sm">
+                {activeFiltersCount}
+              </Badge>
+              <span
+                role="button"
+                tabIndex={activeFiltersCount > 0 ? 0 : -1}
+                aria-label="Effacer les filtres"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearFilters();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearFilters();
+                  }
+                }}
+                className="inline-flex items-center justify-center rounded-md p-0.5 text-muted hover:text-foreground hover:bg-dark-200 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </span>
+            </span>
+          </Button>
         </div>
       </div>
 

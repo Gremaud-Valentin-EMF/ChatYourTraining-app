@@ -1,0 +1,87 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>US-25 — Persistance et gestion des sessions de chat</title>
+<style>
+:root{--bg:#0b0f14;--card:#131a22;--line:#1f2a36;--fg:#e6edf3;--muted:#8aa0b2;--accent:#00d4aa;--blue:#5b9bff;--amber:#f59e0b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:40px 20px}
+.wrap{max-width:960px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:32px 0 12px;color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 24px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0}
+.kpis{display:flex;gap:14px;flex-wrap:wrap}
+.kpi{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .v{font-size:26px;font-weight:700}.kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-top:6px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid;font-weight:700;font-size:13px}
+.ok{background:#00d4aa1a;color:#00d4aa;border-color:#00d4aa55}
+.tag{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--muted)}
+ul{margin:8px 0 0;padding-left:20px}li{margin:4px 0}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+.foot{color:var(--muted);font-size:12px;margin-top:28px;border-top:1px solid var(--line);padding-top:14px}
+.crit{font-style:italic;color:var(--muted);margin:0 0 10px}
+.note{border-left:3px solid var(--amber);background:#f59e0b0d}
+</style></head><body><div class="wrap">
+<h1>US-25 — Persistance et gestion des sessions de chat</h1>
+<p class="sub">L'athlète retrouve ses conversations passées, en crée de nouvelles, voit ses 20 dernières sessions dans un panneau latéral et peut les archiver. <b>Méthode :</b> chaque critère d'acceptation est rejoué de bout en bout dans l'app réelle (Playwright, session authentifiée) sur <code>/chat</code> et l'API <code>/api/chat</code> ; l'état du chat est seedé/relu en base via le client service-role. • Utilisateur de test : <code>e2e-chat@chatyourtraining.test</code> • Chromium • 2026-06-30</p>
+
+<div class="kpis">
+ <div class="kpi"><div class="v" style="color:var(--accent)">4 / 4</div><div class="l">Critères d'acceptation validés (Playwright)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">4 / 4</div><div class="l">Tests passés</div></div>
+ <div class="kpi"><div class="v" style="color:var(--blue)">20</div><div class="l">Messages d'historique envoyés au LLM (max)</div></div>
+ <div class="kpi"><div class="v" style="color:var(--accent)">0</div><div class="l">Régression tsc / lint</div></div>
+</div>
+<p class="muted" style="margin:6px 2px 0">Le socle (panneau latéral, « Nouvelle conversation », menu Renommer/Archiver/Supprimer, historique complet) était déjà en place. Deux correctifs serveur ont été apportés dans <code>src/app/api/chat/route.ts</code> : l'historique envoyé au LLM passe des <b>10 premiers</b> aux <b>20 derniers</b> messages, et <code>chat_sessions.updated_at</code> est <b>bumpé à chaque message</b> pour un tri par dernière activité correct.</p>
+
+<h2><span class="tag">CA1</span> Création auto de session + titre</h2>
+<div class="card">
+<p class="crit">« 1er message sans session active → une nouvelle session est créée dans <code>chat_sessions</code> avec le titre auto-généré sur les 50 premiers caractères du message. »</p>
+<table><thead><tr><th>Cas</th><th>Vérification</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>Message &gt; 50 caractères envoyé sans session active</td><td>une <code>chat_sessions</code> est créée pour l'utilisateur</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Titre auto-généré</td><td><code>title === message.slice(0, 50)</code> (relu en base)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">La session et le message utilisateur sont persistés côté serveur dès le POST, avant le streaming du LLM — l'assertion est donc robuste.</p>
+</div>
+
+<h2><span class="tag">CA2</span> Liste des 20 dernières sessions, triées par dernière activité</h2>
+<div class="card">
+<p class="crit">« plusieurs sessions passées → à l'ouverture de <code>/chat</code>, les 20 dernières sessions sont listées dans un panneau latéral, triées par date de dernière activité. »</p>
+<table><thead><tr><th>Données seedées</th><th>Vérification (panneau latéral)</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>22 sessions, <code>updated_at</code> croissant (Session 01…22)</td><td>« Session 22 » (plus récente) et « Session 03 » visibles</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>idem</td><td>« Session 02 » et « Session 01 » (les 2 plus anciennes) <b>absentes</b></td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">Prouve la limite de 20 et le tri décroissant par dernière activité (<code>updated_at</code>, désormais bumpé à chaque message).</p>
+</div>
+
+<h2><span class="tag">CA3</span> Fenêtre LLM de 20 messages, historique complet visible</h2>
+<div class="card note">
+<p class="crit">« session de &gt; 20 messages → seuls les 20 derniers messages sont envoyés au LLM comme historique, mais la totalité reste visible dans l'UI. »</p>
+<table><thead><tr><th>Aspect</th><th>Vérification</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>Historique complet dans l'UI</td><td>session de 25 messages → « Message 01 », « 13 » et « 25 » tous visibles</td><td class="num"><span class="badge ok">OK</span> (Playwright)</td></tr>
+<tr><td>20 derniers messages au LLM</td><td><code>order created_at desc · limit(20)</code> puis remis en ordre chronologique</td><td class="num"><span class="badge ok">OK</span> (revue de code)</td></tr>
+</tbody></table>
+<p class="muted" style="margin:10px 0 0">La sélection « 20 derniers » est interne au serveur (non observable en boîte noire) : validée par revue de code (<code>route.ts</code>), tandis que l'historique complet visible est testé via Playwright.</p>
+</div>
+
+<h2><span class="tag">CA4</span> Archivage (sans suppression)</h2>
+<div class="card">
+<p class="crit">« clic sur "Archiver" → la session passe à <code>is_archived = true</code> et disparaît de la liste principale sans être supprimée. »</p>
+<table><thead><tr><th>Action</th><th>Vérification</th><th class="num">Résultat</th></tr></thead><tbody>
+<tr><td>Menu contextuel → « Archiver » sur « À archiver »</td><td>disparaît de la liste ; « Garder » reste affichée</td><td class="num"><span class="badge ok">OK</span></td></tr>
+<tr><td>Non supprimée</td><td>en base : <code>is_archived === true</code> (la ligne existe toujours)</td><td class="num"><span class="badge ok">OK</span></td></tr>
+</tbody></table>
+</div>
+
+<h2>Conclusion</h2>
+<div class="card">
+<ul>
+<li><b>Critères satisfaits : 4/4.</b> Création auto + titre 50 caractères (CA1), panneau des 20 dernières sessions trié par dernière activité (CA2), fenêtre LLM de 20 messages avec historique complet visible (CA3), archivage non destructif (CA4).</li>
+<li><b>Correctifs serveur :</b> historique LLM = 20 derniers messages (au lieu des 10 premiers) ; <code>updated_at</code> bumpé à chaque message pour le tri « dernière activité ». Migration <code>00015</code> ajoutée pour aligner le SQL sur la colonne <code>is_archived</code> (déjà présente en base).</li>
+<li><b>Qualité :</b> <code>tsc --noEmit</code> et <code>eslint</code> sans erreur ; UI déjà en place, aucune régression.</li>
+</ul>
+</div>
+
+<p class="foot">Méthodologie : 4 tests Playwright (<code>e2e/chat.spec.ts</code>) sur une session réelle authentifiée. Chaque test re-seede son propre état de chat via le client service-role (sessions/messages), puis valide le comportement sur <code>/chat</code> et relit la base. CA1 déclenche un appel LLM réel mais l'assertion porte sur la session/titre créés avant le streaming. CA3 : limite « 20 derniers » vérifiée par revue de code (non observable côté client) ; historique complet visible testé. Données de test re-seedées à chaque exécution.</p>
+</div></body></html>
