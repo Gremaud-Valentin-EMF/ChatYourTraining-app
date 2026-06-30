@@ -22,6 +22,7 @@ import type { Json } from "@/types/database";
 import { ActivityStreamChart } from "@/components/workouts/activity-stream-chart";
 import { FirstVisitRpeModal } from "@/components/workouts/first-visit-rpe-modal";
 import { estimateTSSFromRPE } from "@/lib/calculations/training-load";
+import { getSportFields } from "@/lib/calculations/manual-activity";
 import { recomputeAndStoreTrainingLoad } from "@/lib/calculations/persist-training-load";
 
 const focusByIntensity: Record<string, string> = {
@@ -39,6 +40,21 @@ const intensityOptions = [
   { value: "threshold", label: "Seuil / tenue de puissance" },
   { value: "vo2max", label: "Augmentation de VO2max" },
 ];
+
+// Human label for the TSS calculation method stored in activities.tss_type.
+const TSS_TYPE_LABELS: Record<string, string> = {
+  tss: "power-based",
+  hrtss: "hr-based",
+  rpe: "rpe-based",
+  estimated: "estimated",
+  rtss: "pace-based",
+  stss: "swim-based",
+};
+
+function tssTypeLabel(tssType: string | null | undefined): string | null {
+  if (!tssType) return null;
+  return TSS_TYPE_LABELS[tssType] ?? tssType;
+}
 
 interface ActivityDetail {
   id: string;
@@ -1003,7 +1019,10 @@ export default function WorkoutDetailPage({
     movingTimeSeconds !== null
       ? movingTimeSeconds / 60
       : activity.actual_duration_minutes ?? null;
-  const isCycling = activity.sport_name === "cycling";
+  // Per-sport field model (distance/elevation/pace/power/hr) drives which metrics
+  // are relevant for this activity's sport. `power` covers cycling AND VTT.
+  const sportFields = getSportFields(activity.sport_name);
+  const isCycling = sportFields.power;
   const formatDurationValue = (minutes: number) =>
     formatDuration(Math.round(minutes));
   const formatPaceValue = (secondsPerKm: number) => {
@@ -1170,18 +1189,27 @@ export default function WorkoutDetailPage({
     },
     {
       label: "Distance",
-      planned: plannedDistanceString,
-      actual: actualDistanceString,
+      planned: sportFields.distance ? plannedDistanceString : null,
+      actual: sportFields.distance ? actualDistanceString : null,
       plannedRaw:
         typeof plannedDistanceKm === "number" ? plannedDistanceKm : null,
       actualRaw: distanceKm,
     },
     {
+      // Pace ("rythme") only makes sense for running.
       label: "Moyenne / rythme moyen",
-      planned: plannedPaceString,
-      actual: actualPaceString,
+      planned: sportFields.pace ? plannedPaceString : null,
+      actual: sportFields.pace ? actualPaceString : null,
       plannedRaw: plannedPaceSeconds,
       actualRaw: averagePaceSeconds,
+    },
+    {
+      label: "Puissance moyenne",
+      actual:
+        isCycling && activity.avg_power_watts
+          ? `${Math.round(activity.avg_power_watts)} W`
+          : null,
+      actualRaw: activity.avg_power_watts,
     },
     {
       label: "NP",
@@ -1212,8 +1240,14 @@ export default function WorkoutDetailPage({
     },
     {
       label: "Dénivelé",
-      planned: plannedElevation !== null ? `${Math.round(plannedElevation)} m` : null,
-      actual: elevationGain !== null ? `${Math.round(elevationGain)} m` : null,
+      planned:
+        sportFields.elevation && plannedElevation !== null
+          ? `${Math.round(plannedElevation)} m`
+          : null,
+      actual:
+        sportFields.elevation && elevationGain !== null
+          ? `${Math.round(elevationGain)} m`
+          : null,
       plannedRaw: plannedElevation,
       actualRaw: elevationGain,
     },
@@ -1938,6 +1972,13 @@ export default function WorkoutDetailPage({
                             {formatComparisonValue(row.actual, row.actualRaw)}
                           </p>
                         )}
+                        {row.label === "TSS" &&
+                          activity.status === "completed" &&
+                          tssTypeLabel(activity.tss_type) && (
+                            <p className="text-xs text-muted mt-1">
+                              Calcul : {tssTypeLabel(activity.tss_type)}
+                            </p>
+                          )}
                         {row.label === "TSS" && activity.status === "completed" && activity.tss_type === "estimated" && (
                           <p className="text-xs text-yellow-400 mt-1">
                             TSS estimé — aucune donnée de puissance, allure ou FC disponible.

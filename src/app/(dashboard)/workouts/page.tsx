@@ -35,6 +35,8 @@ import {
   ChevronLeft,
   Filter,
   Trash,
+  Plug,
+  Gauge,
 } from "lucide-react";
 import {
   cn,
@@ -55,6 +57,7 @@ interface Activity {
   elevation_gain_m: number | null;
   avg_hr: number | null;
   max_hr: number | null;
+  avg_power_watts: number | null;
   tss: number | null;
   source: IntegrationProvider;
   intensity: string | null;
@@ -169,7 +172,7 @@ export default function WorkoutsPage() {
     intensity: "all",
   });
 
-  const pageSize = 10;
+  const pageSize = 20;
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const applyFilterChanges = (changes: Partial<ActivityFilters>) => {
@@ -281,6 +284,7 @@ export default function WorkoutsPage() {
           elevation_gain_m,
           avg_hr,
           max_hr,
+          avg_power_watts,
           tss,
           source,
           intensity,
@@ -365,6 +369,7 @@ export default function WorkoutsPage() {
             tss: a.tss,
             avg_hr: a.avg_hr,
             max_hr: a.max_hr,
+            avg_power_watts: a.avg_power_watts,
             source: a.source,
             sport: {
               name: a.sports?.name || "other",
@@ -786,9 +791,15 @@ export default function WorkoutsPage() {
       ) : activities.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted mb-4">Aucune activité trouvée</p>
-          <Button variant="secondary" leftIcon={<Plus className="h-4 w-4" />}>
-            Ajouter une nouvelle séance
-          </Button>
+          <p className="text-sm text-muted mb-6">
+            Connectez Strava ou Whoop pour importer automatiquement vos
+            séances.
+          </p>
+          <Link href="/integrations">
+            <Button variant="secondary" leftIcon={<Plug className="h-4 w-4" />}>
+              Connecter une application
+            </Button>
+          </Link>
         </div>
       ) : (
         <>
@@ -801,6 +812,10 @@ export default function WorkoutsPage() {
               const SportIcon = getSportIconComponent(
                 activity.sport.icon ?? undefined
               );
+              const fields = getSportFields(activity.sport.name);
+              const showPower =
+                fields.power && activity.avg_power_watts != null;
+              const showDistance = !showPower && fields.distance;
 
               return (
                 <Link
@@ -851,12 +866,22 @@ export default function WorkoutsPage() {
                             : "--"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4 text-muted" />
-                        <span>
-                          {activity.actual_distance_km?.toFixed(1) || "--"} km
-                        </span>
-                      </div>
+                      {showPower ? (
+                        <div className="flex items-center gap-1.5">
+                          <Gauge className="h-4 w-4 text-muted" />
+                          <span>
+                            {Math.round(activity.avg_power_watts as number)}
+                            <span className="text-muted"> W</span>
+                          </span>
+                        </div>
+                      ) : showDistance ? (
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-4 w-4 text-muted" />
+                          <span>
+                            {activity.actual_distance_km?.toFixed(1) || "--"} km
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center gap-1.5">
                         <Heart className="h-4 w-4 text-error" />
                         <span>
@@ -915,6 +940,10 @@ export default function WorkoutsPage() {
                 const SportIcon = getSportIconComponent(
                   activity.sport.icon ?? undefined
                 );
+                const fields = getSportFields(activity.sport.name);
+                const showPower =
+                  fields.power && activity.avg_power_watts != null;
+                const showDistance = !showPower && fields.distance;
 
                 return (
                   <Link
@@ -954,12 +983,22 @@ export default function WorkoutsPage() {
                             : "--"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4 text-muted" />
-                        <span>
-                          {activity.actual_distance_km?.toFixed(1) || "--"} km
-                        </span>
-                      </div>
+                      {showPower ? (
+                        <div className="flex items-center gap-1.5">
+                          <Gauge className="h-4 w-4 text-muted" />
+                          <span>
+                            {Math.round(activity.avg_power_watts as number)}
+                            <span className="text-muted"> W</span>
+                          </span>
+                        </div>
+                      ) : showDistance ? (
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-4 w-4 text-muted" />
+                          <span>
+                            {activity.actual_distance_km?.toFixed(1) || "--"} km
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center gap-1.5">
                         <Heart className="h-4 w-4 text-error" />
                         <span>
