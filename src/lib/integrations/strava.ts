@@ -156,7 +156,10 @@ export async function getActivities(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to fetch Strava activities");
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch Strava activities (${response.status} ${response.statusText}): ${body}`
+    );
   }
 
   return response.json();

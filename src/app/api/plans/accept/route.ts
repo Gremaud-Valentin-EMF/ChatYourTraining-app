@@ -8,6 +8,7 @@ type PlanSession = {
   duration_minutes?: number;
   description?: string;
   intensity?: string;
+  tss?: number;
 };
 
 type PlanDay = {
@@ -101,6 +102,10 @@ export async function POST(request: Request) {
             status: "planned",
             planned_duration_minutes: session.duration_minutes || null,
             intensity,
+            tss:
+              typeof session.tss === "number" && session.tss > 0
+                ? Math.round(session.tss)
+                : null,
             source: "manual",
           });
         }

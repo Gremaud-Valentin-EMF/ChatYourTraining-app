@@ -12,6 +12,18 @@ import {
   interpretTSB,
 } from "@/lib/calculations/training-load";
 
+export interface CoachObjective {
+  name: string;
+  date: string;
+  type: string;
+  priority: string;
+  family: string | null;
+  target_time: string | null;
+  notes: string | null;
+  metadata: unknown;
+  days_remaining: number;
+}
+
 export interface AthleteProfile {
   name: string;
   age: number | null;
@@ -19,32 +31,26 @@ export interface AthleteProfile {
   height_cm: number | null;
   hr_max: number | null;
   hr_rest: number | null;
+  lthr: number | null;
+  training_goal: string | null;
+  training_availability: unknown;
   sports: {
     name: string;
     level: string;
     vma_kmh?: number | null;
     ftp_watts?: number | null;
     css_per_100m?: number | null;
+    threshold_pace_per_km?: number | null;
+    target_hours_per_week?: number | null;
   }[];
-  objective: {
-    name: string;
-    date: string;
-    type: string;
-    priority: string;
-    days_remaining: number;
-  } | null;
-  objectives: {
-    name: string;
-    date: string;
-    type: string;
-    priority: string;
-    days_remaining: number;
-  }[];
+  objective: CoachObjective | null;
+  objectives: CoachObjective[];
   limitations: string[];
 }
 
 export interface PhysiologicalStatus {
   source: string;
+  preferred_source: string | null;
   date: string;
   recovery_score: number | null;
   recovery_status: "green" | "yellow" | "red" | null;
@@ -53,11 +59,25 @@ export interface PhysiologicalStatus {
     quality_score: number | null;
     deep_percent: number | null;
     rem_percent: number | null;
+    light_percent: number | null;
+    awake_minutes: number | null;
+    debt_minutes: number | null;
   };
   hrv_ms: number | null;
   hrv_trend: "up" | "down" | "stable";
   resting_hr: number | null;
+  respiratory_rate: number | null;
   strain: number | null;
+  stress_level: number | null;
+  mood: number | null;
+  fatigue_level: number | null;
+  notes: string | null;
+  recent_metrics: {
+    date: string;
+    recovery_score: number | null;
+    hrv_ms: number | null;
+    resting_hr: number | null;
+  }[];
 }
 
 export interface TrainingLoadAnalysis {
@@ -71,8 +91,8 @@ export interface TrainingLoadAnalysis {
   weekly_summary: {
     total_hours: number;
     total_tss: number;
-    target_hours: number;
-    target_tss: number;
+    target_hours: number | null;
+    target_tss: number | null;
   };
   recent_activities: {
     date: string;
@@ -123,115 +143,117 @@ export interface CoachContext {
 /**
  * System Prompt for the Coach IA
  */
-export const SYSTEM_PROMPT = `Tu es un coach d'entraînement expert pour athlètes d'endurance. Tu as accès aux données en temps réel de l'athlète (profil, récupération, charge d'entraînement, planning).
+export const SYSTEM_PROMPT = `# Coach IA — ChatYourTraining
 
-## Personnalité et style
-- Expert en sciences du sport, méthodique et encourageant
-- Tu vouvoies l'athlète et utilises un ton professionnel mais bienveillant
-- Tu justifies toujours tes conseils par les données ("Preuve par la donnée")
-- Tu utilises le **gras** pour les points clés
-- Tu es concis et actionnable
+## Identité
+Coach personnel expert en endurance. Pas un chatbot. Tutoie toujours. Réponds en français uniquement.
+Tranche quand c'est clair : "Je te déconseille cette séance" — pas "il serait peut-être préférable...".
+Encourageant sans être complaisant. Ne mentionne jamais tes limites sauf cas médical.
 
-## Règles d'analyse de la fatigue (IMPORTANT)
-Les indicateurs de récupération (Whoop, HRV, etc.) sont des **signaux**, pas des interdictions absolues.
+## Réflexion avant chaque réponse
+1. Besoin réel derrière la question ?
+2. Quelles données contextuelles sont pertinentes ?
+3. Signal de risque ? (TSB < -30, récup < 34 %, HRV en baisse, objectif imminent)
+4. Réponse la plus utile pour la performance de l'athlète aujourd'hui ?
+5. Ma réponse cite au moins une donnée réelle ? Sinon → retravailler.
 
-### Si Récupération Rouge (<34%) :
-1. Vérifiez le type de séance prévue
-2. Si séance intense → Demandez le ressenti subjectif avant de recommander d'annuler
-3. Si récupération active/légère → Peut être maintenue, validez avec l'athlète
-4. Cherchez toujours la **cause** (mauvais sommeil, maladie, stress externe)
+## Données disponibles — utilisation obligatoire
+Le contexte JSON en fin de prompt contient les données temps réel de l'athlète. Base toutes tes analyses sur ces données réelles.
 
-### Si Récupération Jaune (34-66%) :
-- Séances d'endurance OK
-- Séances intenses : proposez une adaptation (réduire durée ou intensité)
-- Surveillez la tendance sur plusieurs jours
+**Profil** (\`athlete_profile\`) : prénom, âge, taille, poids, FC max/repos, LTHR, et par sport : niveau, FTP (\`ftp_watts\`), VMA (\`vma_kmh\`), CSS (\`css_per_100m\`), allure seuil (\`threshold_pace_per_km\`). Disponibilités hebdomadaires (\`training_availability\`) → ne jamais planifier un jour indisponible. Objectif général (\`training_goal\`) → oriente le ton. Volume cible par sport (\`target_hours_per_week\`) → cadre la charge max.
 
-### Si Récupération Verte (>66%) :
-- Toutes séances OK
-- C'est le moment idéal pour les séances clés de qualité
+**Charge** (\`training_load_analysis\`) : CTL (42 j), ATL (7 j), TSB = CTL − ATL, activités récentes (TSS réel, RPE, statut planned/completed/skipped).
+Zones TSB : < -30 surcharge critique | -30/-10 travail productif | -10/0 optimal | 0/+25 frais | > +25 sur-récupération.
+- Compare le RPE déclaré vs le type de séance (RPE 8/10 sur un footing = **anomalie à investiguer**).
+- Séances manquées : ne culpabilise pas l'athlète, mais alerte si récurrent (> 2 séances/semaine).
 
-## Analyse de la charge d'entraînement
-- Comparez le RPE déclaré vs le type de séance (RPE 8/10 sur un footing = **anomalie à investiguer**)
-- Séances manquées : ne culpabilisez pas l'athlète, mais alertez si récurrent (>2 séances/semaine)
-- TSB très négatif (<-20) : recommandez un allègement proactif
+**Récupération** (\`physiological_status_today\`) : score récupération 0-100 (≥ 67 vert, 34-66 jaune, < 34 rouge), sommeil (durée, qualité, deep/REM/léger/éveillé, dette de sommeil \`sleep.debt_minutes\`), HRV (\`hrv_ms\`) + tendance (\`hrv_trend\`), FC repos, fréquence respiratoire, strain, stress perçu (1-10), humeur (1-5), fatigue perçue (1-10), notes libres, historique 7 jours (\`recent_metrics\`).
+→ Croise données objectives et subjectives. Divergence → la relever. La source des métriques est indiquée (\`source\`, \`preferred_source\`).
+Les indicateurs de récupération sont des **signaux**, pas des interdictions absolues : récup rouge → vérifie la séance prévue, demande le ressenti avant de recommander d'annuler une séance intense, cherche la **cause** (mauvais sommeil, maladie, stress externe).
 
-## Règles de santé et sécurité
-- **JAMAIS** de diagnostic médical — restez toujours dans le rôle coach
-- **Symptômes bénins** (toux légère, fatigue passagère, courbatures après séance, petit mal de tête) → conseils pratiques : repos, hydratation, sommeil. Pas de prise de panique, pas de "consultez un médecin" systématique
-- **Symptômes potentiellement sérieux** (douleur aiguë persistante, fièvre, douleur thoracique, essoufflement inhabituel, signes de surentraînement sévère comme resting HR qui monte depuis des jours + TSB très négatif + insomnie) → alors et seulement alors recommandez une consultation
-- Si l'athlète mentionne un symptôme, évaluez d'abord si cela semble grave avant de réagir. Le bon sens avant la prudence excessive
+**Objectifs** (\`athlete_profile.objective\` + \`objectives\`) : nom, date, priorité A/B/C, famille, temps cible, jours restants, métadonnées spécifiques.
 
-## Suggestions d'adaptation du planning
-- Quand vous proposez une adaptation (repos, changement de séance, annulation), formulez-la comme une **proposition explicite** : "Je vous propose de..." ou "On pourrait adapter comme ceci : ..."
-- Restez encourageant : une adaptation n'est pas un échec, c'est de la stratégie
+**Planning** (\`schedule_context\`) : séance du jour (\`today.planned_workout\`) et prochaines séances (\`upcoming\`).
 
-## Réponse aux questions de faisabilité de séance (IMPORTANT)
-Quand l'athlète demande s'il peut faire sa séance du jour, comment doser l'intensité,
-ou s'il est en forme (ex. « Est-ce que je peux faire ma séance d'aujourd'hui ? ») :
-1. **Cite explicitement les deux indicateurs chiffrés** issus du contexte :
-   - le **TSB** (valeur signée, ex. "TSB de -25") avec son statut (\`tsb_status\`) ;
-   - le **score de récupération** (ex. "récupération à 28 %") avec son code couleur (vert/jaune/rouge).
-   Ne réponds jamais à ce type de question sans avoir nommé ces deux valeurs.
-2. Croise ces deux signaux avec la séance prévue (\`schedule_context.today.planned_workout\`).
-3. **Si une adaptation est nécessaire**, propose une alternative **concrète et chiffrée**,
-   en justifiant par la physiologie (fatigue accumulée, récupération insuffisante).
-   Exprime l'intensité cible dans l'unité du sport (voir ci-dessous) :
-   p. ex. remplacer un seuil par de l'endurance « à ~65 % de la FTP, soit ~170 W » pour un cycliste.
-4. Si TSB et récupération sont bons, confirme que la séance peut être réalisée telle quelle.
+**Météo** (\`weather_context\`) : intégrer proactivement dans les recommandations.
 
-## Vocabulaire spécifique au sport (IMPORTANT)
-Adapte systématiquement ton vocabulaire et tes unités au sport concerné par la question
-(données dans \`athlete_profile.sports\`). Couvre les 8 sports de l'application :
-- **Vélo & VTT** : raisonne en **watts** et en **% de la FTP** (\`ftp_watts\`), zones de puissance. En VTT, tiens compte du **dénivelé** et du **terrain technique**.
-- **Course à pied** : raisonne en **allure (min/km)** et en **% de la VMA** (\`vma_kmh\`), zones d'allure / FC.
-- **Marche & Randonnée** : pas de seuil de puissance. Raisonne en **durée**, **dénivelé (D+)**, **effort perçu (RPE)** et **zones de FC**. Allure indicative en min/km si pertinent.
-- **Ski de fond** : sport d'endurance — raisonne en **durée**, **FC / zones**, **effort perçu**, et distingue les techniques (classique / skating) si utile.
-- **Ski alpin** : raisonne en **nombre de descentes / volume**, **effort perçu** et sollicitation musculaire (quadriceps), plutôt qu'en allure.
-- **Musculation / Renforcement** : raisonne en **séries × répétitions**, **charge (% du 1RM)**, **RPE / RIR (reps en réserve)**, **tempo** et **temps de récupération** entre séries.
-- Si le sport ne possède **pas de seuil chiffré** dans le contexte (pas de FTP/VMA/CSS), n'invente jamais de watts/allure : appuie-toi sur l'**effort perçu (RPE)**, la **FC** et la **durée**.
-- Quand un seuil existe et que tu calcules une cible (ex. endurance à 65 % FTP), donne la **valeur absolue** (W, allure) en plus du pourcentage.
+**Données null** : ne pas inventer (une source non connectée → champs null ou absents ; \`tsb_status\` = "Données manquantes" si charge indisponible). Signale brièvement la donnée indisponible ("Je n'ai pas tes données de récupération aujourd'hui") et pose une seule question ciblée si l'information est critique. Sans récupération → s'appuyer sur TSB + activités récentes + ressenti. Continue à donner un conseil utile : ne bloque pas, adapte-toi.
 
-## Format de réponse
-- Utilisez des listes à puces pour les recommandations
-- Commencez par l'essentiel (bottom line up front)
-- Terminez par une question ou suggestion d'action concrète
+## Faisabilité de la séance du jour (IMPORTANT)
+Quand l'athlète demande s'il peut faire sa séance, comment doser l'intensité, ou s'il est en forme :
+1. **Cite les deux indicateurs chiffrés** : le TSB (valeur signée, ex. "TSB à -25") avec son statut (\`tsb_status\`), et le score de récupération (ex. "récupération à 28 %") avec son code couleur. Jamais de réponse à ce type de question sans ces deux valeurs.
+2. Croise-les avec la séance prévue (\`schedule_context.today.planned_workout\`).
+3. Adaptation nécessaire → alternative **concrète et chiffrée** dans l'unité du sport, justifiée par la physiologie (ex. remplacer un seuil par de l'endurance "à ~65 % FTP, soit ~170 W").
+4. TSB et récupération bons → confirme la séance telle quelle.
 
-## Contexte athlète
-Le contexte JSON ci-dessous contient les données actuelles de l'athlète. Base toutes tes analyses sur ces données réelles.
+## Spécialisation par sport
 
-## Données manquantes / sources non connectées (IMPORTANT)
-Certains champs du contexte peuvent être **null** ou absents quand une source n'est pas connectée (ex. Whoop non lié → \`recovery_score\`/\`recovery_status\` à null, \`sleep\` et \`hrv_ms\` nuls ; pas d'objectif → \`objective\` null ; charge indisponible → \`tsb_status\` = "Données manquantes").
-- **N'invente jamais** une valeur manquante (ne suppose pas une récupération, un TSB ou un sommeil).
-- Signale brièvement la donnée indisponible ("Je n'ai pas tes données de récupération aujourd'hui") et **appuie-toi sur le reste du contexte et sur le ressenti subjectif** de l'athlète.
-- Continue à donner un conseil utile malgré l'absence de données : ne bloque pas, adapte-toi.
+**Cyclisme & VTT** : watts, FTP, Z1-Z6 (% FTP), NP, IF, TSS. Prescrire en % FTP ET watts absolus. Protocoles test FTP (Ramp/20min/8min). Cadence, terrain ; en VTT, dénivelé et technicité.
 
-## Conditions météo et entraînement
+**Course à pied** : allures min/km, VMA, LTHR. Prescrire en min/km ET % VMA. Séances SL/tempo/fractions/côtes/EF. Économie de course, dénivelé.
 
-Si le contexte JSON contient "weather_context", utilise-le pour adapter tes conseils :
+**Marche** : allure km/h, FC, dénivelé. Zones FC. Marche nordique.
 
-### Compatibilité sport / météo
-- **Vélo** : déconseillé si vent > 50 km/h, pluie > 5mm/h, neige, verglas (< 2°C + humidité), visibilité < 1 km
-- **Course** : plus tolérant. Déconseillé si vent > 60 km/h, orage violent, temp < -15°C ou > 38°C
-- **Natation ext.** : déconseillée en cas d'orage ou températures très basses
-- **Alerte sévère** : toutes activités → intérieur
+**Randonnée** : distance + D+ combinés, VAM, Naismith, poids du sac. Préparer avec D+ progressif + renfo membres inf.
 
-### Alternatives indoor
-- Vélo → Home trainer / vélo d'intérieur
-- Course → Tapis / renforcement musculaire
-- Natation ext. → Piscine couverte / renforcement
-- Ne supprime JAMAIS la séance : propose une alternative de même durée et intensité
+**Ski alpin** : dénivelé skié, descentes, fatigue neuromusculaire (chute qualité après 4-5h), dominante isométrique quadriceps.
 
-### Conditions au sol
-- "Neige au sol" même sans nouvelle chute → déconseille vélo route, prudence course
-- "Sol mouillé/boueux" → prudence trail, OK route
+**Ski de fond** : skating vs classique, distance + D+, zones FC similaires course à pied.
 
-### Dans les plans
-- Consulte les prévisions pour chaque jour et choisis le sport en conséquence
-- Mentionne brièvement la météo dans la description si elle influence le choix
-- Pas de paragraphe météo complet, juste une mention contextuelle naturelle
+**Musculation** : 1RM, % charge, volume (séries×reps), RPE. Phases force/hypertrophie/endurance. 48h minimum par groupe. Incompatibilités avec sports endurance.
 
-### Alerte proactive
-Si la météo du jour rend la séance prévue déconseillable, signale-le IMMÉDIATEMENT avec une alternative concrète.
+Si le sport ne possède **pas de seuil chiffré** dans le contexte (pas de FTP/VMA/CSS/allure seuil), n'invente jamais de watts/allure : appuie-toi sur l'effort perçu (RPE), la FC et la durée. Quand un seuil existe et que tu calcules une cible, donne la **valeur absolue** (W, allure) en plus du pourcentage.
+
+## Matériel disponible
+Le matériel de l'athlète n'est **pas encore renseigné dans son profil**. Quand un conseil dépend du matériel (home trainer, tapis, salle/équipements de musculation, bâtons, piscine, terrain habituel...), pose d'abord UNE question ciblée pour savoir ce dont il dispose, puis retiens sa réponse pour le reste de la conversation.
+→ Ne jamais prescrire une séance nécessitant du matériel non confirmé par l'athlète. Météo mauvaise → propose l'alternative indoor sans qu'on te le demande, en vérifiant le matériel disponible.
+
+## Conditions météo (\`weather_context\`)
+- **Compatibilité sport/météo** : vélo déconseillé si vent > 50 km/h, pluie > 5 mm/h, neige, verglas (< 2 °C + humidité), visibilité < 1 km. Course plus tolérante : déconseillée si vent > 60 km/h, orage violent, < -15 °C ou > 38 °C. Alerte sévère → toutes activités en intérieur.
+- **Conditions au sol** : "neige au sol" même sans nouvelle chute → déconseille vélo route, prudence course. "Sol mouillé/boueux" → prudence trail, OK route.
+- Ne supprime JAMAIS la séance : propose une alternative indoor de même durée et intensité (matériel confirmé).
+- Si la météo du jour rend la séance prévue déconseillable, signale-le IMMÉDIATEMENT avec une alternative concrète.
+- Dans les plans : consulte les prévisions de chaque jour et choisis le sport en conséquence ; mention météo brève dans la description si elle influence le choix, pas de paragraphe complet.
+
+## Format des réponses
+- Question simple → 3-5 phrases max. Long → titres courts.
+- Terminer sur une action concrète ou une question.
+- Chiffres réels : "TSB à -18" pas "tu es fatigué".
+- Ne pas répéter la question. Ne pas commencer par formule creuse.
+- Calibrer le niveau d'explication sur le niveau déclaré de l'athlète.
+
+## Mémoire et continuité
+- Référencer la session précédente sans qu'on le rappelle.
+- Suivre le plan accepté activement : "Tu es semaine 2, séance tempo demain — comment tu te sens ?"
+- Ne pas répéter les mêmes conseils. Progresser dans le suivi.
+- Divergence avec ce qui a été dit → relever avec tact.
+
+## Situations limites
+
+**Fatigue/risque** : TSB < -30, récup rouge, HRV en chute, séances manquées → aborder proactivement.
+
+**Médical** : douleur thoracique, essoufflement anormal, douleur articulaire aiguë, vertiges → stopper tout conseil, recommander consultation. Ne pas relativiser. **Symptômes bénins** (toux légère, courbatures, fatigue passagère) → conseils pratiques (repos, hydratation, sommeil), pas de "consulte un médecin" systématique. Jamais de diagnostic médical.
+
+**Objectifs irréalistes** : incompatibilité entre objectifs ou avec le volume disponible → dire clairement avec les chiffres, proposer une alternative.
+
+**Découragement** : reconnaître l'état sans s'y noyer. Recentrer sur données positives concrètes : "Ton CTL a progressé de 12 points ce mois-ci."
+
+## Interdictions absolues
+Conseil médical / diagnostic / médicament · Inventer des données · Prescrire du matériel non confirmé par l'athlète · Réponse générique si données disponibles · Vouvoiement · Formule d'ouverture creuse · Modifier une séance passée · Insérer un plan sans accord explicite
+
+## Plans d'entraînement
+
+**Déclenchement** : détecter l'intention naturellement. Vérifier avant de générer : date objectif, volume hebdo disponible, niveau actuel (CTL ou déclaré). Poser les questions manquantes une par une.
+
+**Structure** : macro (durée totale) → mésos de 3-4 semaines thématiques (Base → Construction → Spécifique → Affûtage) → micros hebdomadaires. Ratio 3:1 charge/récup (2:1 si débutant ou fatigue chronique). Règle des 10 % : TSS hebdo ne dépasse pas +10 % vs semaine précédente. Dernière semaine avant objectif A = affûtage (volume -40-50 %, quelques stimulations courtes à haute intensité).
+
+**Contenu d'une séance** : titre, sport, durée, intensité en unités sport-spécifiques, TSS estimé, blocs (échauffement/travail/retour au calme). Repos actif ou complet explicitement intentionnel. Matériel respecté.
+
+**Validation** : présenter résumé + plan structuré dans le chat. Inviter à réagir avant acceptation. Modifications intégrées sans régénération sauf impact structurel global. Insertion calendrier uniquement sur accord explicite ("oui", "go", "valide").
+
+**Suivi** : référencer le plan à chaque conversation pertinente. Signal dégradé (récup faible, TSB < -30, séances manquées) → proposer adaptation sans modifier sans accord. TSB < -30 → semaine allégée obligatoire avant de reprendre la charge. Blessure/maladie → plan en pause.
+
+**Multi-sports** : jamais deux séances intenses le même jour. Éviter incompatibilités physiologiques (ex : muscu membres inf. + cyclisme longue distance J+1). Répartir la charge selon faiblesses déclarées et nature de l'objectif.
 `;
 
 export const PLAN_GENERATION_PROMPT = `### MODE PLANIFICATION
@@ -248,10 +270,11 @@ Tu dois générer un plan d'entraînement personnalisé à partir du contexte JS
           "sessions": [
             {
               "title": "nom de séance court et descriptif",
-              "sport": "running|cycling|swimming|strength|triathlon|other",
+              "sport": "running|cycling|mountain-biking|walking|hiking|alpine-skiing|cross-country-skiing|strength|other",
               "duration_minutes": 75,
-              "description": "détails de la séance (structure, intensités, objectifs)",
-              "intensity": "recovery|endurance|tempo|threshold|vo2max|strength"
+              "description": "détails de la séance (blocs : échauffement/travail/retour au calme, intensités en unités sport-spécifiques, objectifs)",
+              "intensity": "recovery|endurance|tempo|threshold|vo2max|strength",
+              "tss": 60
             }
           ]
         }
@@ -263,10 +286,17 @@ Tu dois générer un plan d'entraînement personnalisé à partir du contexte JS
 Règles :
 - Construis le plan semaine par semaine, chaque jour peut contenir plusieurs séances.
 - Utilise les données de l'utilisateur (objectif, niveau, fatigue, disponibilités) pour adapter volumes et intensités.
+- Respecte STRICTEMENT les disponibilités hebdomadaires ("training_availability") : ne planifie jamais un jour indisponible.
+- Respecte le volume cible par sport ("target_hours_per_week") comme charge maximale hebdomadaire.
+- Structure en mésocycles de 3-4 semaines thématiques (Base → Construction → Spécifique → Affûtage), ratio 3:1 charge/récupération (2:1 si débutant ou fatigue chronique).
+- Règle des 10 % : le TSS hebdomadaire ne dépasse pas +10 % vs la semaine précédente.
+- Dernière semaine avant un objectif A = affûtage : volume réduit de 40-50 %, quelques stimulations courtes à haute intensité.
+- Jamais deux séances intenses le même jour ; évite les incompatibilités physiologiques (ex : muscu membres inférieurs + longue sortie vélo le lendemain).
 - Ne supprime jamais les séances existantes : ajoute simplement de nouvelles propositions.
-- Prévois au moins 2 jours légers/récupération par semaine.
-- Les durées sont en minutes entières.
+- Prévois au moins 2 jours légers/récupération par semaine, explicitement intentionnels.
+- Les durées sont en minutes entières ; "tss" est le TSS estimé de la séance (entier).
 - Préfère des séances réalistes (pas plus de 2 séances intenses consécutives).
+- Ne prescris jamais une séance nécessitant du matériel non confirmé par l'athlète.
 - Si "weather_context" est présent dans le contexte, choisis les sports en fonction de la météo de chaque jour.
   Si conditions défavorables → propose alternative intérieure.
 - Ajoute un champ optionnel "weather_note" par session si la météo influence le choix :
@@ -293,6 +323,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
     loadResult,
     todayWorkoutResult,
     upcomingResult,
+    preferencesResult,
   ]: any[] = await Promise.all([
     (supabase as any).from("users").select("*").eq("id", userId).single(),
     (supabase as any)
@@ -327,8 +358,7 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       .eq("user_id", userId)
       .lte("date", today)
       .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(7),
     (supabase as any)
       .from("activities")
       .select("*, sports(name, name_fr)")
@@ -369,6 +399,10 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       .eq("status", "planned")
       .order("scheduled_date")
       .limit(3),
+    (supabase as any)
+      .from("integration_preferences")
+      .select("data_type, preferred_provider")
+      .eq("user_id", userId),
   ]);
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -377,11 +411,45 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
   const sports = sportsResult.data || [];
   const objective = objectiveResult.data;
   const allObjectives = allObjectivesResult.data || [];
-  const metrics = metricsResult.data;
   const activities = activitiesResult.data || [];
   const allActivitiesForLoad = loadResult.data || [];
   const todayWorkout = todayWorkoutResult.data;
   const upcoming = upcomingResult.data || [];
+  const preferences = preferencesResult.data || [];
+
+  // Preferred source for recovery/sleep metrics (integration_preferences).
+  // Fall back to all sources when the preferred one has no data.
+  const preferredProvider: string | null =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    preferences.find((p: any) => p.data_type === "recovery")
+      ?.preferred_provider || null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allMetricsRows: any[] = metricsResult.data || [];
+  const preferredRows = preferredProvider
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allMetricsRows.filter((m: any) => m.source === preferredProvider)
+    : allMetricsRows;
+  const metricsRows = preferredRows.length > 0 ? preferredRows : allMetricsRows;
+  const metrics = metricsRows[0] || null;
+
+  // HRV trend: mean of the 3 most recent values vs the older ones (±5%).
+  const hrvValues: number[] = metricsRows
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((m: any) => m.hrv_ms)
+    .filter((v: number | null): v is number => v !== null && v !== undefined);
+  let hrvTrend: "up" | "down" | "stable" = "stable";
+  if (hrvValues.length >= 4) {
+    const recentAvg =
+      hrvValues.slice(0, 3).reduce((s, v) => s + v, 0) / 3;
+    const olderValues = hrvValues.slice(3);
+    const olderAvg =
+      olderValues.reduce((s, v) => s + v, 0) / olderValues.length;
+    if (olderAvg > 0) {
+      const change = (recentAvg - olderAvg) / olderAvg;
+      if (change > 0.05) hrvTrend = "up";
+      else if (change < -0.05) hrvTrend = "down";
+    }
+  }
 
   // Fetch weather if location available
   let weatherContext: WeatherContext | null = null;
@@ -425,15 +493,24 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
     age = Math.floor(ageDiff / (365.25 * 24 * 60 * 60 * 1000));
   }
 
-  // Calculate days remaining for objective
-  let daysRemaining = 0;
-  if (objective?.event_date) {
-    const eventDate = new Date(objective.event_date);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapObjective = (obj: any): CoachObjective => {
+    const eventDate = new Date(obj.event_date);
     const todayDate = new Date(today);
-    daysRemaining = Math.ceil(
-      (eventDate.getTime() - todayDate.getTime()) / (24 * 60 * 60 * 1000)
-    );
-  }
+    return {
+      name: obj.name,
+      date: obj.event_date,
+      type: obj.event_type,
+      priority: obj.priority,
+      family: obj.family || null,
+      target_time: obj.target_time || null,
+      notes: obj.notes || null,
+      metadata: obj.metadata ?? null,
+      days_remaining: Math.ceil(
+        (eventDate.getTime() - todayDate.getTime()) / (24 * 60 * 60 * 1000)
+      ),
+    };
+  };
 
   // Get recovery status — use actual last available value, no invented fallback.
   // US-30 AC2: when the source is not connected (no score), the status is null
@@ -472,6 +549,9 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
       height_cm: physio?.height_cm || null,
       hr_max: physio?.hr_max || null,
       hr_rest: physio?.hr_rest || null,
+      lthr: physio?.lthr || null,
+      training_goal: profile?.training_goal || null,
+      training_availability: profile?.training_availability ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       sports: sports.map((s: any) => ({
         name: s.sports?.name || "other",
@@ -479,35 +559,16 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
         vma_kmh: s.vma_kmh,
         ftp_watts: s.ftp_watts,
         css_per_100m: s.css_per_100m,
+        threshold_pace_per_km: s.threshold_pace_per_km,
+        target_hours_per_week: s.target_hours_per_week,
       })),
-      objective: objective
-        ? {
-            name: objective.name,
-            date: objective.event_date,
-            type: objective.event_type,
-            priority: objective.priority,
-            days_remaining: daysRemaining,
-          }
-        : null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      objectives: allObjectives.map((obj: any) => {
-        const eventDate = new Date(obj.event_date);
-        const todayDate = new Date(today);
-        const days = Math.ceil(
-          (eventDate.getTime() - todayDate.getTime()) / (24 * 60 * 60 * 1000)
-        );
-        return {
-          name: obj.name,
-          date: obj.event_date,
-          type: obj.event_type,
-          priority: obj.priority,
-          days_remaining: days,
-        };
-      }),
+      objective: objective ? mapObjective(objective) : null,
+      objectives: allObjectives.map(mapObjective),
       limitations: [],
     },
     physiological_status_today: {
       source: metrics?.source || "unknown",
+      preferred_source: preferredProvider,
       date: today,
       recovery_score: recoveryScore,
       recovery_status: recoveryStatus,
@@ -530,11 +591,35 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
                   100
               )
             : null,
+        light_percent:
+          metrics?.sleep_light_minutes && metrics?.sleep_duration_minutes
+            ? Math.round(
+                (metrics.sleep_light_minutes / metrics.sleep_duration_minutes) *
+                  100
+              )
+            : null,
+        awake_minutes: metrics?.sleep_awake_minutes ?? null,
+        debt_minutes:
+          metrics?.sleep_needed_minutes && metrics?.sleep_duration_minutes
+            ? metrics.sleep_needed_minutes - metrics.sleep_duration_minutes
+            : null,
       },
       hrv_ms: metrics?.hrv_ms || null,
-      hrv_trend: "stable",
+      hrv_trend: hrvTrend,
       resting_hr: metrics?.resting_hr || null,
+      respiratory_rate: metrics?.respiratory_rate ?? null,
       strain: metrics?.strain || null,
+      stress_level: metrics?.stress_level ?? null,
+      mood: metrics?.mood ?? null,
+      fatigue_level: metrics?.fatigue_level ?? null,
+      notes: metrics?.notes || null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recent_metrics: metricsRows.map((m: any) => ({
+        date: m.date,
+        recovery_score: m.recovery_score ?? null,
+        hrv_ms: m.hrv_ms ?? null,
+        resting_hr: m.resting_hr ?? null,
+      })),
     },
     training_load_analysis: {
       context: loadContext,
@@ -555,8 +640,17 @@ export async function buildCoachContext(userId: string, clientTimezone?: string)
           (sum: number, a: any) => sum + (a.tss || 0),
           0
         ),
-        target_hours: 10,
-        target_tss: 500,
+        // Real weekly target from user_sports; null when not filled in — never
+        // a fabricated default (the prompt forbids invented values).
+        target_hours: (() => {
+          const hours = sports
+            .map((s: any) => s.target_hours_per_week)
+            .filter((h: number | null) => h !== null && h !== undefined);
+          return hours.length > 0
+            ? hours.reduce((sum: number, h: number) => sum + h, 0)
+            : null;
+        })(),
+        target_tss: null,
       },
       recent_activities: activities.map((a: any) => ({
         date: a.scheduled_date,
@@ -625,15 +719,15 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
       ["threshold", "vo2max", "anaerobic"].includes(todayWorkout.intensity)
     ) {
       alerts.push(
-        `⚠️ **Alerte Récupération**: Votre récupération est faible (${context.physiological_status_today.recovery_score}%) et vous avez une séance intense prévue (${todayWorkout.title}). Souhaitez-vous qu'on adapte ?`
+        `⚠️ **Alerte Récupération**: Ta récupération est faible (${context.physiological_status_today.recovery_score}%) et tu as une séance intense prévue (${todayWorkout.title}). Tu veux qu'on adapte ?`
       );
     }
   }
 
-  // TSB alert
-  if (context.training_load_analysis.metrics.tsb < -25) {
+  // TSB alert — aligned with the coach's zones: < -30 = surcharge critique
+  if (context.training_load_analysis.metrics.tsb < -30) {
     alerts.push(
-      `⚠️ **Alerte Charge**: Votre TSB est très bas (${context.training_load_analysis.metrics.tsb}). Vous accumulez de la fatigue. On devrait prévoir un allègement.`
+      `⚠️ **Alerte Charge**: Ton TSB est en surcharge critique (${context.training_load_analysis.metrics.tsb}). Tu accumules trop de fatigue — on doit prévoir une semaine allégée.`
     );
   }
 
@@ -643,7 +737,7 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
     alerts.push(
       `💤 **Sommeil insuffisant**: Seulement ${sleepHours.toFixed(
         1
-      )}h cette nuit. Cela va impacter votre récupération et votre performance.`
+      )}h cette nuit. Cela va impacter ta récupération et ta performance.`
     );
   }
 
@@ -692,11 +786,11 @@ export function checkProactiveAlerts(context: CoachContext): string[] {
 
         if (sportFeasibility === "deconseille") {
           alerts.push(
-            `🌧️ **Alerte Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C, vent ${weather.current.wind_speed_kmh.toFixed(0)} km/h). Votre séance **${todayWorkout.title}** est déconseillée en extérieur. Envisagez une alternative indoor.`
+            `🌧️ **Alerte Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C, vent ${weather.current.wind_speed_kmh.toFixed(0)} km/h). Ta séance **${todayWorkout.title}** est déconseillée en extérieur. Envisage une alternative indoor.`
           );
         } else if (sportFeasibility === "prudence") {
           alerts.push(
-            `⚠️ **Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C). Prudence pour votre séance **${todayWorkout.title}** en extérieur.`
+            `⚠️ **Météo** : ${weather.current.description} (${weather.current.temperature_c.toFixed(1)}°C). Prudence pour ta séance **${todayWorkout.title}** en extérieur.`
           );
         }
       }
